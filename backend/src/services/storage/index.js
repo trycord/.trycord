@@ -121,6 +121,7 @@ function objectKey(owner, ownerId, kind, objectId) {
 const key = {
   userMedia: (userId, kind, objectId) => objectKey('user', userId, kind, objectId),
   communityMedia: (serverId, kind, objectId) => objectKey('community', serverId, kind, objectId),
+  conversationMedia: (conversationId, kind, objectId) => objectKey('conversation', conversationId, kind, objectId),
   // Scoped by channel rather than message: an attachment is uploaded before the
   // message exists, and re-keying it on attach would mean a failed attach loses
   // the object. The channel is stable for the life of the attachment.

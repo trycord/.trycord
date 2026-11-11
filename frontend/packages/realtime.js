@@ -8,7 +8,7 @@
 
 import Api from './api.js';
 import { TrycordConfig } from './config.js';
-import { State, on as onState } from './store.js';
+import { State, on as onState, setPresence as storePresence } from './store.js';
 
 export const EVENTS = {
   MESSAGE: 'message',
@@ -25,6 +25,10 @@ export const EVENTS = {
   DM_MESSAGE_EMBEDS: 'dm:message_embeds',
   DM_READ: 'dm:read',
   DM_TYPING: 'dm:typing',
+  DM_CONVERSATION_UPDATED: 'dm:conversation_updated',
+  DM_PINNED: 'dm:pinned',
+  DM_UNPINNED: 'dm:unpinned',
+  DM_INVITE: 'dm:invite',
 
   PRESENCE: 'presence',
   NOTIFICATION: 'notification',
@@ -83,7 +87,11 @@ let socket = null;
 let reconnectTimer = null;
 let reconnectDelay = 1000;
 let stopped = true;
-let joinedServer = null;
+// Every community this client has on screen lives in its own server room, so
+// a change to any of them - a new channel, a role, a member - arrives as it
+// happens. One room per socket made the rail go stale behind the page that
+// was open.
+let joinedServers = new Set();
 let joinedChannel = null;
 let joinedDm = null;
 let typingTimer = 0;
@@ -137,7 +145,7 @@ async function open() {
   socket.addEventListener('open', () => {
     reconnectDelay = 1000;
     setStatus('online');
-    if (joinedServer) sendRaw({ type: 'join-server', serverId: joinedServer });
+    for (const id of joinedServers) sendRaw({ type: 'join-server', serverId: id });
     if (joinedChannel) sendRaw({ type: 'join', channelId: joinedChannel });
     if (joinedDm) sendRaw({ type: 'dm:join', conversationId: joinedDm });
     emit('open', {});
@@ -149,7 +157,11 @@ async function open() {
     if (!message || !message.type) return;
     emit(message.type, message);
     if (message.type === EVENTS.PRESENCE && message.userId) {
-      State.presence.set(String(message.userId), message.presence || 'offline');
+      // Store first: every page that draws a dot listens to the store, and the
+      // old path wrote the map directly so those pages never repainted. The
+      // chrome event stays for the shell and for any listener that wants the
+      // raw frame.
+      storePresence(String(message.userId), message.presence || 'offline');
       emit('presence-changed', message);
     }
   });
@@ -178,7 +190,7 @@ export function connect() {
 export function disconnect() {
   stopped = true;
   clearTimeout(reconnectTimer);
-  joinedServer = null;
+  joinedServers = new Set();
   joinedChannel = null;
   joinedDm = null;
   if (socket) {
@@ -189,13 +201,26 @@ export function disconnect() {
 }
 
 export function joinServer(serverId) {
-  joinedServer = serverId || null;
-  if (joinedServer) sendRaw({ type: 'join-server', serverId: joinedServer });
+  const id = serverId === undefined || serverId === null ? null : String(serverId);
+  if (!id) return;
+  // Joining a room twice is one frame the first time: every refresh of the
+  // community list lands here, and the socket needs the room once.
+  if (joinedServers.has(id)) return;
+  joinedServers.add(id);
+  sendRaw({ type: 'join-server', serverId: id });
 }
 
-export function leaveServer() {
-  joinedServer = null;
-  sendRaw({ type: 'leave-server' });
+export function leaveServer(serverId) {
+  // No argument: leave every room (signing out of one community's screen is
+  // the caller's business; leaving the app is sign-out's).
+  if (serverId === undefined || serverId === null) {
+    for (const id of joinedServers) sendRaw({ type: 'leave-server', serverId: id });
+    joinedServers = new Set();
+    return;
+  }
+  const id = String(serverId);
+  if (!joinedServers.delete(id)) return;
+  sendRaw({ type: 'leave-server', serverId: id });
 }
 
 export function joinChannel(channelId) {
@@ -230,7 +255,7 @@ export function typing(conversationId) {
 }
 
 export function inspect() {
-  return { status, socket: !!socket, server: joinedServer, channel: joinedChannel, dm: joinedDm };
+  return { status, socket: !!socket, servers: [...joinedServers], channel: joinedChannel, dm: joinedDm };
 }
 
 const TrycordRealtime = {

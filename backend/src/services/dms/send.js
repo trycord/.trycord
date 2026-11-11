@@ -55,6 +55,19 @@ async function send(userId, username, conversationId, body) {
 
   const nonce = String(input.clientNonce || '').trim().slice(0, 64) || null;
 
+  // Every row this function returns describes its author the way the history
+  // read does; the live broadcast spreads the same object, so a message drawn
+  // as it arrives carries the author's face rather than initials.
+  const author = await db.get(
+    'SELECT display_name, avatar_url, is_bot FROM users WHERE id = ?',
+    [userId]
+  );
+  const authorBlock = {
+    authorName: (author && (author.display_name || author.username)) || username,
+    authorAvatar: (author && author.avatar_url) || null,
+    authorIsBot: !!(author && author.is_bot),
+  };
+
   if (nonce) {
     const existing = await db.get(
       DEDUPE_SELECT + ' WHERE dm.conversation_id = ? AND dm.client_nonce = ? AND dm.author_id = ?',
@@ -72,7 +85,7 @@ async function send(userId, username, conversationId, body) {
         createdAt: existing.created_at,
         editedAt: null,
         authorId: existing.author_id,
-        authorName: username,
+        ...authorBlock,
         threadRootId: existing.thread_root_id || null,
         attachments: await uploads.getForDmMessage(existing.id),
         deduped: true,
@@ -140,7 +153,7 @@ async function send(userId, username, conversationId, body) {
     createdAt: msg.created_at,
     editedAt: null,
     authorId: userId,
-    authorName: username,
+    ...authorBlock,
     threadRootId,
     attachments,
   };

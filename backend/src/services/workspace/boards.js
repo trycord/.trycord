@@ -219,7 +219,7 @@ async function recordActivity(conn, cardId, serverId, actorId, field, from, to) 
 async function notifyAssignee(assigneeId, actorId, cardId) {
   if (!assigneeId || String(assigneeId) === String(actorId)) return;
   try {
-    await notifications.create(assigneeId, 'mention', actorId, cardId);
+    await notifications.create(assigneeId, 'card_assigned', actorId, cardId);
   } catch (e) {
     // A card that was saved must not be lost because a notification could
     // not be written. The failure is logged rather than swallowed.
@@ -251,7 +251,7 @@ async function dueReminderJob({ cardId }) {
   if (!card) return { skipped: 'card not found' };
   if (!card.assignee_id) return { skipped: 'card has no assignee' };
   try {
-    await notifications.create(card.assignee_id, 'mention', card.created_by, card.id);
+    await notifications.create(card.assignee_id, 'card_assigned', card.created_by, card.id);
   } catch (e) {
     console.warn('[workspace] could not send the due-date reminder for card ' + card.id + ': ' + (e && e.message));
   }

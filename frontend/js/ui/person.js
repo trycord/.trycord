@@ -122,9 +122,15 @@ async function copyHandle(user) {
   }
 }
 
-// A report needs a reason and the words a moderator reads first. The person
-// reported is never told who filed it.
-function raiseReport(user) {
+// The report dialog, shared by everything that can be reported: a person
+// (from their menu) or a message (from the message menu). A report needs a
+// reason and the words a moderator reads first. The person reported is never
+// told who filed it. `payload` turns the two answers into the request body,
+// so the caller decides what is being reported and where it lives.
+export function reportDialog(options) {
+  const opts = options || {};
+  const who = opts.who ? ' ' + opts.who : '';
+
   const reason = el('select', { class: 'input', 'aria-label': 'Reason' }, ...[
     ['harassment', 'Harassment or abuse'],
     ['spam', 'Spam or a scam'],
@@ -141,23 +147,38 @@ function raiseReport(user) {
   const send = el('button', { class: 'btn btn--primary', type: 'button' }, 'Send report');
 
   const body = el('div', { class: 'form-stack' },
-    el('p', { class: 'form-note' }, 'This goes to whoever moderates this instance. ' + nameOf(user) + ' is not told who filed it.'),
+    el('p', { class: 'form-note' }, opts.who
+      ? 'This goes to whoever moderates this instance. ' + opts.who + ' is not told who filed it.'
+      : 'This goes to whoever moderates this instance. Nobody is told who filed it.'),
     el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'Reason'), reason),
     el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'What happened'), detail));
 
-  const dialog = openDialog({ title: 'Report ' + nameOf(user), foot: [cancel, send] });
+  const dialog = openDialog({ title: opts.title || 'Send a report', foot: [cancel, send] });
   dialog.element.insertBefore(body, dialog.element.querySelector('.dialog-foot'));
   cancel.addEventListener('click', () => dialog.close());
   send.addEventListener('click', async () => {
     send.disabled = true;
     try {
-      await Api.reports({ targetType: 'user', targetId: user.id, reason: reason.value, description: detail.value.trim() });
+      await Api.reports(Object.assign(
+        { reason: reason.value, description: detail.value.trim() },
+        opts.payload ? opts.payload(reason.value, detail.value.trim()) : {}
+      ));
       dialog.close();
       toast('Report sent. Thank you.', { type: 'success' });
     } catch (error) {
       errorToast(error);
       send.disabled = false;
     }
+  });
+}
+
+function raiseReport(user) {
+  reportDialog({
+    title: 'Report ' + nameOf(user),
+    who: nameOf(user),
+    payload: (reason, description) => ({
+      targetType: 'user', targetId: user.id, reason, description,
+    }),
   });
 }
 
@@ -235,4 +256,4 @@ export function personContextMenu(node, raw, options) {
   attachContextMenu(node, () => personSheetEntries(raw, options), options);
 }
 
-export default { personSheetEntries, personSheet, personContextMenu, isSelf };
+export default { personSheetEntries, personSheet, personContextMenu, reportDialog, isSelf };

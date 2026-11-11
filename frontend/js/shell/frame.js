@@ -104,6 +104,12 @@ export function buildFrame() {
     'aria-label': 'Show navigation', 'aria-expanded': 'true',
   }, icon('sidebar', { size: 18 }));
 
+  const sidebarButton = el('button', {
+    class: 'cmdbar-sidebar icon-btn', type: 'button',
+    'aria-label': 'Toggle sidebar',
+    'title': 'Toggle sidebar',
+  }, icon('sidebar', { size: 18 }));
+
   const kbd = el('kbd', { class: 'cmdbar-kbd' });
   const omnibox = el('button', {
     class: 'cmdbar-omni', type: 'button', 'aria-haspopup': 'dialog',
@@ -124,7 +130,7 @@ export function buildFrame() {
     hidden: true,
   }, icon('panel-left', { size: 18 }));
   const commandBar = el('header', { class: 'cmdbar', id: 'command-bar', 'aria-label': 'Command bar' },
-    navToggle, omnibox, el('div', { class: 'spacer' }), inspectorToggle, connection, alertsSlot);
+    sidebarButton, navToggle, omnibox, el('div', { class: 'spacer' }), inspectorToggle, connection, alertsSlot);
 
   // -- the rail --------------------------------------------------------------
   const rail = el('nav', {

@@ -127,7 +127,8 @@ function signHeaders(method, key, query, extraHeaders, payloadHash) {
   const date = new Date();
   const stamp = amzDate(date);
   const headers = { ...baseHeaders(payloadHash, stamp), ...(extraHeaders || {}) };
-  const { scope, signature } = sign({ method, key, query, headers, payloadHash, date });
+  // Use the same date stamp in sign() as in baseHeaders()
+  const { scope, signature } = sign({ method, key, query, headers, payloadHash, date: stamp });
   const signedList = Object.keys(headers)
     .map((h) => h.toLowerCase())
     .sort()

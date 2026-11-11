@@ -23,10 +23,9 @@ router.use(rateLimit({ windowMs: 60000, max: 60 }));
 router.get('/', wrap(async (req, res) => {
   const report = await diagnostics.report();
   // Reading the diagnostics is an operator action, and it is written down.
-  await db.run(
-    `INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, reason, created_at)
-     VALUES (?, ?, 'read_diagnostics', 'instance', NULL, ?, ?)`,
-    [uuid(), req.user.id, JSON.stringify({ overall: report.overall }), now()]
+  await require('../services/audit').record(
+    req.user.id, 'read_diagnostics', 'instance', null,
+    JSON.stringify({ overall: report.overall })
   ).catch(() => { /* the audit trail must never block the reading */ });
   res.json(report);
 }));

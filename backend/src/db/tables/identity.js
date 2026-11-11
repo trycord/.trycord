@@ -30,6 +30,15 @@ module.exports = (engine) => [
       avatar_url VARCHAR(512),
       banner_url VARCHAR(512),
       status_text VARCHAR(128),
+      -- The presence the account chooses to publish: online, idle, dnd or
+      -- invisible. NULL means "no choice made" and is read as online. The
+      -- socket registry still decides whether the account is connected; this
+      -- column is the account's own answer about how to present that.
+      presence_status VARCHAR(16),
+      -- The last time the account was seen connected. Used only to put a
+      -- friend who is offline now but was around recently ahead of one who
+      -- has not opened the app in weeks. Not a precise tracking log.
+      last_active_at VARCHAR(64),
       -- Server-controlled bot identity. Was reachable only through the
       -- migration lists, so a freshly created database had the column added by
       -- the first boot's ALTER rather than by the schema itself. publicUser()
@@ -60,6 +69,10 @@ module.exports = (engine) => [
 
   `CREATE TABLE IF NOT EXISTS admins (
       user_id VARCHAR(64) PRIMARY KEY,
+      -- Platform authority is a role, not a boolean. Existing rows are
+      -- promoted to PLATFORM_ADMIN by the migration, which preserves the
+      -- behaviour they had before granular roles existed.
+      role VARCHAR(32) NOT NULL DEFAULT 'PLATFORM_ADMIN',
       created_at VARCHAR(64) NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,

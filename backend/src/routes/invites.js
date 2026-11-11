@@ -7,6 +7,8 @@ const { resolveServer, requirePerm } = require('../middleware/serverAccess');
 const { fail, serviceError } = require('../errors');
 const invites = require('../services/invites');
 const events = require('../services/events');
+const notifications = require('../services/notifications');
+const db = require('../db');
 
 // --- per-server management (MANAGE_INVITES) ---
 const managed = express.Router({ mergeParams: true });
@@ -20,8 +22,8 @@ managed.get('/', requirePerm('MANAGE_INVITES'), async (req, res, next) => {
 
 managed.post('/', auth.requireVerified, requirePerm('MANAGE_INVITES'), async (req, res, next) => {
   try {
-    const { maxUses, expiresInHours } = req.body || {};
-    const inv = await invites.create(req.server.id, req.user.id, { maxUses, expiresInHours });
+    const { maxUses, expiresInHours, code } = req.body || {};
+    const inv = await invites.create(req.server.id, req.user.id, { maxUses, expiresInHours, code });
     events.emit(req.server.id, 'invite_created', { invite: inv });
     res.json(inv);
   } catch (e) { serviceError(res, e); }
@@ -36,6 +38,37 @@ managed.delete('/:inviteId', auth.requireVerified, requirePerm('MANAGE_INVITES')
     res.json(out);
   } catch (e) { next(e); }
 });
+
+// Send an existing invite to one person as a notification.
+//
+// The invite code is the reference: the recipient already has the join route,
+// and putting the code in the notification means they do not have to be sent a
+// link in a different app. This does not create a second invite and does not
+// bypass the code's own limits; it only tells somebody it exists.
+managed.post('/:inviteId/notify', auth.requireVerified,
+  rateLimit({ windowMs: 60000, max: 20 }), requirePerm('MANAGE_INVITES'), async (req, res, next) => {
+    try {
+      const userId = String((req.body || {}).userId || '');
+      if (!userId) return fail(res, 'VALIDATION_ERROR', '`userId` is required');
+      const inv = await invites.getById(req.params.inviteId);
+      if (!inv || inv.server_id !== req.server.id) return fail(res, 'NOT_FOUND', 'invite not found');
+      const member = await db.get(
+        'SELECT 1 FROM server_members WHERE server_id = ? AND user_id = ?',
+        [req.server.id, userId]
+      );
+      if (member) return fail(res, 'ALREADY_MEMBER', 'they are already in this community');
+      const target = await db.get('SELECT id FROM users WHERE id = ?', [userId]);
+      if (!target) return fail(res, 'NOT_FOUND', 'user not found');
+      const { notification, held, suppressed } = await notifications.create(
+        userId, 'community_invite', req.user.id, inv.code,
+        { detail: req.server.name, dedupeKey: 'community-invite:' + inv.id + ':' + userId }
+      );
+      if (notification && !held) {
+        events.emitTo(userId, 'notification', { notification });
+      }
+      res.json({ notified: !!notification, held: !!held, suppressed: !!suppressed });
+    } catch (e) { serviceError(res, e); }
+  });
 
 // --- code-scoped: preview (authed) + join (authed, validated, atomic) ---
 const byCode = express.Router();

@@ -1,146 +1,51 @@
-// The Mobile router.
+// The router.
 //
-// One place turns an address into a mobile screen. It reads the same registry the
-// desktop router reads - the addresses of the product are the platform's, not a
-// module's - resolves whatever the screen needs from the store, and paints the
-// mobile shell from the renderer's answer.
+// One place turns an address into a phone screen. It reads the same registry
+// the desktop reads — the product's addresses are the platform's, not a
+// module's — resolves what the route names from the store, and paints the
+// shell. A signed-out reader is answered with the front door whatever they
+// asked for.
 
 import { matchRoute, renderPage } from '../../packages/registry.js';
 import { currentRoute, currentQuery, navigate, path } from '../../packages/nav.js';
+import { State, signedIn, serverById, refreshServer, refreshServerTree, channelById, channelsOf } from '../../packages/store.js';
+import { paintScreen, paintComposer, refreshChrome, shellRoot } from './shell.js';
+import { renderAuth } from './views/auth.js';
 import { el } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import {
-  State, serverById, channelById, refreshServer, refreshServers, refreshServerTree, signedIn,
-} from '../../packages/store.js';
-import { setAppBar, setView, setComposer, setLayout, refreshChrome, shellRoot } from './shell.js';
-import { failure } from './components.js';
-import { renderNotFound } from './views/plain.js';
 
 let activeCleanup = null;
-let rawNode = null;
 let generation = 0;
 
-// The sign-in and public documents are the whole page rather than a screen inside
-// the shell, so the shell is hidden and the node is placed beside it.
-function showRaw(node) {
-  const root = shellRoot();
-  if (root) root.hidden = true;
-  if (rawNode) rawNode.remove();
-  rawNode = node || null;
-  if (rawNode) document.body.appendChild(rawNode);
-  try { document.documentElement.dataset.raw = 'true'; } catch { /* no document */ }
-}
-
-function clearRaw() {
-  if (rawNode) { rawNode.remove(); rawNode = null; }
-  const root = shellRoot();
-  if (root) root.hidden = false;
-  try { delete document.documentElement.dataset.raw; } catch { /* no document */ }
-}
-
-function setRoute(route) {
-  try { document.documentElement.dataset.route = route; } catch { /* no document */ }
-}
-
-function paint(result, page, route) {
-  if (result && result.raw) {
-    setView(null);
-    setComposer(null);
-    setLayout('plain');
-    setAppBar({ lead: null, title: result.title || page.label || '' });
-    showRaw(result.node);
-    setRoute(route);
-    return false;
+function resolveServerId(page, params) {
+  if (page.id === 'community.legacy' || page.id.indexOf('community.') === 0) return params.id || null;
+  if (page.id === 'community') {
+    const slug = params.slug;
+    const found = (State.servers || []).find((s) => s.slug === slug);
+    return found ? found.id : null;
   }
-
-  clearRaw();
-  setAppBar(result.head || { title: result.title || page.label || '' });
-  setView(result.node);
-  setComposer(result.composer || null);
-  setLayout(result.composer ? 'conversation' : 'default');
-  setRoute(route);
-  return true;
-}
-
-function paintNotFound(route) {
-  clearRaw();
-  const { node } = renderNotFound();
-  setAppBar({ lead: 'back', title: 'Not found' });
-  setView(node);
-  setComposer(null);
-  setLayout('default');
-  setRoute(route);
-}
-
-// A route-level failure, answered in the shape of what went wrong rather than
-// one fault for every cause - the same shapes the desk answers with, in the
-// mobile state container. A refusal and a dead wire are different news.
-function errorState(error, retry) {
-  const status = error && error.status;
-  const code = error && error.code;
-  if (code === 'NETWORK') {
-    return el('div', { class: 'm-state', 'data-failed': 'true' },
-      el('span', { class: 'm-state__icon' }, icon('wifi-off', { size: 24 })),
-      el('div', { class: 'm-state__title' }, 'No connection'),
-      el('div', { class: 'm-state__text' }, 'Trycord cannot reach the instance right now. Check your connection and try again.'),
-      el('button', { class: 'm-btn m-btn--sm', type: 'button', onClick: retry }, 'Try again'));
-  }
-  if (status === 401) {
-    return el('div', { class: 'm-state', 'data-failed': 'true' },
-      el('span', { class: 'm-state__icon' }, icon('shield-alert', { size: 24 })),
-      el('div', { class: 'm-state__title' }, 'Your session has ended'),
-      el('div', { class: 'm-state__text' }, 'The instance asked you to sign in again. Nothing was changed; sign in to continue.'),
-      el('a', { class: 'm-btn m-btn--sm', href: path('/login') }, 'Sign in'));
-  }
-  if (status === 403) {
-    return el('div', { class: 'm-state', 'data-failed': 'true' },
-      el('span', { class: 'm-state__icon' }, icon('shield', { size: 24 })),
-      el('div', { class: 'm-state__title' }, 'This page is closed to you'),
-      el('div', { class: 'm-state__text' }, (error && error.message) || 'The instance refused this page for your account.'),
-      el('a', { class: 'm-btn m-btn--sm', href: path('/home') }, 'Back to your places'));
-  }
-  if (status >= 500) {
-    return el('div', { class: 'm-state', 'data-failed': 'true' },
-      el('span', { class: 'm-state__icon' }, icon('alert', { size: 24 })),
-      el('div', { class: 'm-state__title' }, 'This page broke on the server'),
-      el('div', { class: 'm-state__text' }, 'The instance answered with an error rather than the page. It may be mid-restart; try again in a moment.'),
-      el('button', { class: 'm-btn m-btn--sm', type: 'button', onClick: retry }, 'Try again'));
-  }
-  return failure(error, retry);
-}
-
-function paintError(route, error) {
-  clearRaw();
-  const box = errorState(error, () => run());
-  box.setAttribute('data-fault-origin', 'router');
-  setAppBar({ lead: 'back', title: 'This page did not open' });
-  setView(box);
-  setComposer(null);
-  setLayout('default');
-  setRoute(route);
-}
-
-async function resolveServerId(page, params) {
-  if (params.id) return params.id;
-  if (!params.slug) return null;
-  const local = State.servers.find((server) => server.slug === params.slug);
-  if (local) return local.id;
-  try { await refreshServers(); } catch { /* reported below */ }
-  const again = State.servers.find((server) => server.slug === params.slug);
-  return again ? again.id : null;
+  return null;
 }
 
 function firstChannel(serverId) {
-  const channels = (State.serverTree.get(serverId) || {}).channels || [];
-  const text = channels.filter((channel) => {
-    const type = String(channel.type || 'text');
-    return type !== 'voice' && type !== 'stage';
-  });
-  return (text.length ? text : channels).slice().sort((a, b) => (a.position || 0) - (b.position || 0))[0] || null;
+  const channels = channelsOf(serverId);
+  for (const ch of channels) if (ch.type === 'text') return ch;
+  return channels[0] || null;
 }
 
 export async function run() {
   const seq = ++generation;
+  try {
+    await paintRoute(seq);
+  } catch (error) {
+    // The last resort: nothing a route does may escape as an unhandled
+    // rejection, because the reader sees a toast about a "background
+    // request" instead of the screen that failed.
+    if (seq === generation) paintScreen({ head: { title: 'Something broke' }, node: faultNode(error) });
+  }
+}
+
+async function paintRoute(seq) {
   const route = currentRoute();
   const match = matchRoute(route);
 
@@ -148,92 +53,127 @@ export async function run() {
     try { activeCleanup(); } catch { /* a cleanup that throws must not stop the route */ }
     activeCleanup = null;
   }
+  paintComposer(null);
+  const root = shellRoot();
+  if (root) {
+    const chrome = root.querySelector('.m-chrome');
+    if (chrome) chrome.classList.remove('m-chrome--raw');
+  }
 
-  if (!match) { paintNotFound(route); refreshChrome(); return; }
+  const page = match ? match.page : null;
+  if (!page) {
+    paintScreen({ head: { title: 'Nothing here' }, node: notFoundNode() });
+    return;
+  }
 
-  const page = match.page;
-  const params = match.params;
-  const rest = match.rest;
-
-  if (State.mfaRequired && page.access !== 'public') {
-    navigate('/two-step', { replace: true });
+  // The front door and its siblings. A reader with a session never sees them;
+  // a reader without one sees nothing else. The gates answer raw themselves;
+  // the shell decides from what they said.
+  if (page.access === 'guest' || (page.access !== 'public' && !signedIn())) {
+    if (page.access === 'guest' && signedIn()) { navigate('/dms', { replace: true }); return; }
+    const gate = await Promise.resolve(renderAuth({ screen: page.id, params: match.params, query: currentQuery() }));
+    if (seq !== generation) return;
+    paintScreen({ raw: !!gate.raw, node: gate.node || gate });
+    return;
+  }
+  if (State.mfaRequired && page.access !== 'public' && page.id !== 'twoStep') {
+    const gate = await Promise.resolve(renderAuth({ screen: 'twoStep' }));
+    paintScreen({ raw: !!gate.raw, node: gate.node || gate });
     return;
   }
   if (page.id === 'twoStep' && !signedIn()) {
     navigate('/login', { replace: true });
     return;
   }
-  if (page.access === 'guest' && signedIn()) {
-    navigate(page.guestTo || '/home', { replace: true });
-    return;
-  }
-  if (page.access === 'session' && !signedIn()) {
-    navigate('/login?next=' + encodeURIComponent(route), { replace: true });
-    return;
-  }
 
+  const params = match.params || {};
   const ctx = {
-    page, params, rest, route,
-    query: currentQuery(),
+    page,
+    params,
+    rest: match.rest || [],
+    route,
+    query: currentQuery() || {},
     serverId: null,
     channel: null,
     conversationId: params.id || null,
   };
 
-  if (page.sidebar === 'community') {
-    const serverId = await resolveServerId(page, params);
-    if (seq !== generation) return;
-    if (!serverId) { paintError(route, new Error('That community does not exist.')); refreshChrome(); return; }
+  // Community addresses name a community; the channel ones also name a
+  // channel, and the tree must be in the store before a screen asks for it.
+  if (page.id === 'community' || page.id.indexOf('community.') === 0) {
+    const serverId = resolveServerId(page, params);
+    if (!serverId) {
+      paintScreen({ head: { title: 'Communities' }, door: '/communities', node: notFoundNode('That community is not on this instance.') });
+      return;
+    }
     ctx.serverId = serverId;
     if (!serverById(serverId)) {
       try { await refreshServer(serverId); } catch { /* the view reports a missing community */ }
       if (seq !== generation) return;
     }
-    if (page.id === 'community' || page.id === 'community.legacy') {
-      try { await refreshServerTree(serverId); } catch { /* handled below */ }
+    if (page.id === 'community.legacy' && (match.rest || []).length === 0) {
+      try { await refreshServerTree(serverId); } catch { /* the next line answers an empty tree */ }
       if (seq !== generation) return;
       const channel = firstChannel(serverId);
       if (channel) { navigate('/server/' + serverId + '/channel/' + channel.id, { replace: true }); return; }
-    } else if (page.id === 'community.channel' || page.id === 'community.channelPins') {
+    } else if (page.id === 'community.channel') {
       try { await refreshServerTree(serverId); } catch { /* the view reports it */ }
       if (seq !== generation) return;
       ctx.channel = channelById(serverId, params.channel) || null;
     }
   }
 
-  let result;
+  let answer;
   try {
-    // A renderer may be a lazy import resolving to the page; the await here is
-    // free for the eager ones, which answer synchronously.
-    result = await renderPage(page, ctx);
+    answer = await Promise.resolve(renderPage(page, ctx));
   } catch (error) {
-    if (seq === generation) { paintError(route, error); refreshChrome(); }
+    if (seq === generation) paintScreen({ head: { title: 'Something broke' }, node: faultNode(error) });
     return;
   }
   if (seq !== generation) return;
 
-  let mounted;
-  try {
-    mounted = paint(result, page, route);
-  } catch (error) {
-    if (seq === generation) { paintError(route, error); refreshChrome(); }
-    return;
-  }
-  refreshChrome();
-
-  if (result && typeof result.cleanup === 'function') activeCleanup = result.cleanup;
-
-  if (mounted && result && typeof result.onMount === 'function') {
-    try {
-      await result.onMount();
-    } catch (error) {
-      if (seq === generation) {
-        const box = failure(error, () => run());
-        box.setAttribute('data-fault-origin', 'mount');
-        setView(box);
-      }
+  const screen = answer && answer.node ? answer : { node: answer };
+  activeCleanup = answer && typeof answer.cleanup === 'function' ? answer.cleanup : null;
+  paintScreen({
+    head: screen.head !== undefined ? screen.head : { title: (page.nav && page.nav.label) || 'Trycord' },
+    door: screen.door !== undefined ? screen.door : defaultDoor(page.id),
+    bare: !!screen.bare,
+    raw: !!screen.raw,
+    node: screen.node,
+  });
+  if (screen.composer) paintComposer(screen.composer);
+  if (typeof screen.onMount === 'function') {
+    // A view's own reading of its data is the view's business, and it can
+    // fail: a private profile, a deleted room, a network that dropped. The
+    // screen says so where the screen is, rather than throwing past the
+    // router into the boot that nobody can answer for.
+    try { await Promise.resolve(screen.onMount()); }
+    catch (error) {
+      if (seq === generation) paintScreen({ head: { title: 'Something broke' }, node: faultNode(error) });
+      return;
     }
   }
+  refreshChrome();
 }
 
-export default { run };
+function defaultDoor(pageId) {
+  if (pageId === 'dms' || pageId === 'dms.conversation' || pageId === 'friends') return '/dms';
+  if (pageId === 'profile') return '/you';
+  if (pageId === 'notifications') return '';
+  if (pageId.indexOf('community') === 0) return '/communities';
+  if (pageId === 'you' || pageId === 'settings') return '/you';
+  return '';
+}
+
+function notFoundNode(note) {
+  return el('div', { class: 'm-empty' },
+    el('div', { class: 'm-empty__icon' }, icon('compass', { size: 24 })),
+    el('div', { class: 'm-empty__title' }, 'Nothing lives here'),
+    el('p', { class: 'm-empty__text' }, note || 'The address points at no screen.'),
+    el('button', { class: 'm-go m-go--quiet', type: 'button', onClick: () => navigate(path('/dms')) }, 'To the chats'));
+}
+
+function faultNode(error) {
+  return el('div', { class: 'm-fault' },
+    el('p', { class: 'm-fault__text' }, (error && error.message) || 'That screen could not be drawn.'));
+}

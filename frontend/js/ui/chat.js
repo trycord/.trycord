@@ -14,8 +14,9 @@ import { swipeToReply } from '../../packages/gestures.js';
 import { saveDraft, clearDraft, restoreDraft } from '../../packages/drafts.js';
 import { icon } from '../../packages/icons.js';
 import { avatar, spinner } from './primitives.js';
-import { State, nameOf } from '../../packages/store.js';
+import { State, nameOf, on as onStore } from '../../packages/store.js';
 import { blank } from './page.js';
+import { reportDialog } from './person.js';
 import {
   openMenu, openContextMenu, openDialog, confirmDialog, errorToast,
   attachContextMenu,
@@ -48,7 +49,9 @@ export function asMessage(raw) {
     editedAt: pick('editedAt', 'edited_at') || null,
     authorId: pick('authorId', 'author_id'),
     authorName: raw.authorName || raw.author_display || raw.author_name || 'Someone',
-    authorAvatar: raw.author_avatar || raw.avatar_url || null,
+    // The face, from whichever naming the sender used: the channel events
+    // answer in snake case, the DM services in camel case.
+    authorAvatar: raw.authorAvatar || raw.author_avatar || raw.avatar_url || null,
     // Whether the author is a bot. The server says so; a name that says
     // "bot" is not a substitute for knowing it.
     authorIsBot: !!(raw.author_is_bot || raw.authorIsBot),
@@ -171,6 +174,14 @@ function inlineContent(m) {
 function attachmentNode(a) {
   const url = a.url || a.objectUrl || '';
   const nice = a.name || a.filename || 'Attachment';
+  // An upload still in flight is a promise, not a file: it is named, and it
+  // is not a link, because there is nothing at the other end yet.
+  if (a.pending) {
+    return el('span', { class: 'msg-file msg-file--pending' },
+      el('span', { class: 'msg-file-glyph' }, icon('upload', { size: 15 })),
+      el('span', { class: 'msg-file-name' }, nice),
+      a.size ? el('span', { class: 'msg-file-size' }, humanSize(a.size)) : null);
+  }
   const isImage = a.contentType && String(a.contentType).startsWith('image/');
   const node = isImage
     ? el('a', { class: 'msg-file msg-file--image', href: url, target: '_blank', rel: 'noreferrer' },
@@ -270,6 +281,25 @@ const messageMenu = (m, self, cfg, composer, openThread, del, live) => {
     label: 'Copy text', icon: 'copy',
     onSelect: () => copyText(m.content || '', 'Message text'),
   });
+  // A message you did not write can be reported where it stands: the report
+  // freezes the words and points at their author, so the moderators read what
+  // you read. Yours cannot be - there is nothing to complain about to
+  // yourself, and a pending message is not on the server yet.
+  if (!self && !m.pending) {
+    items.push({
+      label: 'Report message', icon: 'flag',
+      onSelect: () => reportDialog({
+        title: 'Report this message',
+        who: m.authorName || 'its author',
+        payload: (reason, description) => ({
+          targetType: cfg.serverId ? 'message' : 'dm',
+          targetId: m.id,
+          serverId: cfg.serverId || undefined,
+          reason, description,
+        }),
+      }),
+    });
+  }
   if (live) {
     if (self && !m.pending) {
       items.push({ separator: true });
@@ -539,6 +569,9 @@ export function conversationSurface(config) {
     openThreadRef: () => openThread,
     delRef: () => del,
   });
+
+  // A new picture of the reader repaints the rows already on the screen.
+  const offUserStore = onStore('user', () => { if (!painting) repaint(true); });
 
   const repaint = (keepScroll) => {
     painting = true;
@@ -950,9 +983,9 @@ export function conversationSurface(config) {
     startUpload(file);
   });
 
-  // A file dropped on the composer is a file the composer accepts. The drop
-  // only happens over the composer, so a stray drag across the page does not
-  // open anything.
+  // A file dropped on the composer is a file the conversation sends: it
+  // uploads and posts itself, without a line of text. The same is true of a
+  // drop anywhere on the conversation and a file pasted into the box.
   form.addEventListener('dragover', (event) => {
     if (!event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes('Files')) return;
     event.preventDefault();
@@ -966,9 +999,85 @@ export function conversationSurface(config) {
     if (!event.dataTransfer || !event.dataTransfer.files || !event.dataTransfer.files.length) return;
     event.preventDefault();
     form.classList.remove('is-dropping');
-    const file = event.dataTransfer.files[0];
-    if (file) startUpload(file);
+    for (const file of event.dataTransfer.files) if (file) dropSend(file);
   });
+
+  // The whole conversation takes a drop too: a file lands where the reader's
+  // eye already is, not only on the narrow strip at the bottom.
+  listEl.addEventListener('dragover', (event) => {
+    if (!event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes('Files')) return;
+    event.preventDefault();
+    listEl.classList.add('is-dropping');
+  });
+  listEl.addEventListener('dragleave', (event) => {
+    if (listEl.contains(event.relatedTarget)) return;
+    listEl.classList.remove('is-dropping');
+  });
+  listEl.addEventListener('drop', (event) => {
+    if (!event.dataTransfer || !event.dataTransfer.files || !event.dataTransfer.files.length) return;
+    event.preventDefault();
+    listEl.classList.remove('is-dropping');
+    for (const file of event.dataTransfer.files) if (file) dropSend(file);
+  });
+
+  // A file on the clipboard is a message too. Text paste is left alone; a
+  // clipboard that carries files (a screenshot, a downloaded picture) posts
+  // them the same way a drop does.
+  textarea.addEventListener('paste', (event) => {
+    const files = event.clipboardData && event.clipboardData.files;
+    if (!files || !files.length) return;
+    event.preventDefault();
+    for (const file of files) if (file) dropSend(file);
+  });
+
+  // -- dropped and pasted files ----------------------------------------------------
+  //
+  // A file dropped on the conversation, or pasted into the composer, is a
+  // message of its own: it uploads, it posts, and the reader never had to
+  // touch the text box. Uploads run one after another from this client while
+  // the reader keeps reading and writing - a slow upload never blocks the
+  // conversation, and the row shows the file's name until the answer lands.
+
+  let dropQueue = Promise.resolve();
+
+  const dropSend = (file) => {
+    if (!cfg.upload || !cfg.send) {
+      composer.setError('Attachments are not open here.');
+      return;
+    }
+    dropQueue = dropQueue.then(() => sendFileAlone(file)).catch(() => {});
+  };
+
+  async function sendFileAlone(file) {
+    const pendingRow = insert({
+      id: 'pending-' + Math.random().toString(36).slice(2),
+      authorId: State.user && State.user.id,
+      authorName: nameOf(State.user),
+      content: '',
+      createdAt: new Date().toISOString(),
+      pending: true,
+      attachments: [{ name: file.name, size: file.size, pending: true }],
+    });
+    repaint(true);
+    try {
+      const started = cfg.upload(file, () => {});
+      const handle = started && typeof started === 'object' && started.promise
+        ? started
+        : { promise: Promise.resolve(started) };
+      const created = await handle.promise;
+      const id = typeof created === 'object' && created ? created.id : created;
+      const sent = asMessage(await cfg.send({ content: '', attachmentIds: [id] }));
+      dropPending(pendingRow);
+      insert(sent);
+      rememberRoots();
+      repaint(true);
+    } catch (e) {
+      dropPending(pendingRow);
+      repaint(true);
+      // A cancelled upload is the reader's own doing, not a failure to report.
+      if (!(e && e.name === 'AbortError')) errorToast(e);
+    }
+  }
 
   // One upload at a time, so two files cannot race for the same context slot.
   // The upload itself reports how far it has got, can be stopped, and can be
@@ -1136,6 +1245,7 @@ export function conversationSurface(config) {
     },
     cleanup() {
       if (typingTimer) { clearTimeout(typingTimer); typingTimer = null; }
+      offUserStore();
       typing.clear();
       drawTyping();
       const scrollerEl = scroller();

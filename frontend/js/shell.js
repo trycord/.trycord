@@ -16,9 +16,12 @@
 import { el, clear } from '../packages/dom.js';
 import { icon } from '../packages/icons.js';
 import { avatar, countBadge, serverMark } from './ui/primitives.js';
-import { State, nameOf, on as onStore } from '../packages/store.js';
+import { State, nameOf, on as onStore, choosePresence } from '../packages/store.js';
 import { path, currentRoute, navigate, BASE } from '../packages/nav.js';
-import { openMenu, attachContextMenu, isOverlayOpen, isMenuOpen, closeTopOverlay, confirmDialog } from './ui/overlays.js';
+import {
+  openMenu, attachContextMenu, isOverlayOpen, isMenuOpen, closeTopOverlay,
+  confirmDialog, toast, errorToast,
+} from './ui/overlays.js';
 import { buildContext, serverMenuItems } from './shell/context.js';
 import {
   buildFrame, attachColumnResize, brandMark,
@@ -419,11 +422,31 @@ function renderCommandBar() {
   const frame = refs.frame;
   if (!frame) return;
   const unread = State.notifications.unreadCount;
-  frame.alertsSlot.replaceChildren(el('button', {
+
+  // Sidebar toggle button
+  const sidebarBtn = el('button', {
+    class: 'icon-btn cmdbar-sidebar', type: 'button',
+    'aria-label': 'Toggle sidebar',
+    'title': 'Toggle sidebar',
+  }, icon('sidebar', { size: 18 }));
+  sidebarBtn.addEventListener('click', () => {
+    const root = refs.frame?.root;
+    if (!root) return;
+    const state = root.dataset.nav;
+    const open = state === 'expanded' || state === 'overlay';
+    const next = open ? 'hidden' : (narrow() ? 'overlay' : 'expanded');
+    root.dataset.nav = next;
+    sidebarBtn.setAttribute('aria-expanded', next === 'hidden' ? 'false' : 'true');
+  });
+
+  // Alert button
+  const alertBtn = el('button', {
     class: 'icon-btn cmdbar-bell', type: 'button',
     'aria-label': unread ? 'Alerts, ' + unread + ' unread' : 'Alerts',
     onClick: () => navigate('/notifications'),
-  }, icon('bell', { size: 18 }), countBadge(unread)));
+  }, icon('bell', { size: 18 }), countBadge(unread));
+
+  frame.alertsSlot.replaceChildren(sidebarBtn, alertBtn);
 }
 
 // ---- the column foot: the account ------------------------------------------
@@ -438,7 +461,14 @@ function renderAccount() {
     onClick: (event) => openAccountMenu(event.currentTarget),
   });
   if (me) {
-    button.appendChild(avatar(me, { size: 'sm' }));
+    // The same dot the rest of the interface uses. The caller's own chosen
+    // state is the truthful one here: an invisible account still sees that it
+    // chose invisible, while everybody else sees offline.
+    const chosen = me.presenceStatus || me.presence || 'online';
+    button.appendChild(avatar(me, {
+      size: 'sm',
+      presence: chosen === 'invisible' ? 'offline' : chosen,
+    }));
     button.appendChild(el('span', { class: 'account-id' },
       el('span', { class: 'account-name truncate' }, nameOf(me)),
       el('span', { class: 'account-sub truncate' }, me.statusText || ('@' + (me.username || '')))));
@@ -451,14 +481,37 @@ function renderAccount() {
   frame.columnFoot.replaceChildren(button);
 }
 
+const PRESENCE_CHOICES = [
+  { value: 'online', label: 'Online', icon: 'circle-dot' },
+  { value: 'idle', label: 'Idle', icon: 'moon' },
+  { value: 'dnd', label: 'Do not disturb', icon: 'equal' },
+  { value: 'invisible', label: 'Invisible', icon: 'eye-off' },
+];
+
 function openAccountMenu(anchor) {
   const me = State.user;
+  const chosen = me ? (me.presenceStatus || me.presence || 'online') : null;
+  const presenceItems = me ? PRESENCE_CHOICES.map((choice) => ({
+    label: choice.label,
+    icon: choice.icon,
+    checked: chosen === choice.value,
+    onSelect: () => {
+      choosePresence(choice.value)
+        .then(() => {
+          toast('Presence set to ' + choice.label.toLowerCase() + '.');
+          refreshChrome();
+        })
+        .catch((error) => errorToast(error));
+    },
+  })) : [];
   openMenu({
     anchor,
     align: 'right',
     items: [
-      me ? { header: nameOf(me) } : null,
+      me ? { header: nameOf(me), sub: '@' + (me.username || '') } : null,
       me ? { label: 'View profile', icon: 'user', onSelect: () => navigate('/users/' + me.id) } : null,
+      ...(me ? [{ separator: true }, { header: 'Presence' }, ...presenceItems] : []),
+      { separator: true },
       { label: 'Account settings', icon: 'settings', onSelect: () => navigate('/settings') },
       // A phone-shaped viewport that explicitly chose the desktop composition stays
       // here (the remembered override outranks the viewport), so this is the visible

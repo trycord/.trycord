@@ -1,685 +1,261 @@
-// Signing in, and the four screens that exist so it is recoverable.
+// The front door.
 //
-// All of them share one shape - a statement of purpose, a form, a way onward - so
-// they share one module. They render outside the shell, because a person who is
-// not signed in has no shell to be inside. This is the Mobile module's own sign-in
-// flow, drawn for a phone.
+// Sign in, create an account, answer the two-step challenge. The screens are
+// raw — the shell's doors mean nothing until there is a session — and they
+// stand on the ember wash, because this page is the brand before it is the app.
 
 import { el } from '../../../packages/dom.js';
 import { brandMark } from '../../../packages/brand.js';
 import Api from '../../../packages/api.js';
-import TrycordConfig from '../../../packages/config.js';
-import { currentQuery, navigate, path, publicPath } from '../../../packages/nav.js';
-import { State, applyToken, loadLegal, loadSession, logout, refreshServers } from '../../../packages/store.js';
-import { withLegalVersions, isStaleLegalError } from '../../../packages/legal.js';
-import { connect } from '../../../packages/realtime.js';
-import { toast } from '../ui.js';
-import { textInput, field } from './util.js';
-import { waitPhrase, passwordIsOverTheCeiling, passwordStrength, signInRefusalWords } from '../../../packages/authwords.js';
+import { withLegalVersions } from '../../../packages/legal.js';
+import { State, loadSession, refreshServers, refreshDms, refreshFriends, refreshNotifications } from '../../../packages/store.js';
+import realtime from '../../../packages/realtime.js';
+import { publicPath } from '../../../packages/nav.js';
+import { navigate, path } from '../../../packages/nav.js';
+import { field, toast, failed } from '../ui.js';
+import * as encrypted from '../../../js/ui/encrypted.js';
+import { setLocalUserId } from '../../../packages/voiceSession.js';
 
-// The sentences a refused sign-in answers with are shared with the desk, and
-// this file draws them on the phone: the two clients must never say two
-// different things about the same failure.
-function refusalAction(action, restartCallback) {
-  if (!action) return null;
-  if (action.kind === 'restart') {
-    return el('button', {
-      class: 'm-btn m-btn--default', type: 'button', onClick: restartCallback,
-    }, 'Start again');
-  }
-  if (action.kind === 'support') {
-    return el('a', { class: 'm-btn m-btn--default', href: path(action.href) }, 'How to reach support');
-  }
-  return null;
+export function renderAuth(ctx) {
+  // Every gate is raw: the doors mean nothing until there is a session, so
+  // the screen stands alone. The router reads the answer and hides the chrome.
+  const screen = (ctx && ctx.screen) || 'login';
+  let node;
+  if (screen === 'register') node = registerScreen();
+  else if (screen === 'twoStep') node = twoStepScreen(ctx);
+  else if (screen === 'forgot') node = forgotScreen();
+  else if (screen === 'resetPassword') node = resetScreen(ctx);
+  else if (screen === 'verifyEmail') node = verifyScreen(ctx);
+  else node = signInScreen();
+  return { node, raw: true };
 }
 
-// The waiting screen for an account that still needs an administrator's yes.
-// On an approval-gated instance the account exists from registration on, but
-// every authenticated path refuses it - entering the workspace is not what
-// happens next. Nothing is promised about when this ends, because nothing
-// here knows.
-function approvalWaiting() {
-  const signOut = el('button', {
-    class: 'm-btn m-btn--ghost m-btn--block', type: 'button',
-    onClick: async () => {
-      try { await logout(); } catch { /* dropped locally either way */ }
-      navigate('/login', { replace: true });
-    },
-  }, 'Sign out');
-  return [
-    el('p', { class: 'm-auth__sub' },
-      'Your account is created. This instance asks an administrator to approve new '
-      + 'accounts before they are opened, so every part of Trycord stays closed '
-      + 'until that happens.'),
-    signOut];
-}
+// The letter's token proves the address; one press confirms it.
+function verifyScreen(ctx) {
+  const token = (ctx && ctx.params && ctx.params.token) || (ctx && ctx.query && ctx.query.token) || '';
+  const go = el('button', { class: 'm-go m-go--block', type: 'submit' }, 'Confirm the address');
+  const error = el('p', { class: 'm-error', hidden: true });
 
-function lockup() {
-  return el('div', { class: 'm-auth__lockup' },
-    brandMark({ size: 36 }),
-    el('span', { class: 'm-auth__name' }, 'Trycord'));
-}
-
-function busy(form, isBusy) {
-  const button = form.querySelector('button[type="submit"]');
-  if (button) button.disabled = isBusy;
-  form.setAttribute('aria-busy', isBusy ? 'true' : 'false');
-}
-
-function showError(form, error, action) {
-  const message = error && error.message ? error.message : 'That did not work.';
-  let box = form.querySelector('.m-form-error');
-  if (!box) {
-    box = el('div', { class: 'm-form-error', role: 'alert' });
-    form.insertBefore(box, form.firstChild);
-  }
-  // The children are filtered rather than passed as they are: the DOM's own
-  // replaceChildren renders a null argument as the text "null", and a sign-in
-  // form that says "null" under the message is a bug somebody will report.
-  box.replaceChildren(...[el('span', {}, message), action || null].filter(Boolean));
-}
-
-function nextTarget() {
-  const next = currentQuery().get('next');
-  if (!next) return '/home';
-  if (next.charAt(0) !== '/' || next.indexOf('//') === 0) return '/home';
-  return next;
-}
-
-async function afterSignIn(next) {
-  let user;
-  try {
-    user = await loadSession();
-  } catch (error) {
-    if (error && error.code === 'MFA_REQUIRED') { navigate('/two-step', { replace: true }); return; }
-    throw error;
-  }
-  if (!user) return;
-  await refreshServers().catch(() => {});
-  connect();
-  navigate(next || '/home', { replace: true });
-}
-
-// Whether an address could be an instance.
-function looksLikeAnInstance(value) {
-  let url;
-  try { url = new URL(value); } catch { return false; }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
-  return !!url.hostname;
-}
-
-// A password field for the phone: the same two controls as the desk, sized
-// for a thumb. The reading is guidance, not a gate; the server enforces its
-// own minimum and ceiling.
-let passwordFieldSeq = 0;
-
-function passwordField(label, options) {
-  const opts = options || {};
-  const input = textInput({
-    name: opts.name || 'password',
-    type: 'password',
-    autocomplete: opts.autocomplete || 'new-password',
-  });
-  const id = 'm-password-' + (++passwordFieldSeq);
-  input.setAttribute('id', id);
-
-  const toggle = el('button', {
-    class: 'm-password-toggle',
-    type: 'button',
-    'aria-controls': id,
-    'aria-pressed': 'false',
-  }, 'Show');
-
-  const fill = el('span', { class: 'm-password-meter__fill' });
-  const meterLabel = el('span', { class: 'm-password-meter__label' });
-  const meter = el('div', { class: 'm-password-meter', 'aria-live': 'polite', hidden: true },
-    el('span', { class: 'm-password-meter__track', 'aria-hidden': 'true' }, fill),
-    meterLabel);
-
-  const node = el('div', { class: 'm-field' },
-    el('span', { class: 'm-field__label' }, label),
-    el('div', { class: 'm-password-control' }, input, toggle),
-    opts.note ? el('span', { class: 'm-field__note' }, opts.note) : null,
-    meter);
-
-  const paint = () => {
-    if (!opts.meter) {
-      meter.hidden = true;
-      return;
-    }
-    const strength = passwordStrength(input.value);
-    meter.hidden = !input.value;
-    meter.dataset.score = String(strength.score);
-    meterLabel.textContent = strength.label + '. ' + strength.hint;
-  };
-
-  toggle.addEventListener('click', () => {
-    const shown = input.getAttribute('type') === 'text';
-    input.setAttribute('type', shown ? 'password' : 'text');
-    toggle.textContent = shown ? 'Show' : 'Hide';
-    toggle.setAttribute('aria-pressed', shown ? 'false' : 'true');
-    if (typeof input.focus === 'function') input.focus();
-  });
-
-  input.addEventListener('input', paint);
-  paint();
-
-  return { node, input, meter, paint };
-}
-
-function confirmPasswordField(label, input, password, note) {
-  const node = field({ label, control: input, note });
-  const noteNode = node.querySelector('.m-field__note');
-  const sync = () => {
-    if (!input.value) {
-      input.classList.remove('m-input--invalid');
-      input.removeAttribute('aria-invalid');
-      if (noteNode) noteNode.textContent = note;
-      return;
-    }
-    const matches = input.value === password.value;
-    input.classList.toggle('m-input--invalid', !matches);
-    input.setAttribute('aria-invalid', matches ? 'false' : 'true');
-    if (noteNode) noteNode.textContent = matches ? 'The passwords match.' : 'The passwords do not match yet.';
-  };
-  input.addEventListener('input', sync);
-  return { node, sync };
-}
-
-function loginForm() {
-  const username = textInput({ name: 'username', autocomplete: 'username' });
-  const passwordEntry = passwordField('Password', {
-    autocomplete: 'current-password',
-    note: 'The password you chose for this instance.',
-  });
-  const password = passwordEntry.input;
-  const code = textInput({ name: 'code', inputmode: 'numeric' });
-  const mfaField = field({ label: 'Two-step code', control: code });
-  mfaField.hidden = true;
-
-  // Which instance.
-  //
-  // An account on one instance is not an account on another, and a reader
-  // who keeps several of them cannot tell from a sign-in form which one they
-  // are signing in to. So the address is on the form, and it can be typed.
-  const instance = textInput({
-    name: 'instance', type: 'url', value: TrycordConfig.backendUrl(),
-    placeholder: 'https://the-instance.example', autocomplete: 'url',
-  });
-
-  const form = el('form', { class: 'm-auth__form' },
-    field({ label: 'Username or email', control: username }),
-    passwordEntry.node,
-    mfaField,
-    field({ label: 'Instance', control: instance }),
-    el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Sign in'));
-
-  let challenge = null;
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    busy(form, true);
+  async function submit() {
+    go.disabled = true;
+    error.hidden = true;
     try {
-      // A different instance is a different account, and the session belongs
-      // to the instance that issued it - so the address is settled before the
-      // sign-in, never after.
-      const wanted = String(instance.value || '').trim();
-      if (wanted && wanted !== TrycordConfig.backendUrl()) {
-        if (!looksLikeAnInstance(wanted)) {
-          showError(form, {
-            message: 'That does not look like an instance address. It is a web address, '
-              + 'like https://trycord.example',
-          });
-          return;
-        }
-        TrycordConfig.setApiUrl(wanted);
-        window.location.reload();
-        return;
-      }
+      await Api.verifyEmail({ token });
+      toast('The address is confirmed. Sign in.', { type: 'success' });
+      navigate(path('/login'));
+    } catch (e) {
+      error.textContent = (e && e.message) || 'That token was not the one.';
+      error.hidden = false;
+    } finally { go.disabled = false; }
+  }
+
+  return authShell('Confirm the address', 'The letter carried a token; this confirms it.',
+    { nodes: [error, go], submit }, null);
+}
+
+function afterSignIn() {
+  try { document.documentElement.dataset.session = 'in'; } catch { /* no document */ }
+  setLocalUserId(() => (State.user && State.user.id) || '');
+  encrypted.ready().catch(() => { /* the You screen reports it */ });
+  Promise.allSettled([refreshServers(), refreshDms(), refreshFriends(), refreshNotifications()])
+    .then(() => realtime.connect());
+}
+
+function authShell(title, lede, form, swap) {
+  return el('div', { class: 'm-auth' },
+    el('div', { class: 'm-auth__brand' },
+      brandMark({ size: 44 }),
+      el('div', { class: 'm-auth__wordmark' }, 'Trycord'),
+      el('p', { class: 'm-auth__lede' }, lede)),
+    el('div', { class: 'm-auth__title' }, el('h1', { style: { 'font-size': 'var(--fs-h2)' } }, title)),
+    el('form', { class: 'm-auth__form', onSubmit: (event) => { event.preventDefault(); form.submit(); } }, form.nodes),
+    swap);
+}
+
+function signInScreen() {
+  const username = el('input', { class: 'm-input', type: 'text', autocomplete: 'username', placeholder: 'you or you@example.com', 'aria-label': 'Username or email' });
+  const password = el('input', { class: 'm-input', type: 'password', autocomplete: 'current-password', placeholder: 'Your password', 'aria-label': 'Password' });
+  const go = el('button', { class: 'm-go m-go--block', type: 'submit' }, 'Sign in');
+  const error = el('p', { class: 'm-error', hidden: true });
+  let challenge = null;
+
+  const code = el('input', { class: 'm-input', type: 'text', inputmode: 'numeric', placeholder: '6-digit code', 'aria-label': 'Two-step code' });
+  const codeField = field('Two-step code', code);
+  codeField.hidden = true;
+
+  const form = { submit: submit };
+
+  async function submit() {
+    go.disabled = true;
+    error.hidden = true;
+    try {
       if (challenge) {
-        const out = await Api.twoFactorVerify({ challengeToken: challenge, code: code.value.trim() });
-        applyToken(out.token, out.user);
-        await afterSignIn(nextTarget());
+        await Api.twoFactorVerify({ challengeToken: challenge, code: code.value.trim() });
+        await loadSession();
+        afterSignIn();
+        navigate(path('/dms'));
         return;
       }
       const out = await Api.login({ username: username.value.trim(), password: password.value });
       if (out && out.mfaRequired) {
-        challenge = out.challengeToken;
-        mfaField.hidden = false;
+        challenge = out.challengeToken || out.challenge || null;
+        codeField.hidden = false;
         code.focus();
         return;
       }
-      applyToken(out.token, out.user);
-      await afterSignIn(nextTarget());
-    } catch (error) {
-      // An approval-gated instance issues the session and then refuses
-      // everything the session can reach with it. There is nothing to fix in
-      // the form, so the waiting screen takes its place.
-      if (error && error.code === 'ACCOUNT_PENDING') {
-        toast('Your account is waiting for an administrator to approve it. Nothing opens until then.', { type: 'info' });
-        form.replaceChildren(...approvalWaiting());
-        return;
-      }
-      // The sentence is the shared one, and what was typed stays in the
-      // fields: a form that empties itself on a wrong password empties the
-      // reader's attention with it.
-      const restart = challenge !== null ? () => {
-        challenge = null;
-        mfaField.hidden = true;
-        code.required = false;
-        code.value = '';
-      } : null;
-      const said = signInRefusalWords(error, restart);
-      if (said) showError(form, said.message, refusalAction(said.action, restart));
-      else showError(form, error);
+      await loadSession();
+      afterSignIn();
+      navigate(path('/dms'));
+    } catch (e) {
+      error.textContent = (e && e.message) || 'That sign-in did not go through.';
+      error.hidden = false;
+    } finally {
+      go.disabled = false;
     }
-    finally { busy(form, false); }
-  });
+  }
 
-  return [form, el('p', { class: 'm-auth__alt' },
-    'New here? ', el('a', { href: path('/register') }, 'Create an account'), ' \u00b7 ',
-    el('a', { href: path('/forgot') }, 'Forgot password?'))];
+  const node = authShell('Welcome back', 'The places and people you keep, on the instance you trust.',
+    { nodes: [username, password, codeField, error, go], submit },
+    el('p', { class: 'm-auth__swap' },
+      'New here? ', el('button', { type: 'button', onClick: () => navigate(path('/register')) }, 'Create an account'),
+      el('span', null, ' · '),
+      el('a', { href: publicPath('/forgot') }, 'Forgot your password?')));
+  return node;
 }
 
-// The acceptance control. The server records the exact versions the reader
-// accepted and refuses a registration whose versions are not the ones in
-// force, so the form states which versions they are and cannot be submitted
-// until they are accepted.
-function legalAcceptance() {
-  const accepted = el('input', { type: 'checkbox', class: 'm-check' });
-  const versions = el('span', { class: 'm-auth__legal-version' });
-  const state = el('span', { class: 'm-auth__legal-state' });
-  const label = el('label', { class: 'm-check-row m-auth__legal' },
-    accepted,
-    el('span', {},
-      el('span', { class: 'm-auth__legal-title' },
-        'I accept the ',
-        el('a', { href: publicPath('/terms'), target: '_blank', rel: 'noopener' }, 'Terms of Service'),
-        ' and the ',
-        el('a', { href: publicPath('/privacy'), target: '_blank', rel: 'noopener' }, 'Privacy Policy')),
-      el('span', { class: 'm-auth__legal-meta' }, versions, ' ', state)));
-
-  // A block of its own, above the fields. On a phone the bottom of a form is
-  // below the fold, and a control a reader cannot do without has to be where
-  // they can see it.
-  const block = el('section', { class: 'm-auth__legal-block' },
-    el('p', { class: 'm-eyebrow' }, 'Before you can join'),
-    el('p', { class: 'm-lede' },
-      'This instance runs on its own rules, and an account here is bound by them. '
-      + 'Read both documents, then accept them.'),
-    label);
-
-  const paintVersions = () => {
-    const legal = State.legal;
-    versions.textContent = legal && legal.termsVersion
-      ? 'Terms v' + legal.termsVersion + ', Privacy v' + legal.privacyVersion + '.'
-      : 'This instance has not said which version is in force.';
-  };
-  const paintState = () => {
-    const on = !!accepted.checked;
-    state.textContent = on ? 'Accepted.' : 'Not accepted yet.';
-    block.classList.toggle('is-accepted', on);
-  };
-  accepted.addEventListener('change', paintState);
-  paintVersions();
-  paintState();
-
-  return { accepted, label, block, paintVersions, paintState };
-}
-
-function registerForm() {
-  const username = textInput({ name: 'username', autocomplete: 'username' });
-  const display = textInput({ name: 'displayName' });
-  const email = textInput({ name: 'email', type: 'email', autocomplete: 'email' });
-  const passwordEntry = passwordField('Password', {
-    autocomplete: 'new-password',
-    note: 'At least 8 characters. A long passphrase works well.',
-    meter: true,
+function registerScreen() {
+  const username = el('input', { class: 'm-input', type: 'text', autocomplete: 'username', name: 'username', placeholder: 'A name people will type', 'aria-label': 'Username' });
+  const email = el('input', { class: 'm-input', type: 'email', autocomplete: 'email', name: 'email', placeholder: 'you@example.com', 'aria-label': 'Email' });
+  const password = el('input', { class: 'm-input', type: 'password', autocomplete: 'new-password', name: 'password', placeholder: 'Something long', 'aria-label': 'Password' });
+  // A way to read what was typed, and a reading of the phrase that is
+  // guidance rather than a gate.
+  const reveal = el('button', { class: 'm-auth__reveal', type: 'button' }, 'Show');
+  reveal.addEventListener('click', () => {
+    const shown = password.getAttribute('type') === 'text';
+    password.setAttribute('type', shown ? 'password' : 'text');
+    reveal.textContent = shown ? 'Show' : 'Hide';
   });
-  const password = passwordEntry.input;
-  const confirm = textInput({ name: 'confirm', type: 'password', autocomplete: 'new-password' });
-  const confirmation = confirmPasswordField('Confirm password', confirm, password,
-    'Type the same password again.');
-  const legal = legalAcceptance();
-  const submit = el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Create account');
-  const form = el('form', { class: 'm-auth__form' },
-    el('p', { class: 'm-auth__instance' },
-      'Joining ', el('strong', {}, TrycordConfig.backendUrl())),
-    legal.block,
-    field({ label: 'Username', control: username, note: '2 to 32 characters: letters, numbers, _ or .' }),
-    field({ label: 'Display name', control: display }),
-    field({ label: 'Email (optional)', control: email }),
-    passwordEntry.node,
-    confirmation.node,
-    submit);
-  passwordEntry.input.addEventListener('input', confirmation.sync);
+  const strength = el('p', { class: 'm-auth__strength' });
+  password.addEventListener('input', () => {
+    const words = password.value.length;
+    strength.textContent = words === 0 ? ''
+      : words < 10 ? 'Short. Ten marks or more, and mixed.' : 'That will hold.';
+  });
+  // The papers are agreed to, not merely shown: the form refuses to send
+  // until the box is ticked.
+  const accepted = el('input', { class: 'm-auth__accept-box', type: 'checkbox', name: 'accepted' });
+  const accept = el('label', { class: 'm-auth__accept' }, accepted,
+    el('span', null, 'I agree to the ',
+      el('a', { href: publicPath('/terms'), target: '_blank', rel: 'noopener' }, 'Terms'),
+      ' and the ',
+      el('a', { href: publicPath('/privacy'), target: '_blank', rel: 'noopener' }, 'Privacy notice'), '.'));
+  const go = el('button', { class: 'm-go m-go--block', type: 'submit' }, 'Create account');
+  const error = el('p', { class: 'm-error', hidden: true });
 
-  // The form cannot be sent until the documents are accepted, and the button
-  // says why: a disabled control with no reason is the control everybody
-  // works around.
-  const submitNote = el('p', { class: 'm-auth__submit-note' });
-  submit.insertAdjacentElement('afterend', submitNote);
-  const syncSubmit = () => {
-    submit.disabled = !legal.accepted.checked;
-    submitNote.textContent = legal.accepted.checked
-      ? ''
-      : 'Accept the Terms of Service and the Privacy Policy to create an account.';
-    legal.paintState();
-  };
-  legal.accepted.addEventListener('change', syncSubmit);
-  syncSubmit();
-
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    if (!legal.accepted.checked) {
-      showError(form, { message: 'Accept the Terms of Service and the Privacy Policy to continue.' });
-      return;
-    }
-    if (confirm.value !== password.value) {
-      showError(form, 'The two passwords do not match. Type them again and try once more.');
-      return;
-    }
-    busy(form, true);
-    // Long passphrases are welcome up to the ceiling the storage can keep;
-    // refused here, the passphrase is still on screen and nothing typed in
-    // the other fields has been spent.
-    if (passwordIsOverTheCeiling(password.value)) {
-      showError(form, 'That passphrase is longer than passwords here can be. Trim it a little and try again.');
-      busy(form, false);
-      return;
-    }
+  async function submit() {
+    go.disabled = true;
+    error.hidden = true;
     try {
-      // The versions come from the instance, never from this file.
-      if (!State.legal) {
-        try { await loadLegal(); } catch { /* the refusal below says so */ }
-        legal.paintVersions();
-      }
-      if (!State.legal) {
-        showError(form, { message: 'This instance did not say which terms are in force. Reload the page and try again.' });
+      if (!accepted.checked) {
+        error.textContent = 'The papers are agreed to before an account is made.';
+        error.hidden = false;
         return;
       }
-      const out = await Api.register(withLegalVersions({
+      if (!State.legal) {
+        error.textContent = 'This instance did not say which terms are in force. Reload and try again.';
+        error.hidden = false;
+        return;
+      }
+      await Api.register(withLegalVersions({
         username: username.value.trim(),
-        displayName: display.value.trim() || undefined,
-        email: email.value.trim() || undefined,
+        email: email.value.trim(),
         password: password.value,
       }, State.legal));
-      if (out && out.token) {
-        applyToken(out.token, out.user);
-        // An approval-gated instance hands out the session and then refuses
-        // every authenticated path with it: the waiting screen is what comes
-        // next, not a workspace that will refuse the reader everywhere.
-        if (out.pendingApproval) {
-          toast('Account created.', { type: 'success' });
-          form.replaceChildren(...approvalWaiting());
-          return;
-        }
-        await afterSignIn('/home');
-      } else {
-        toast('Account created. Check your email to continue.', { type: 'success' });
-        navigate('/login', { replace: true });
-      }
-    } catch (error) {
-      if (isStaleLegalError(error)) {
-        showError(form, {
-          message: 'The Terms or Privacy Policy changed since this page was opened. Reload to read the current version.',
-        }, el('button', {
-          class: 'm-btn m-btn--default', type: 'button',
-          onClick: () => window.location.reload(),
-        }, 'Reload'));
-      } else {
-        showError(form, error);
-      }
+      await loadSession();
+      afterSignIn();
+      navigate(path('/dms'));
+    } catch (e) {
+      error.textContent = (e && e.message) || 'That account could not be made.';
+      error.hidden = false;
+    } finally {
+      go.disabled = false;
     }
-    finally { busy(form, false); syncSubmit(); }
-  });
-  return [form, el('p', { class: 'm-auth__alt' }, 'Already have an account? ', el('a', { href: path('/login') }, 'Sign in'))];
+  }
+
+  return authShell('Join', 'An account on this instance is a name, an address and a long password.',
+    { nodes: [username, email, password, reveal, strength, accept, error, go], submit },
+    el('p', { class: 'm-auth__swap' },
+      'Already here? ', el('button', { type: 'button', onClick: () => navigate(path('/login')) }, 'Sign in')));
 }
 
-function forgotForm() {
-  const email = textInput({ name: 'email', type: 'email' });
-  const form = el('form', { class: 'm-auth__form' },
-    field({ label: 'Email address', control: email }),
-    el('p', { class: 'm-field__note' }, 'If the link does not arrive, look in the spam folder.'),
-    el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Send reset link'));
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    busy(form, true);
+function forgotScreen() {
+  const email = el('input', { class: 'm-input', type: 'email', name: 'email', autocomplete: 'email', placeholder: 'The address the account uses', 'aria-label': 'Email' });
+  const go = el('button', { class: 'm-go m-go--block', type: 'submit' }, 'Send the way back in');
+  const error = el('p', { class: 'm-error', hidden: true });
+
+  async function submit() {
+    go.disabled = true;
+    error.hidden = true;
     try {
       await Api.forgotPassword({ email: email.value.trim() });
-      // "On its way" rather than "sent": the request went out, and nothing
-      // here has seen a delivery.
-      toast('If that address is on an account here, a reset link is on its way.', { type: 'info' });
-      navigate('/login');
-    } catch (error) { showError(form, error); }
-    finally { busy(form, false); }
-  });
-  return [form, el('p', { class: 'm-auth__alt' }, el('a', { href: path('/login') }, 'Back to sign in'))];
+      toast('If that address holds an account, a letter is on its way.', { type: 'success' });
+      navigate(path('/login'));
+    } catch (e) {
+      error.textContent = (e && e.message) || 'The letter could not be sent.';
+      error.hidden = false;
+    } finally { go.disabled = false; }
+  }
+
+  return authShell('Locked out', 'The instance sends a letter with a way back in.',
+    { nodes: [email, error, go], submit },
+    el('p', { class: 'm-auth__swap' },
+      'Remembered it? ', el('button', { type: 'button', onClick: () => navigate(path('/login')) }, 'Sign in')));
 }
 
-function resetForm(token) {
-  const passwordEntry = passwordField('New password', {
-    name: 'newPassword',
-    autocomplete: 'new-password',
-    note: 'At least 8 characters. A long passphrase works well.',
-    meter: true,
-  });
-  const next = passwordEntry.input;
-  const confirm = textInput({ name: 'confirmPassword', type: 'password', autocomplete: 'new-password' });
-  const confirmation = confirmPasswordField('Confirm new password', confirm, next,
-    'Type the same password again.');
-  const form = el('form', { class: 'm-auth__form' },
-    passwordEntry.node,
-    confirmation.node,
-    el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Set new password'));
-  passwordEntry.input.addEventListener('input', confirmation.sync);
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    busy(form, true);
-    if (next.value !== confirm.value) {
-      showError(form, 'The two passwords do not match. Type them again and try once more.');
-      busy(form, false);
-      return;
-    }
-    if (passwordIsOverTheCeiling(next.value)) {
-      showError(form, 'That passphrase is longer than passwords here can be. Trim it a little and try again.');
-      busy(form, false);
-      return;
-    }
+function resetScreen(ctx) {
+  const token = (ctx && ctx.params && ctx.params.token) || (ctx && ctx.query && ctx.query.token) || '';
+  const next = el('input', { class: 'm-input', type: 'password', name: 'newPassword', autocomplete: 'new-password', placeholder: 'The new phrase', 'aria-label': 'New password' });
+  const again = el('input', { class: 'm-input', type: 'password', name: 'confirmPassword', autocomplete: 'new-password', placeholder: 'The same phrase again', 'aria-label': 'Repeat the new password' });
+  const go = el('button', { class: 'm-go m-go--block', type: 'submit' }, 'Set the phrase');
+  const error = el('p', { class: 'm-error', hidden: true });
+
+  async function submit() {
+    go.disabled = true;
+    error.hidden = true;
     try {
-      const out = await Api.resetPassword({ token, newPassword: next.value, confirmPassword: confirm.value });
-      // An account with a second factor gets a challenge rather than a session:
-      // the password is changed, and the sign-in still owes the second step.
-      toast(out && out.mfaRequired
-        ? 'Password set. Sign in with your two-step code.'
-        : 'Password set. Sign in with it.', { type: 'success' });
-      navigate('/login', { replace: true });
-    } catch (error) {
-      // A spent reset link is not a mistake the password fields can fix - the
-      // link itself is gone. The way back is a new link, and it is offered
-      // here rather than left to be figured out.
-      if (error && error.code === 'AUTH_REQUIRED') {
-        showError(form, (error && error.message)
-          || 'This reset link is no longer valid. Request a new one to continue.',
-        el('button', {
-          class: 'm-btn m-btn--default', type: 'button',
-          onClick: () => navigate('/forgot'),
-        }, 'Request a new link'));
-      } else {
-        showError(form, error);
-      }
-    }
-    finally { busy(form, false); }
-  });
-  return [form, el('p', { class: 'm-auth__alt' }, el('a', { href: path('/login') }, 'Back to sign in'))];
+      const out = await Api.resetPassword({ token, newPassword: next.value, confirmPassword: again.value });
+      toast(out && out.mfaRequired ? 'Two steps is waiting at the door.' : 'The phrase is set. Sign in.', { type: 'success' });
+      navigate(path('/login'));
+    } catch (e) {
+      error.textContent = (e && e.message) || 'That phrase could not be set.';
+      error.hidden = false;
+    } finally { go.disabled = false; }
+  }
+
+  return authShell('A new phrase', 'The letter carried a token; the token carried the right to set this.',
+    { nodes: [next, again, error, go], submit },
+    null);
 }
 
-function verifyPanel(token) {
-  const status = el('p', { class: 'm-auth__sub' }, 'Checking this link...');
-  const form = el('form', { class: 'm-auth__form' });
-  (async () => {
+function twoStepScreen(ctx) {
+  const code = el('input', { class: 'm-input', type: 'text', inputmode: 'numeric', placeholder: 'The code from your second factor', 'aria-label': 'Two-step code' });
+  const go = el('button', { class: 'm-go m-go--block', type: 'submit' }, 'Verify');
+  const error = el('p', { class: 'm-error', hidden: true });
+
+  async function submit() {
+    go.disabled = true;
     try {
-      await Api.verifyEmail({ token });
-      status.textContent = 'Your email is verified.';
-      form.appendChild(el('a', { class: 'm-btn m-btn--primary m-btn--block', href: path('/login') }, 'Sign in'));
-    } catch (error) {
-      // The raw reason first, then the paths that exist from here: a fresh
-      // link for signed-in readers - the account knows its own address - and
-      // sign-in for everyone else.
-      const mine = (State.user || {}).email;
-      status.textContent = (error && error.message) || 'That link did not work.';
-      if (mine) {
-        const resend = el('button', {
-          class: 'm-btn m-btn--default m-btn--block', type: 'button',
-          onClick: async () => {
-            resend.disabled = true;
-            try {
-              await Api.verifyEmailResend({ email: mine });
-              status.textContent = 'The link is on its way to ' + mine + '. If it does not arrive, look in the spam folder.';
-            } catch (resendError) {
-              status.textContent = (resendError && resendError.message) || 'That did not work. Try again.';
-              resend.disabled = false;
-            }
-          },
-        }, 'Send a new link to the address on your account');
-        form.appendChild(resend);
-        form.appendChild(el('a', { class: 'm-btn m-btn--block', href: path('/home') }, 'Continue to Trycord'));
-      } else {
-        form.appendChild(el('a', { class: 'm-btn m-btn--block', href: path('/login') }, 'Go to sign in'));
-      }
-    }
-  })();
-  return [status, form];
+      await Api.twoFactorVerify({ challengeToken: (ctx && ctx.challengeToken) || (State.user || {}).challengeToken, code: code.value.trim() });
+      await loadSession();
+      afterSignIn();
+      navigate(path('/dms'));
+    } catch (e) {
+      error.textContent = (e && e.message) || 'That code was not the one.';
+      error.hidden = false;
+    } finally { go.disabled = false; }
+  }
+
+  return authShell('Two steps', 'This account keeps a second factor. The code proves it is you.',
+    { nodes: [code, error, go], submit },
+    null);
 }
-
-function twoStepPanel() {
-  const host = el('div', { class: 'm-auth__form' });
-  const saved = { password: '' };
-  function swap(node) { host.replaceChildren(node); }
-
-  function passwordStep() {
-    const passwordEntry = passwordField('Password', {
-      autocomplete: 'current-password',
-      note: 'Your account password, not the six-digit code.',
-    });
-    const password = passwordEntry.input;
-    const form = el('form', { class: 'm-auth__form' },
-      passwordEntry.node,
-      el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Continue'));
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      busy(form, true);
-      try {
-        const out = await Api.twoFactorSetup({ password: password.value });
-        saved.password = password.value;
-        swap(codeStep(out && out.secret ? out.secret : ''));
-      } catch (error) {
-        showError(form, (error && error.code === 'ACCOUNT_LOCKED')
-          ? 'Too many tries in a row. ' + waitPhrase(error.details && error.details.retryAfterSeconds)
-          : (error && error.message) || 'That did not work. Try again.');
-      }
-      finally { busy(form, false); }
-    });
-    return form;
-  }
-
-  function codeStep(secret) {
-    const code = textInput({ name: 'code', inputmode: 'numeric' });
-    const form = el('form', { class: 'm-auth__form' },
-      field({ label: 'Secret', control: el('code', { class: 'm-secret' }, secret) }),
-      field({ label: 'Code from your app', control: code }),
-      el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'submit' }, 'Turn on two-step sign-in'));
-    code.focus();
-    form.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      busy(form, true);
-      try {
-        const out = await Api.twoFactorEnable({ password: saved.password, code: code.value.trim() });
-        swap(codesStep(out && out.recoveryCodes ? out.recoveryCodes : []));
-      } catch (error) {
-        showError(form, (error && error.code === 'ACCOUNT_LOCKED')
-          ? 'Too many tries in a row. ' + waitPhrase(error.details && error.details.retryAfterSeconds)
-          : (error && error.message) || 'That did not work. Try again.');
-      }
-      finally { busy(form, false); }
-    });
-    return form;
-  }
-
-  function codesStep(codes) {
-    const done = el('button', { class: 'm-btn m-btn--primary m-btn--block', type: 'button' }, 'Sign in again');
-    done.addEventListener('click', async () => {
-      try { await logout(); } catch { /* dropped locally either way */ }
-      navigate('/login', { replace: true });
-    });
-    return el('div', { class: 'm-auth__form' },
-      el('p', { class: 'm-auth__sub' }, 'Save these now. Each signs you in once if you lose your authenticator.'),
-      el('div', { class: 'm-codes' }, codes.map((value) => el('code', { class: 'm-secret' }, value))),
-      done);
-  }
-
-  const signOut = el('button', {
-    class: 'm-btn m-btn--ghost m-btn--block', type: 'button',
-    onClick: async () => {
-      try { await logout(); } catch { /* dropped locally either way */ }
-      navigate('/login', { replace: true });
-    },
-  }, 'Sign out');
-
-  swap(passwordStep());
-  return [host, signOut];
-}
-
-export function renderAuth(page, params) {
-  let built;
-  let title;
-  switch (page.id) {
-    case 'register': {
-      const [form, alt] = registerForm();
-      built = [el('h1', { class: 'm-auth__title' }, 'Create your account'), form, alt];
-      title = 'Create account';
-      break;
-    }
-    case 'forgot': {
-      const [form, alt] = forgotForm();
-      built = [el('h1', { class: 'm-auth__title' }, 'Reset your password'), form, alt];
-      title = 'Reset password';
-      break;
-    }
-    case 'resetPassword': {
-      const [form, alt] = resetForm(params.token);
-      built = [el('h1', { class: 'm-auth__title' }, 'Choose a new password'), form, alt];
-      title = 'New password';
-      break;
-    }
-    case 'verifyEmail': {
-      const [status, form] = verifyPanel(params.token);
-      built = [el('h1', { class: 'm-auth__title' }, 'Verify your email'), status, form];
-      title = 'Verify email';
-      break;
-    }
-    case 'twoStep': {
-      const [form, alt] = twoStepPanel();
-      built = [
-        el('h1', { class: 'm-auth__title' }, 'Two-step sign-in required'),
-        el('p', { class: 'm-auth__sub' }, 'This instance asks every account for a second factor. Set one up to continue, or sign out.'),
-        form, alt,
-      ];
-      title = 'Two-step sign-in';
-      break;
-    }
-    default: {
-      const [form, alt] = loginForm();
-      built = [
-        el('h1', { class: 'm-auth__title' }, 'Welcome back'),
-        el('p', { class: 'm-auth__sub' }, 'Sign in to your communities.'),
-        form, alt,
-      ];
-      title = 'Sign in';
-    }
-  }
-  const node = el('div', { class: 'm-auth' },
-    el('div', { class: 'm-auth__card' }, lockup(), ...built));
-  return { raw: true, node, title };
-}
-
-export default { renderAuth };

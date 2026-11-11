@@ -171,6 +171,10 @@ router.post('/credentials', requireVerified, limit({ windowMs: 60000, max: 20 })
 // Join a voice channel. Authorization is the service's job, so this route stays thin.
 router.post('/channels/:channelId/join', requireVerified, limit({ windowMs: 60000, max: 30 }), wrap(async (req, res) => {
   try {
+    if (await require('../services/enforcement').isRestricted(req.user.id, 'VOICE')) {
+      return fail(res, 'FEATURE_RESTRICTED', 'voice is restricted on your account', 403,
+        { feature: 'VOICE' });
+    }
     res.status(201).json(await adapters.join(req.params.channelId, req.user.id));
   } catch (e) {
     if (!voiceFailure(res, e)) throw e;
@@ -307,6 +311,10 @@ async function gate() {
 // service layer, so a mesh seat is held to the same rules as an SFU session.
 router.post('/channels/:channelId/mesh-join', requireVerified, wrap(async (req, res) => {
   try {
+    if (await require('../services/enforcement').isRestricted(req.user.id, 'VOICE')) {
+      return fail(res, 'FEATURE_RESTRICTED', 'voice is restricted on your account', 403,
+        { feature: 'VOICE' });
+    }
     res.status(201).json(await adapters.join(req.params.channelId, req.user.id));
   } catch (e) {
     if (!voiceFailure(res, e)) throw e;

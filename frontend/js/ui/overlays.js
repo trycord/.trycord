@@ -440,3 +440,40 @@ export function attachContextMenu(node, build, options) {
   node.addEventListener('touchcancel', cancel);
   node.addEventListener('scroll', cancel, { passive: true });
 }
+
+// Ask for the words an enforcement-shaped action carries, through the same
+// dialog the desk's console already uses. The reason is part of the action's
+// own record, so the answer is the reason, and a reader who will not give
+// one keeps the action but not the words - the server treats that as a fault
+// the reader can answer for.
+export function askReason(options) {
+  const opts = options || {};
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => { if (settled) return; settled = true; resolve(value || null); };
+    const field = el('textarea', {
+      class: 'input', rows: '3', maxlength: '2000',
+      'aria-label': opts.fieldLabel || 'Reason',
+      placeholder: opts.placeholder || 'Tell them why',
+    });
+    if (opts.reason) field.value = opts.reason;
+    const proceed = el('button', {
+      class: 'btn ' + (opts.danger ? 'btn--danger' : 'btn--primary'), type: 'button',
+      onClick: () => {
+        const reason = String(field.value || '').trim();
+        if (!reason) { field.focus(); return; }
+        dialog.close({ reason });
+      },
+    }, opts.confirmLabel || 'Apply');
+    const dialog = openDialog({
+      title: opts.title || 'A reason',
+      sub: opts.body || null,
+      body: el('label', { class: 'field' }, el('span', { class: 'field-label' }, opts.fieldLabel || 'Reason'), field),
+      foot: [
+        el('button', { class: 'btn btn--ghost', type: 'button', onClick: () => dialog.close(null) }, 'Cancel'),
+        proceed,
+      ],
+      onClose: (result) => finish(result || null),
+    });
+  });
+}

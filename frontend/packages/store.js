@@ -54,7 +54,11 @@ export const State = {
   dms: [],
   friends: [],
   friendRequests: { incoming: [], outgoing: [] },
-  notifications: { items: [], unreadCount: 0, hasMore: false, nextCursor: null },
+  notifications: {
+    items: [], unreadCount: 0, unreadByCategory: {},
+    hasMore: false, nextCursor: null, category: null,
+  },
+  dmInvites: [],
   presence: new Map(),
   typing: new Map(),
   mutedChannels: new Set(),
@@ -82,8 +86,12 @@ export function normalizeUser(raw) {
     bannerUrl: raw.banner_url !== undefined ? raw.banner_url : raw.bannerUrl,
     bio: raw.bio || null,
     statusText: raw.status_text !== undefined ? raw.status_text : raw.statusText,
+    presence: raw.presence !== undefined ? raw.presence : null,
+    presenceStatus: raw.presence_status || raw.presenceStatus || null,
+    lastActiveAt: raw.last_active_at || raw.lastActiveAt || null,
+    role: raw.role || null,
     isBot: !!(raw.is_bot || raw.isBot),
-    isOwner: !!raw.is_owner || !!raw.isOwner,
+    isOwner: !!(raw.is_owner || raw.isOwner),
     roles: raw.roles || [],
     joinedAt: raw.joined_at || raw.joinedAt || null,
     timeoutExpiresAt: raw.timeout_expires_at || null,
@@ -201,9 +209,13 @@ function clearCaches() {
   State.serverRoles.clear();
   State.serverPermissions.clear();
   State.dms = [];
+  State.dmInvites = [];
   State.friends = [];
   State.friendRequests = { incoming: [], outgoing: [] };
-  State.notifications = { items: [], unreadCount: 0, hasMore: false, nextCursor: null };
+  State.notifications = {
+    items: [], unreadCount: 0, unreadByCategory: {},
+    hasMore: false, nextCursor: null, category: null,
+  };
   State.presence.clear();
   presenceInFlight = null;
   presenceFetchedAt = 0;
@@ -302,6 +314,7 @@ export async function refreshServerMembers(serverId, opts) {
 export async function refreshServerRoles(serverId) {
   const roles = await Api.roles(serverId);
   State.serverRoles.set(serverId, roles || []);
+  emit('roles', { serverId, roles: State.serverRoles.get(serverId) });
   return State.serverRoles.get(serverId);
 }
 
@@ -359,6 +372,18 @@ export async function refreshDms() {
   State.dms = await Api.dms();
   emit('dms', State.dms);
   return State.dms;
+}
+
+// The group invitations waiting for this account. They are separate from the
+// list of conversations because a question is not yet a place to talk in.
+export async function refreshDmInvites() {
+  State.dmInvites = await Api.dmInvites();
+  emit('dm-invites', State.dmInvites);
+  return State.dmInvites;
+}
+
+export function dmInviteById(id) {
+  return (State.dmInvites || []).find((invite) => String(invite.id) === String(id)) || null;
 }
 
 export function dmById(id) {
@@ -453,22 +478,97 @@ export function friendshipWith(userId) {
 // --- notifications ----------------------------------------------------------
 
 export async function refreshNotifications(opts) {
-  const page = await Api.notifications(opts);
-  if (opts && opts.before) {
+  const o = opts || {};
+  const page = await Api.notifications(o);
+  if (o.before) {
     State.notifications.items = State.notifications.items.concat(page.items || []);
   } else {
     State.notifications.items = page.items || [];
   }
   State.notifications.unreadCount = page.unreadCount || 0;
+  State.notifications.unreadByCategory = page.unreadByCategory || {};
   State.notifications.hasMore = !!page.hasMore;
   State.notifications.nextCursor = page.nextCursor || null;
+  // The filter is part of the answer, because a category page is a different
+  // list from the whole list and refreshing the wrong one would replace the
+  // rows the reader is looking at.
+  State.notifications.category = o.category || null;
   emit('notifications', State.notifications);
   return State.notifications;
+}
+
+function decrementUnread(entry) {
+  State.notifications.unreadCount = Math.max(0, (State.notifications.unreadCount || 0) - 1);
+  const category = entry && entry.category;
+  if (category && State.notifications.unreadByCategory) {
+    State.notifications.unreadByCategory[category] = Math.max(
+      0,
+      (State.notifications.unreadByCategory[category] || 0) - 1
+    );
+  }
+}
+
+export function noteNotificationRead(id) {
+  const entry = (State.notifications.items || [])
+    .find((item) => String(item.id) === String(id));
+  if (!entry || entry.readAt) return false;
+  entry.readAt = new Date().toISOString();
+  decrementUnread(entry);
+  emit('notifications', State.notifications);
+  return true;
+}
+
+export function removeNotificationLocal(id) {
+  const list = State.notifications.items || [];
+  const entry = list.find((item) => String(item.id) === String(id));
+  if (!entry) return false;
+  if (!entry.readAt) decrementUnread(entry);
+  State.notifications.items = list.filter((item) => String(item.id) !== String(id));
+  emit('notifications', State.notifications);
+  return true;
+}
+
+export function forgetNotifications(opts) {
+  const o = opts || {};
+  const list = State.notifications.items || [];
+  State.notifications.items = o.readOnly
+    ? list.filter((entry) => !entry.readAt)
+    : [];
+  if (!o.readOnly) {
+    State.notifications.unreadCount = 0;
+    State.notifications.unreadByCategory = {};
+    State.notifications.hasMore = false;
+    State.notifications.nextCursor = null;
+  }
+  emit('notifications', State.notifications);
 }
 
 export function bumpUnread(delta) {
   State.notifications.unreadCount = Math.max(0, State.notifications.unreadCount + delta);
   emit('notifications', State.notifications);
+}
+
+// A new notification arrived over the socket while the reader is looking at a
+// filtered list. It is only added to the visible rows when it belongs to the
+// filter; the badge and the category totals always move.
+export function noteNotificationIncoming(notification) {
+  if (!notification || !notification.id) return false;
+  if ((State.notifications.items || []).some((entry) => String(entry.id) === String(notification.id))) {
+    return false;
+  }
+  const category = State.notifications.category;
+  if (!category || category === notification.category) {
+    State.notifications.items = [notification].concat(State.notifications.items || []);
+  }
+  if (!notification.readAt) {
+    State.notifications.unreadCount = (State.notifications.unreadCount || 0) + 1;
+    const key = notification.category;
+    if (key && State.notifications.unreadByCategory) {
+      State.notifications.unreadByCategory[key] = (State.notifications.unreadByCategory[key] || 0) + 1;
+    }
+  }
+  emit('notifications', State.notifications);
+  return true;
 }
 
 // --- presence ---------------------------------------------------------------
@@ -479,16 +579,29 @@ let presenceFetchedAt = 0;
 let presenceWanted = [];
 
 export async function refreshPresence(ids) {
-  const unique = Array.from(new Set(ids.filter(Boolean)));
+  const unique = Array.from(new Set((ids || []).filter(Boolean).map(String)));
   if (!unique.length) return State.presence;
   for (const id of unique) if (presenceWanted.indexOf(id) === -1) presenceWanted.push(id);
+
+  // A cached answer is only fresh for the ids it actually covers. A page that
+  // opens a new conversation during the TTL used to ask for its people and be
+  // handed the previous batch's cache, leaving them with no dot until the next
+  // unrelated refresh.
+  const missing = unique.filter((id) => !State.presence.has(id));
   const fresh = presenceFetchedAt && (Date.now() - presenceFetchedAt) < PRESENCE_TTL_MS;
-  if (fresh || presenceInFlight) {
-    if (presenceInFlight) await presenceInFlight;
-    return State.presence;
-  }
-  const batch = presenceWanted.slice();
+  if (fresh && !missing.length) return State.presence;
+
+  if (presenceInFlight) await presenceInFlight;
+  const stillMissing = unique.filter((id) => !State.presence.has(id));
+  if (!presenceWanted.length && !stillMissing.length) return State.presence;
+
+  let batch = presenceWanted.slice();
   presenceWanted = [];
+  // The in-flight request may have answered everything the caller asked for
+  // while this call was waiting; asking again would be a wasted round trip.
+  batch = batch.filter((id) => !State.presence.has(id) || !fresh);
+  if (!batch.length) return State.presence;
+
   presenceInFlight = (async () => {
     try {
       const map = await Api.presence(batch);
@@ -508,8 +621,23 @@ export function presenceOf(userId) {
 }
 
 export function setPresence(userId, status) {
-  State.presence.set(userId, status);
+  State.presence.set(String(userId), status);
   emit('presence', State.presence);
+}
+
+// The account's own chosen state. The map is the same one other views read, so
+// the little dot on the account is the setting the reader just picked.
+export async function choosePresence(status) {
+  const answer = await Api.setPresence(status);
+  const chosen = (answer && answer.status) || status;
+  const me = State.user;
+  if (me) {
+    me.presenceStatus = chosen;
+    me.presence = chosen;
+    setPresence(me.id, chosen);
+    emit('user', me);
+  }
+  return chosen;
 }
 
 // --- typing -----------------------------------------------------------------

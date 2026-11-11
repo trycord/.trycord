@@ -18,6 +18,11 @@ const prefs = require('../services/prefs');
 const wellbeing = require('../services/wellbeing');
 const events = require('../services/events');
 
+let gateway = { refreshPresence: null };
+function setGateway(gw) {
+  gateway = Object.assign(gateway, gw);
+}
+
 const router = express.Router();
 router.use(auth);
 
@@ -38,7 +43,7 @@ router.patch('/privacy', rateLimit({ windowMs: 60_000, max: 30 }), async (req, r
   try {
     const body = req.body || {};
     const patch = {};
-    for (const key of ['friendRequests', 'dms', 'presence']) {
+    for (const key of ['friendRequests', 'dms', 'presence', 'profileVisibility']) {
       if (body[key] === undefined) continue;
       const v = privacy.normalizeScope(body[key]);
       if (!v) {
@@ -61,6 +66,10 @@ router.patch('/privacy', rateLimit({ windowMs: 60_000, max: 30 }), async (req, r
     // refreshed. The payload is the caller's own preferences, so it discloses
     // nothing to anyone else.
     events.emitTo(req.user.id, 'privacy', { privacy: saved });
+    // A presence preference is also a realtime audience. The people who just
+    // lost permission have to be told to stop showing the account as online;
+    // that is a separate push from the account's own settings echo above.
+    if ('presence' in patch && gateway.refreshPresence) gateway.refreshPresence(req.user.id);
     res.json(saved);
   } catch (e) { next(e); }
 });
@@ -92,6 +101,8 @@ router.post('/blocks', rateLimit({ windowMs: 60_000, max: 20 }), async (req, res
     }
     const blocked = await privacy.block(req.user.id, userId, body.reason ? String(body.reason) : null);
     events.emitTo(req.user.id, 'blocks', { blocked });
+    // A block removes somebody from the presence audience immediately.
+    if (gateway.refreshPresence) gateway.refreshPresence(req.user.id);
     res.json(blocked);
   } catch (e) { next(e); }
 });
@@ -101,6 +112,10 @@ router.delete('/blocks/:userId', async (req, res, next) => {
   try {
     const unblocked = await privacy.unblock(req.user.id, String(req.params.userId));
     events.emitTo(req.user.id, 'blocks', { unblocked });
+    // Unblocking lets the other person see presence again, if the presence
+    // preference allows it. refresh sends the current state rather than
+    // waiting for the next connect.
+    if (gateway.refreshPresence) gateway.refreshPresence(req.user.id);
     res.json(unblocked);
   } catch (e) { next(e); }
 });
@@ -185,3 +200,4 @@ router.patch('/wellbeing', rateLimit({ windowMs: 60_000, max: 60 }), async (req,
 });
 
 module.exports = router;
+module.exports.setGateway = setGateway;

@@ -208,7 +208,7 @@ async function reminderJob({ eventId }) {
   );
   for (const attendee of attendees) {
     try {
-      await notifications.create(attendee.user_id, 'mention', event.created_by, event.id);
+      await notifications.create(attendee.user_id, 'event_reminder', event.created_by, event.id);
     } catch (e) {
       console.warn('[workspace] could not send the reminder for event ' + event.id + ': ' + (e && e.message));
     }

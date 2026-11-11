@@ -1,1712 +1,1091 @@
-// Instance administration, on a phone.
+// The instance console on the phone.
 //
-// One screen per destination in the admin scope, with the scope's own list as a
-// horizontal strip above it. It is the Mobile module's own tree over the shared
-// platform: the catalogue, the labels and the bounds come from the server, so a
-// setting the server would refuse is never drawn as something a save could set.
-//
-// The actions here are the same requests the desktop module makes. Nothing in
-// this file reaches past the API client.
+// Every section the desk's console offers is answered here with the same API
+// calls: the report queue and its cases, the people console and the
+// enforcements it applies, approvals, appeals, communities, the audit log,
+// data requests, instance settings, announcements, incidents, voice,
+// diagnostics, backups, Continuum and the public page editor. A reader who is
+// not an operator is told so once, by the server's own answer.
 
 import { el, clear } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
-import { avatar, serverMark, empty, loading, failure } from '../components.js';
-import { path, navigate } from '../../../packages/nav.js';
-import { scopeNav } from '../../../packages/registry.js';
-import { toast, menu, sheet, confirm, attachLongPress } from '../ui.js';
-import { relativeTime } from '../../../packages/format.js';
+import { avatar } from '../../../js/ui/primitives.js';
 import Api from '../../../packages/api.js';
-import { screen, notice, stat, primaryButton, ghostButton } from './util.js';
-import { continuum, moderationSurface } from './federation.js';
-import { voiceBody } from './voice.js';
+import { nameOf } from '../../../packages/store.js';
+import { navigate, path } from '../../../packages/nav.js';
+import { sheet, closeSheet, confirm, toast, failed, hold, failure, field, emptyState } from '../ui.js';
 
-function field(label, control, note) {
-  return el('label', { class: 'm-field' },
-    el('span', { class: 'm-field__label' }, label),
-    control,
-    note ? el('span', { class: 'm-field__note' }, note) : null);
+const REPORT_FILTERS = [
+  ['', 'All'],
+  ['OPEN', 'Open'],
+  ['INVESTIGATING', 'Investigating'],
+  ['RESOLVED', 'Resolved'],
+  ['DISMISSED', 'Dismissed'],
+];
+
+const REPORT_MOVES = {
+  INVESTIGATING: 'Investigate',
+  RESOLVED: 'Resolve',
+  DISMISSED: 'Dismiss',
+};
+
+const STATUS_WORDS = {
+  OPEN: 'Open',
+  INVESTIGATING: 'Being investigated',
+  RESOLVED: 'Resolved',
+  DISMISSED: 'Dismissed',
+  UNDER_REVIEW: 'Under review',
+  APPROVED: 'Approved',
+  DENIED: 'Denied',
+  PENDING: 'Waiting',
+};
+
+function statusWord(status) {
+  return STATUS_WORDS[String(status || '').toUpperCase()] || String(status || '—').replace(/_/g, ' ');
 }
 
-function group(title, children) {
-  return el('section', { class: 'm-section' },
-    el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, title)),
-    children);
+function items(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && Array.isArray(payload.items)) return payload.items;
+  return [];
 }
 
-function switchControl(initial, onChange, label) {
-  let value = !!initial;
-  const control = el('button', {
-    class: 'm-switch' + (value ? ' is-on' : ''), type: 'button', role: 'switch',
-    'aria-checked': String(value), 'aria-label': label || 'Toggle',
+// -- shared pieces -------------------------------------------------------------
+
+let operator = null;
+
+async function isOperator() {
+  if (operator !== null) return operator;
+  try {
+    await Api.adminMe();
+    operator = true;
+  } catch {
+    operator = false;
+  }
+  return operator;
+}
+
+function refusal() {
+  return emptyState('shield', 'Not your console',
+    'This instance does not answer to you. The pages exist for its operators.');
+}
+
+function row(entry) {
+  const node = el(entry.onClick ? 'button' : 'div', {
+    class: 'm-row' + (entry.danger ? ' m-row--danger' : ''),
+    type: entry.onClick ? 'button' : null,
+    onClick: entry.onClick || null,
   });
-  control.addEventListener('click', () => {
-    value = !value;
-    control.setAttribute('aria-checked', String(value));
-    control.classList.toggle('is-on', value);
-    onChange(value);
+  if (entry.lead) node.appendChild(entry.lead);
+  node.appendChild(el('div', { class: 'm-row__body' },
+    el('div', { class: 'm-row__name truncate' }, entry.title || ''),
+    entry.sub ? el('div', { class: 'm-row__note truncate' }, entry.sub) : null));
+  if (entry.side) node.appendChild(el('div', { class: 'm-row__meta' }, entry.side));
+  if (entry.chevron && entry.onClick) node.appendChild(el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 16 })));
+  return node;
+}
+
+function cardOf(kicker, children) {
+  const card = el('div', { class: 'm-card' });
+  if (kicker) card.appendChild(el('div', { class: 'm-kicker' }, kicker));
+  for (const child of children) if (child) card.appendChild(child);
+  return card;
+}
+
+function fact(label, value) {
+  return el('div', { class: 'm-row' },
+    el('div', { class: 'm-row__body' }, el('div', { class: 'm-row__name' }, label)),
+    el('div', { class: 'm-row__meta' }, el('div', { class: 'm-row__note' }, value == null ? '—' : String(value))));
+}
+
+// A sheet that asks for words before an action that records them. Every
+// decision the console takes carries a reason; this is where the reason is
+// written.
+function reasonSheet(options, run) {
+  const words = el('textarea', {
+    class: 'm-area', rows: '4', maxlength: '2000',
+    placeholder: options.placeholder || 'What happened, and what you did about it',
+    'aria-label': options.fieldLabel || 'Reason',
   });
-  return control;
-}
-
-function debounce(fn, wait) {
-  let timer = 0;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), wait);
-  };
-}
-
-// -- overview ----------------------------------------------------------------
-
-function overviewBody() {
-  const host = el('div', { class: 'm-stack' });
-
-  async function load() {
-    host.replaceChildren(loading('Reading the instance'));
-    try {
-      const out = await Api.adminOverview();
-      const strip = el('div', { class: 'm-strip' },
-        stat(String(out.users || 0), 'people'),
-        stat(String(out.servers || 0), 'communities'),
-        stat(String(out.reports || out.openReports || 0), 'reports'),
-        stat(String(out.audit || 0), 'audit'));
-      const recent = el('div', { class: 'm-list' });
-      const rows = out.recentAudit || out.recent || [];
-      if (!rows.length) {
-        recent.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'Nothing logged yet.'))));
-      }
-      for (const row of rows) {
-        recent.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, icon('activity', { size: 17 })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title truncate' }, String(row.action || '')),
-            el('span', { class: 'm-row__sub truncate' }, (row.targetType || row.target_type || '') + ' ' + (row.targetId || row.target_id || ''))),
-          el('span', { class: 'm-row__actions' }, relativeTime(row.createdAt || row.created_at))));
-      }
-      host.replaceChildren(strip, group('What changed lately', recent));
-    } catch (error) {
-      host.replaceChildren(failure(error, load));
+  const go = el('button', { class: 'm-go m-go--block' + (options.danger ? ' m-go--danger' : ''), type: 'button' }, options.confirmLabel || 'Save');
+  go.addEventListener('click', async () => {
+    const reason = words.value.trim();
+    if (!reason) {
+      toast('Write the reason first — it is saved with the action.', { type: 'danger' });
+      return;
     }
-  }
-
-  load();
-  return host;
-}
-
-// -- people ------------------------------------------------------------------
-
-function usersBody() {
-  const host = el('div', { class: 'm-stack' });
-  const search = el('input', { class: 'm-input', placeholder: 'Search by username', type: 'search', 'aria-label': 'Search people' });
-  const list = el('div', { class: 'm-list' });
-  host.append(search, list);
-  const run = debounce((q) => load(q), 250);
-  search.addEventListener('input', () => run(search.value.trim()));
-
-  async function load(q) {
-    list.replaceChildren(loading('Searching'));
+    go.disabled = true;
     try {
-      const rows = await Api.adminUsers({ q: q || '' });
-      list.replaceChildren();
-      if (!rows.length) {
-        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'No accounts match.'))));
-        return;
-      }
-      for (const user of rows) list.appendChild(rowFor(user));
+      await run(reason);
+      closeSheet();
     } catch (error) {
-      list.replaceChildren(failure(error, () => load(q)));
+      failed(error);
+      go.disabled = false;
     }
-  }
-
-  function stateOf(user) {
-    // The list endpoint answers with a boolean and the kind of enforcement.
-    // A bare `true` is not a state a person reads.
-    if (user.enforced) return String(user.enforcement || user.enforcementState || user.enforcement_state || 'enforced');
-    return 'active';
-  }
-
-  function rowFor(user) {
-    const name = user.display_name || user.displayName || user.username;
-    const row = el('div', { class: 'm-row' },
-      el('span', { class: 'm-row__lead' }, avatar({ id: user.id, username: user.username, displayName: name }, { size: 'md', decorative: true })),
-      el('span', { class: 'm-row__body' },
-        el('span', { class: 'm-row__title truncate' }, name),
-        el('span', { class: 'm-row__sub truncate' }, '@' + user.username + ' \u00b7 ' + stateOf(user))),
-      el('span', { class: 'm-row__actions' },
-        el('button', {
-          class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
-          onClick: () => openCase(user),
-        }, 'Case')));
-    // A long press on the account raises the same case.
-    attachLongPress(row, () => openCase(user), { title: name });
-    return row;
-  }
-
-  // The case: the account as the list answered it, the actions recorded
-  // against it, and the decisions behind one more press. Everything here is
-  // the server's own answer; nothing is inferred from what it did not send.
-  async function openCase(user) {
-    const name = user.display_name || user.displayName || user.username;
-    const history = el('div', { class: 'm-list' });
-    history.appendChild(loading('Reading the actions'));
-    try {
-      const rows = await Api.adminUserActions(user.id);
-      history.replaceChildren();
-      const entries = Array.isArray(rows) ? rows : [];
-      if (!entries.length) {
-        history.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' },
-          el('span', { class: 'm-row__sub' }, 'No actions recorded.'))));
-      }
-      for (const action of entries) {
-        const subParts = [
-          (action.actor_name || action.actorName)
-            ? 'by ' + (action.actor_name || action.actorName) : '',
-          action.reason || '',
-          action.expiresAt ? 'expires ' + String(action.expiresAt).slice(0, 10) : '',
-        ].filter(Boolean).join(' \u00b7 ');
-        history.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, icon('clock', { size: 17 })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title truncate' }, String(action.actionType || action.action || 'An action')),
-            el('span', { class: 'm-row__sub truncate' }, subParts || '\u2014')),
-          el('span', { class: 'm-row__actions' }, relativeTime(action.createdAt))));
-      }
-    } catch (error) {
-      history.replaceChildren(failure(error, () => { openCase(user); }));
-    }
-
-    const layer = sheet({
-      title: name || 'An account',
-      body: el('div', { class: 'm-stack' },
-        el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, avatar({ id: user.id, username: user.username, displayName: name }, { size: 'md', decorative: true })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title' }, '@' + (user.username || '')),
-            el('span', { class: 'm-row__sub' },
-              (user.enforced ? 'Enforced: ' + stateOf(user) : 'Active')
-              + (user.createdAt ? ' \u00b7 joined ' + String(user.createdAt).slice(0, 10) : '')))),
-        group('Actions on this account', history),
-        el('p', { class: 'm-section__note' },
-          user.enforced
-            ? 'This account is under enforcement. Lifting it takes its decision.'
-            : 'An enforcement applied from here is written down in this case.')),
-      footer: el('div', { class: 'm-stack' },
-        el('button', {
-          class: 'm-btn m-btn--block m-btn--ghost', type: 'button',
-          onClick: () => { layer.close(); menuFor(user); },
-        }, 'Take action')),
-    });
-    return layer;
-  }
-
-  // The actions on an account, one list, raised either way.
-  function userActions(user) {
-    return [
-      { label: 'Suspend', icon: 'clock', onSelect: () => promptEnforce(user, 'SUSPENSION') },
-      { label: 'Ban', icon: 'ban', danger: true, onSelect: () => promptEnforce(user, 'ACCOUNT_BAN') },
-      { label: 'Lift enforcement', icon: 'check', onSelect: () => promptLift(user) },
-      { label: 'Approve account', icon: 'check', onSelect: () => promptApprove(user) },
-    ];
-  }
-
-  function menuFor(user) {
-    menu({
-      title: user.display_name || user.username,
-      items: userActions(user),
-    });
-  }
-
-  function promptEnforce(user, actionType) {
-    const reason = el('input', { class: 'm-input', placeholder: 'What is this for?', 'aria-label': 'Reason' });
-    const minutes = el('input', { class: 'm-input', type: 'number', min: '1', value: '1440', 'aria-label': 'Minutes' });
-    const isBan = actionType === 'ACCOUNT_BAN';
-    const layer = sheet({
-      title: isBan ? 'Ban this account' : 'Suspend this account',
-      body: el('div', { class: 'm-stack' }, field('Reason', reason), isBan ? null : field('Minutes', minutes)),
-      footer: el('button', {
-        class: 'm-btn m-btn--block' + (isBan ? ' m-btn--danger' : ' m-btn--primary'), type: 'button',
-        onClick: async (event) => {
-          event.currentTarget.disabled = true;
-          try {
-            // The server's contract: the action type it knows, the reason, and
-            // the length of a suspension in **hours**. It asked for minutes
-            // and for a type it does not have, so every one of these actions
-            // was refused.
-            const body = { actionType, reason: reason.value };
-            if (isBan) {
-              // A ban cannot be undone by lifting it, so the server asks for
-              // an explicit confirmation and the person pressing the button
-              // is it.
-              body.confirm = true;
-            } else {
-              body.expiresInHours = Math.max(1, Math.round((Number(minutes.value) || 1440) / 60));
-            }
-            await Api.adminEnforceUser(user.id, body);
-            layer.close();
-            toast('Saved.', { type: 'success' });
-            load(search.value.trim());
-          } catch (error) { toast(error.message, { type: 'danger' }); event.currentTarget.disabled = false; }
-        },
-      }, isBan ? 'Ban' : 'Suspend'),
-    });
-  }
-
-  function promptLift(user) {
-    const reason = el('input', { class: 'm-input', placeholder: 'What is this for?', 'aria-label': 'Reason' });
-    const layer = sheet({
-      title: 'Lift enforcement',
-      body: field('Reason', reason),
-      footer: el('button', {
-        class: 'm-btn m-btn--block m-btn--primary', type: 'button',
-        onClick: async (event) => {
-          event.currentTarget.disabled = true;
-          try { await Api.adminLiftUser(user.id, reason.value); layer.close(); toast('Lifted.', { type: 'success' }); load(search.value.trim()); }
-          catch (error) { toast(error.message, { type: 'danger' }); event.currentTarget.disabled = false; }
-        },
-      }, 'Lift'),
-    });
-  }
-
-  // Approve a registration the instance is holding back. The server refuses
-  // an account that is already approved, and its answer is the truth shown.
-  function promptApprove(user) {
-    confirm({
-      title: 'Approve ' + (user.display_name || user.displayName || user.username || 'this account') + '?',
-      text: 'The account gets full access to this instance.',
-      confirmLabel: 'Approve',
-    }).then(async (yes) => {
-      if (!yes) return;
-      try {
-        await Api.approveUser(user.id);
-        toast('Approved.', { type: 'success' });
-        load(search.value.trim());
-      } catch (error) { toast(error.message, { type: 'danger' }); }
-    });
-  }
-
-  load('');
-  return host;
-}
-
-// -- communities -------------------------------------------------------------
-
-function communitiesBody() {
-  const host = el('div', { class: 'm-stack' });
-  const search = el('input', { class: 'm-input', placeholder: 'Search communities', type: 'search', 'aria-label': 'Search communities' });
-  const results = el('div', { class: 'm-list' });
-  host.append(search, results);
-  const run = debounce((q) => load(q), 250);
-  search.addEventListener('input', () => run(search.value.trim()));
-
-  async function load(q) {
-    results.replaceChildren(loading('Searching'));
-    try {
-      const rows = await Api.adminServers({ q: q || '' });
-      results.replaceChildren();
-      if (!rows.length) {
-        results.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'No communities match.'))));
-        return;
-      }
-      for (const server of rows) {
-        const state = server.enforcement_state || 'active';
-        results.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, serverMark({ id: server.id, name: server.name, icon_url: server.icon_url }, { size: 'md' })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title truncate' }, server.name),
-            el('span', { class: 'm-row__sub truncate' }, (server.owner_name ? 'Owner ' + server.owner_name + ' \u00b7 ' : '') + state)),
-          el('span', { class: 'm-row__actions' },
-            el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => navigate('/server/' + server.id) }, 'Open'),
-            el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => promptServer(server) }, state === 'active' ? 'Suspend' : 'Lift'))));
-      }
-    } catch (error) {
-      results.replaceChildren(failure(error, () => load(q)));
-    }
-  }
-
-  function promptServer(server) {
-    const suspended = (server.enforcement_state || 'active') !== 'active';
-    const reason = el('input', { class: 'm-input', placeholder: 'What is this for?', 'aria-label': 'Reason' });
-    const layer = sheet({
-      title: (suspended ? 'Lift enforcement on ' : 'Suspend ') + server.name,
-      body: field('Reason', reason),
-      footer: el('button', {
-        class: 'm-btn m-btn--block' + (suspended ? ' m-btn--primary' : ' m-btn--danger'), type: 'button',
-        onClick: async (event) => {
-          event.currentTarget.disabled = true;
-          try {
-            const why = reason.value.trim();
-            if (suspended) await Api.adminLiftServer(server.id, why);
-            else await Api.adminSuspendServer(server.id, { reason: why });
-            layer.close();
-            toast(suspended ? 'Lifted.' : 'Suspended.', { type: 'success' });
-            load(search.value.trim());
-          } catch (error) { toast(error.message, { type: 'danger' }); event.currentTarget.disabled = false; }
-        },
-      }, suspended ? 'Lift' : 'Suspend'),
-    });
-  }
-
-  load('');
-  return host;
-}
-
-// -- reports -----------------------------------------------------------------
-
-const REPORT_STATUSES = ['', 'OPEN', 'INVESTIGATING', 'RESOLVED', 'DISMISSED'];
-
-function reportsBody() {
-  const host = el('div', { class: 'm-stack' });
-  const filter = el('select', { class: 'm-input m-input--select', 'aria-label': 'Filter reports by status' });
-  for (const value of REPORT_STATUSES) filter.appendChild(el('option', { value }, value || 'All statuses'));
-  const list = el('div', { class: 'm-list' });
-  host.append(filter, list);
-  filter.addEventListener('change', () => load());
-
-  async function load() {
-    list.replaceChildren(loading('Loading reports'));
-    try {
-      const rows = await Api.adminReports(filter.value ? { status: filter.value } : {});
-      list.replaceChildren();
-      if (!rows.length) {
-        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'No reports.'))));
-        return;
-      }
-      for (const report of rows) list.appendChild(rowFor(report));
-    } catch (error) {
-      list.replaceChildren(failure(error, load));
-    }
-  }
-
-  function rowFor(report) {
-    const reason = report.reason || report.description || '(no reason)';
-    const row = el('div', { class: 'm-row' },
-      el('span', { class: 'm-row__lead' }, icon('flag', { size: 17 })),
-      el('span', { class: 'm-row__body' },
-        el('span', { class: 'm-row__title truncate' }, reason),
-        el('span', { class: 'm-row__sub truncate' }, (report.target_type || '') + ' ' + (report.target_id || '') + ' \u00b7 by ' + (report.reporter_name || 'someone') + ' \u00b7 ' + (report.status || ''))),
-      el('span', { class: 'm-row__actions' },
-        el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => update(report.id, 'RESOLVED') }, 'Resolve'),
-        el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => update(report.id, 'DISMISSED') }, 'Dismiss')));
-    // A long press on the report raises the same two decisions.
-    attachLongPress(row, () => [
-      { label: 'Resolve the report', icon: 'check', onSelect: () => update(report.id, 'RESOLVED') },
-      { label: 'Dismiss the report', icon: 'x', onSelect: () => update(report.id, 'DISMISSED') },
-    ], { title: reason });
-    return row;
-  }
-
-  async function update(id, status) {
-    try { await Api.adminUpdateReport(id, { status }); toast('Updated.', { type: 'success' }); load(); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  load();
-  return host;
-}
-
-// -- appeals -----------------------------------------------------------------
-
-function appealsBody() {
-  const host = el('div', { class: 'm-stack' });
-  const list = el('div', { class: 'm-list' });
-  host.appendChild(list);
-
-  async function load() {
-    list.replaceChildren(loading('Loading appeals'));
-    try {
-      const rows = await Api.adminAppeals({});
-      list.replaceChildren();
-      if (!rows.length) {
-        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'No appeals.'))));
-        return;
-      }
-      for (const appeal of rows) {
-        list.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, icon('mail', { size: 17 })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title truncate' }, appeal.user_name || appeal.username || 'Someone'),
-            el('span', { class: 'm-row__sub truncate' }, (appeal.action_type || '') + ' \u00b7 ' + (appeal.statement || appeal.reason || '') + ' \u00b7 ' + (appeal.status || ''))),
-          el('span', { class: 'm-row__actions' },
-            el('button', { class: 'm-btn m-btn--sm m-btn--primary', type: 'button', onClick: () => decide(appeal.id, 'APPROVED') }, 'Grant'),
-            el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => decide(appeal.id, 'DENIED') }, 'Deny'))));
-      }
-    } catch (error) {
-      list.replaceChildren(failure(error, load));
-    }
-  }
-
-  async function decide(id, decision) {
-    try { await Api.adminDecideAppeal(id, decision, ''); toast('Decided.', { type: 'success' }); load(); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  load();
-  return host;
-}
-
-// -- audit -------------------------------------------------------------------
-
-function auditBody() {
-  const host = el('div', { class: 'm-stack' });
-  const list = el('div', { class: 'm-list' });
-  host.appendChild(list);
-
-  async function load() {
-    list.replaceChildren(loading('Loading the audit log'));
-    try {
-      const rows = await Api.adminAudit({});
-      list.replaceChildren();
-      if (!rows.length) {
-        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'Nothing logged yet.'))));
-        return;
-      }
-      for (const entry of rows) {
-        list.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, icon('book', { size: 17 })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title truncate' }, String(entry.action || '')),
-            el('span', { class: 'm-row__sub truncate' }, (entry.actor_id || 'system') + ' \u2192 ' + (entry.target_type || '') + ' ' + (entry.target_id || '') + (entry.reason ? ' \u00b7 ' + entry.reason : ''))),
-          el('span', { class: 'm-row__actions' }, relativeTime(entry.created_at || entry.createdAt))));
-      }
-    } catch (error) {
-      list.replaceChildren(failure(error, load));
-    }
-  }
-
-  load();
-  return host;
-}
-
-// -- data requests -----------------------------------------------------------
-
-function gdprBody() {
-  const host = el('div', { class: 'm-stack' });
-  const list = el('div', { class: 'm-list' });
-  host.appendChild(list);
-
-  async function load() {
-    list.replaceChildren(loading('Loading requests'));
-    try {
-      const rows = await Api.adminGdprRequests({});
-      list.replaceChildren();
-      if (!rows.length) {
-        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'No data requests.'))));
-        return;
-      }
-      for (const request of rows) {
-        list.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, icon('lock', { size: 17 })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title truncate' }, request.username || request.userId || 'Someone'),
-            el('span', { class: 'm-row__sub truncate' }, (request.requestType || '') + ' \u00b7 ' + (request.status || '') + (request.reason ? ' \u00b7 ' + request.reason : ''))),
-          el('span', { class: 'm-row__actions' },
-            el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => review(request.id, 'APPROVED') }, 'Approve'),
-            el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => review(request.id, 'REJECTED') }, 'Deny'),
-            el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => process(request) }, 'Process'))));
-      }
-    } catch (error) {
-      list.replaceChildren(failure(error, load));
-    }
-  }
-
-  async function review(id, decision) {
-    try { await Api.adminReviewGdprRequest(id, decision, ''); toast('Reviewed.', { type: 'success' }); load(); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  async function process(request) {
-    const sure = await confirm({
-      title: 'Process this request?',
-      text: 'Erasing is final: the account and its content go. Export requests are handed back to the person.',
-      confirmLabel: 'Process', danger: true,
-    });
-    if (!sure) return;
-    try { await Api.adminProcessGdprRequest(request.id); toast('Processed.', { type: 'success' }); load(); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  load();
-  return host;
-}
-
-// -- announcements -----------------------------------------------------------
-
-function announcementsBody() {
-  const host = el('div', { class: 'm-stack' });
-  const list = el('div', { class: 'm-list' });
-  const create = el('button', {
-    class: 'm-btn m-btn--sm m-btn--primary', type: 'button',
-    onClick: () => editAnnouncement(null, onSaved),
-  }, 'New announcement');
-  host.appendChild(el('div', { class: 'm-section' },
-    el('div', { class: 'm-section__head' }, el('div', { class: 'm-section__title' }, 'Announcements'), create),
-    list));
-
-  function onSaved() { load(); }
-
-  async function load() {
-    list.replaceChildren(loading('Loading announcements'));
-    try {
-      const out = await Api.allAnnouncements();
-      const rows = Array.isArray(out) ? out : (out.items || []);
-      list.replaceChildren();
-      if (!rows.length) {
-        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'Nothing announced.'))));
-        return;
-      }
-      for (const row of rows) {
-        list.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, icon('bell', { size: 17 })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title truncate' }, row.body),
-            el('span', { class: 'm-row__sub' }, (row.level || 'info') + ' \u00b7 ' + (row.active ? 'live' : 'hidden'))),
-          el('span', { class: 'm-row__actions' },
-            el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => editAnnouncement(row, onSaved) }, 'Edit'),
-            el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: () => remove(row) }, 'Delete'))));
-      }
-    } catch (error) {
-      list.replaceChildren(failure(error, load));
-    }
-  }
-
-  async function remove(row) {
-    const sure = await confirm({ title: 'Delete announcement?', confirmLabel: 'Delete', danger: true });
-    if (!sure) return;
-    try { await Api.deleteAnnouncement(row.id); toast('Deleted.', { type: 'success' }); load(); }
-    catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  load();
-  return host;
-}
-
-function editAnnouncement(row, done) {
-  const body = el('textarea', { class: 'm-input m-input--area', rows: '3', maxlength: '500', 'aria-label': 'Message' }, row ? row.body : '');
-  const level = el('select', { class: 'm-input m-input--select', 'aria-label': 'Level' });
-  for (const value of ['info', 'warning', 'critical']) level.appendChild(el('option', { value }, value));
-  level.value = row ? row.level : 'info';
-  const linkLabel = el('input', { class: 'm-input', value: row ? (row.linkLabel || '') : '', 'aria-label': 'Link label' });
-  const linkHref = el('input', { class: 'm-input', value: row ? (row.linkHref || '') : '', 'aria-label': 'Link address' });
-  const active = switchControl(row ? !!row.active : true, () => {}, 'Active');
-  const layer = sheet({
-    title: row ? 'Edit announcement' : 'New announcement',
-    body: el('div', { class: 'm-stack' },
-      field('Message', body),
-      field('Level', level),
-      field('Link label', linkLabel),
-      field('Link address', linkHref),
-      el('div', { class: 'm-row' },
-        el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__title' }, 'Active')),
-        el('span', { class: 'm-row__actions' }, active))),
-    footer: el('button', {
-      class: 'm-btn m-btn--block m-btn--primary', type: 'button',
-      onClick: async (event) => {
-        event.currentTarget.disabled = true;
-        const payload = {
-          body: body.value,
-          level: level.value,
-          linkLabel: linkLabel.value || null,
-          linkHref: linkHref.value || null,
-          active: active.getAttribute('aria-checked') === 'true',
-        };
-        try {
-          if (row) await Api.updateAnnouncement(row.id, payload);
-          else await Api.createAnnouncement(payload);
-          layer.close();
-          toast('Saved.', { type: 'success' });
-          done();
-        } catch (error) { toast(error.message, { type: 'danger' }); event.currentTarget.disabled = false; }
-      },
-    }, 'Save'),
   });
-}
-
-// -- pages -------------------------------------------------------------------
-
-function pagesBody() {
-  const host = el('div', { class: 'm-stack' });
-  const list = el('div', { class: 'm-list' });
-  host.appendChild(list);
-
-  async function load() {
-    list.replaceChildren(loading('Loading pages'));
-    try {
-      const rows = await Api.adminPages();
-      list.replaceChildren();
-      for (const row of rows || []) {
-        list.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, icon('file', { size: 17 })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title truncate' }, row.title || row.route),
-            el('span', { class: 'm-row__sub' }, '/' + row.route + ' \u00b7 ' + (row.status || '') + (row.legal ? ' \u00b7 legal' : ''))),
-          el('span', { class: 'm-row__actions' },
-            el('a', { class: 'm-btn m-btn--sm m-btn--ghost', href: path('/' + row.route), target: '_blank', rel: 'noopener' },
-              'View', el('span', { class: 'm-row__lead' }, icon('external', { size: 14 }))))));
-      }
-    } catch (error) {
-      list.replaceChildren(failure(error, load));
-    }
-  }
-
-  load();
-  return host;
-}
-
-// -- approvals ----------------------------------------------------------------
-
-function approvalsBody() {
-  const host = el('div', { class: 'm-stack' });
-  const list = el('div', { class: 'm-list' });
-  host.appendChild(list);
-
-  async function load() {
-    list.replaceChildren(loading('Loading the waiting accounts'));
-    try {
-      const data = await Api.adminApprovals();
-      list.replaceChildren();
-      if (!data || data.enabled === false) {
-        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'Approval is off for this instance.'))));
-        return;
-      }
-      const pending = Array.isArray(data.pending) ? data.pending : [];
-      if (!pending.length) {
-        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'Nobody is waiting to be let in.'))));
-        return;
-      }
-      for (const account of pending) {
-        list.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, icon('user', { size: 17 })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title truncate' }, account.displayName || account.username || 'An account'),
-            el('span', { class: 'm-row__sub truncate' }, '@' + (account.username || ''))),
-          el('span', { class: 'm-row__actions' },
-            el('button', {
-              class: 'm-btn m-btn--sm m-btn--primary', type: 'button',
-              onClick: async () => {
-                try {
-                  await Api.approveUser(account.id);
-                  toast('Approved.', { type: 'success' });
-                  load();
-                } catch (error) { toast(error.message, { type: 'danger' }); }
-              },
-            }, 'Approve'))));
-      }
-    } catch (error) {
-      list.replaceChildren(failure(error, load));
-    }
-  }
-
-  load();
-  return host;
-}
-
-// -- diagnostics --------------------------------------------------------------
-
-function diagnosticsBody() {
-  const host = el('div', { class: 'm-stack' });
-  const list = el('div', { class: 'm-list' });
-  host.appendChild(list);
-
-  async function load() {
-    list.replaceChildren(loading('Reading the subsystems'));
-    try {
-      const report = await Api.adminDiagnostics();
-      const subsystems = report.subsystems || {};
-      list.replaceChildren();
-      for (const [name, entry] of Object.entries(subsystems)) {
-        const detail = entry && (entry.note || entry.error || (typeof entry.detail === 'string' ? entry.detail : ''));
-        list.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, icon('activity', { size: 17 })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title truncate' }, name),
-            el('span', { class: 'm-row__sub truncate' }, String(entry.state || 'unknown') + (detail ? ' · ' + detail : ''))),
-          el('span', { class: 'm-row__actions' }, icon('check', { size: 16 }))));
-      }
-      if (!Object.keys(subsystems).length) {
-        list.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'This instance reported no subsystems.'))));
-      }
-    } catch (error) {
-      list.replaceChildren(failure(error, load));
-    }
-  }
-
-  load();
-  return host;
-}
-
-// -- configuration -----------------------------------------------------------
-
-// The mail console. It answers one honest question on the phone, the same one
-// the desktop answers: does email leave this instance at all. The three modes
-// and their summaries come from the backend's mail registry, so a provider the
-// server does not run cannot be selected here.
-function mailConsoleBlock() {
-  const host = el('div', { class: 'm-stack' });
-
-  async function load() {
-    host.replaceChildren(loading('Reading the mail setup'));
-    try {
-      const out = await Api.mailConsole();
-      const current = (out && out.current) || 'disabled';
-      const providers = (out && out.providers) || [];
-      const describe = out && out.status;
-
-      const statusText = current === 'disabled'
-        ? 'Mail is switched off. Email-dependent features say so rather than pretending to work.'
-        : describe && describe.ready
-          ? 'Mail is configured and ready to send.'
-          : 'Mail is not ready: ' + (((describe && describe.problems) || []).join(' ') || '');
-
-      const parts = [notice({
-        tone: current === 'disabled' ? 'neutral' : (describe && describe.ready ? 'success' : 'warning'),
-        title: 'Mail',
-        meta: null,
-        text: statusText,
-      })];
-
-      const modes = el('div', { class: 'm-list', role: 'radiogroup', 'aria-label': 'Delivery mode' });
-      for (const provider of providers) {
-        const active = provider.mode === current;
-        modes.appendChild(el('button', {
-          class: 'm-row is-active' + (active ? ' is-current' : ''),
-          type: 'button', role: 'radio', 'aria-checked': String(active),
-          onClick: async () => {
-            if (provider.mode === current) { load(); return; }
-            try {
-              await Api.updateInstanceSettings({ 'mail.mode': provider.mode });
-              toast('The delivery mode is ' + String(provider.label || 'changed').toLowerCase(), { type: 'success' });
-              load();
-            } catch (error) {
-              toast((error && error.message) || 'That mode was not accepted.', { type: 'danger' });
-            }
-          },
-        },
-          el('span', { class: 'm-row__lead' }, icon('mail', { size: 17 })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title' }, provider.label || provider.mode),
-            el('span', { class: 'm-row__sub' }, provider.summary || '')),
-          active ? el('span', { class: 'm-row__actions' }, icon('check', { size: 18 })) : null));
-      }
-      parts.push(modes);
-
-      const provider = providers.find((p) => p.mode === current) || null;
-      if (provider && current !== 'disabled') {
-        const to = el('input', {
-          class: 'm-input', type: 'email', inputmode: 'email',
-          placeholder: 'you@example.com',
-          'aria-label': 'Address the test message goes to',
-        });
-        parts.push(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__sub' }, 'Send a test message through the chosen transport.'),
-            to),
-          el('span', { class: 'm-row__actions' }, el('button', {
-            class: 'm-btn m-btn--primary', type: 'button',
-            onClick: async () => {
-              try {
-                await Api.mailTestSend(to.value.trim() || undefined);
-                toast('A test message was queued.', { type: 'success' });
-              } catch (error) {
-                toast((error && error.message) || 'The test did not send.', { type: 'danger' });
-              }
-            },
-          }, 'Send'))));
-      } else if (provider) {
-        parts.push(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__sub' }, 'No transport is chosen, so there is nothing to test against.'))));
-      }
-
-      host.replaceChildren(...parts);
-    } catch (error) {
-      host.replaceChildren(failure(error, load));
-    }
-  }
-
-  load();
-  return host;
-}
-
-function instanceSettingsBody() {
-  const host = el('div', { class: 'm-stack' });
-  let catalogue = [];
-  let status = { pendingRestart: [], lastSavedAt: null };
-  let activeId = null;
-  const saved = new Map();
-  const edits = new Map();
-  const strip = el('div', { class: 'm-seg m-seg--scroll', role: 'tablist', 'aria-label': 'Setting categories' });
-  const body = el('div', { class: 'm-stack' });
-  const saveBar = el('div', { class: 'm-savebar' });
-  const restartNote = el('div');
-  const saveNote = el('span', { class: 'm-row__sub' });
-
-  host.append(strip, body, el('div', { class: 'm-stack' }, saveBar));
-
-  function allEntries() {
-    const out = [];
-    for (const category of catalogue) for (const entry of category.settings || category.entries || []) out.push(entry);
-    return out;
-  }
-  function entryOf(key) {
-    return (catalogue.flatMap((c) => c.settings || c.entries || []).find((entry) => entry.key === key)) || { key };
-  }
-  function statusNote() { return body; }
-
-  function remember(data) {
-    catalogue = (data && data.categories) || [];
-    status = (data && data.status) || { pendingRestart: [], lastSavedAt: null };
-    saved.clear();
-    edits.clear();
-    for (const entry of allEntries()) if (entry.type !== 'secret') saved.set(entry.key, entry.value);
-    if (!catalogue.some((c) => c.id === activeId)) activeId = catalogue.length ? catalogue[0].id : null;
-  }
-
-  async function load() {
-    host.replaceChildren(loading('Reading the configuration'));
-    try {
-      remember(await Api.instanceSettings());
-      host.replaceChildren(strip, body, saveBar);
-      paint();
-    } catch (error) {
-      host.replaceChildren(failure(error, load));
-    }
-  }
-
-  function paint() {
-    strip.replaceChildren();
-    for (const category of catalogue) {
-      const count = entriesOf(category).filter((entry) => edits.has(entry.key)).length;
-      strip.appendChild(el('button', {
-        class: 'm-seg__item' + (category.id === activeId ? ' is-active' : ''), type: 'button', role: 'tab',
-        'aria-selected': category.id === activeId ? 'true' : 'false',
-        onClick: () => { if (category.id !== activeId) { activeId = category.id; paint(); } },
-      }, category.label + (count ? ' \u00b7 ' + count : '')));
-    }
-    const category = catalogue.find((c) => c.id === activeId);
-    body.replaceChildren();
-    if (!category) {
-      body.appendChild(el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__sub' }, 'Nothing to configure.'))));
-    } else {
-      const list = el('div', { class: 'm-stack' });
-      for (const entry of entriesOf(category)) {
-        if (entry.key === 'mail.mode') continue; // the mail console owns this choice
-        list.appendChild(entryRow(entry));
-      }
-      if (category.id === 'mail') list.prepend(mailConsoleBlock());
-      body.appendChild(group(category.label, list));
-    }
-    paintSaveBar();
-  }
-
-  function entriesOf(category) {
-    return category.settings || category.entries || [];
-  }
-
-  function paintSaveBar() {
-    saveBar.replaceChildren();
-    if (status.pendingRestart && status.pendingRestart.length) {
-      const names = status.pendingRestart.map((key) => (entryOf(key) || {}).label || key);
-      saveBar.appendChild(notice({
-        tone: 'warning',
-        title: names.length === 1 ? 'One change is waiting for a restart' : names.length + ' changes are waiting for a restart',
-        text: 'Stored, but the running process still has the old value. Restart the server to put ' + names.join(', ') + ' into effect.',
-      }));
-    }
-    const changed = edits.size;
-    const save = el('button', {
-      class: 'm-btn m-btn--block m-btn--primary', type: 'button', disabled: changed ? null : true,
-      onClick: saveEdits,
-    }, changed ? 'Save ' + changed + ' change' + (changed === 1 ? '' : 's') : 'No changes');
-    saveBar.appendChild(save);
-  }
-
-  function entryRow(entry) {
-    const label = entry.label || entry.key;
-    const control = controlFor(entry);
-    const reset = resetAction(entry);
-    const row = el('div', { class: 'm-row' + (entry.locked ? ' is-locked' : '') },
-      el('span', { class: 'm-row__body' },
-        el('span', { class: 'm-row__title' }, label),
-        el('span', { class: 'm-row__sub' }, entry.help || entry.description || '')),
-      el('span', { class: 'm-row__actions' }, reset, control));
-    return row;
-  }
-
-  function valueOf(entry) {
-    return edits.has(entry.key) ? edits.get(entry.key) : entry.value;
-  }
-
-  function isChanged(entry, value) {
-    if (entry.type === 'secret') return !!value;
-    const original = saved.get(entry.key);
-    if (original === value) return false;
-    if (original === null || original === undefined) return value !== '' && value !== null && value !== undefined;
-    if (value === null || value === undefined) return String(original) !== '';
-    return String(original) !== String(value);
-  }
-
-  function edit(entry, value) {
-    if (isChanged(entry, value)) edits.set(entry.key, value);
-    else edits.delete(entry.key);
-    paint();
-  }
-
-  function controlFor(entry) {
-    const value = valueOf(entry);
-    if ((entry.type || 'string') === 'boolean') {
-      return switchControl(!!value, (next) => edit(entry, next), entry.label || entry.key);
-    }
-    if (Array.isArray(entry.allowed) && entry.allowed.length) {
-      const select = el('select', { class: 'm-input m-input--select', 'aria-label': entry.label || entry.key });
-      for (const option of entry.allowed) select.appendChild(el('option', { value: option }, option === '' ? 'Not set' : option));
-      select.value = value === undefined || value === null ? '' : String(value);
-      select.addEventListener('change', () => edit(entry, select.value));
-      return select;
-    }
-    const type = entry.type === 'number' || entry.type === 'integer' ? 'number'
-      : entry.type === 'secret' ? 'password' : entry.type === 'url' ? 'url' : 'text';
-    const input = el('input', {
-      class: 'm-input m-input--compact', type, 'aria-label': entry.label || entry.key,
-      value: entry.type === 'secret' ? null : (value === undefined || value === null ? '' : String(value)),
-      placeholder: entry.type === 'secret' ? (entry.set ? 'Stored - type to replace' : 'Not set') : null,
-      autocomplete: entry.type === 'secret' ? 'new-password' : 'off',
-    });
-    input.addEventListener('input', () => edit(entry, input.value));
-    return input;
-  }
-
-  function resetAction(entry) {
-    if (entry.locked || entry.source !== 'instance') return null;
-    return el('button', {
-      class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', 'aria-label': 'Reset ' + (entry.label || entry.key),
-      onClick: async (event) => {
-        event.currentTarget.disabled = true;
-        try {
-          remember(await Api.resetInstanceSetting(entry.key));
-          paint();
-          toast((entry.label || entry.key) + ' is back to its default.', { type: 'success' });
-        } catch (error) { event.currentTarget.disabled = false; toast(error.message, { type: 'danger' }); }
-      },
-    }, 'Reset');
-  }
-
-  async function saveEdits() {
-    if (!edits.size) return;
-    const payload = Object.fromEntries(edits);
-    try {
-      remember(await Api.updateInstanceSettings(payload));
-      paint();
-      toast('Saved.', { type: 'success' });
-    } catch (error) {
-      // Consequential values answer CONFIRMATION_REQUIRED on the first attempt;
-      // the save button is itself the confirmation, so repeat the save with the flag.
-      if (error && (error.code === 'CONFIRMATION_REQUIRED' || String(error.message || '').includes('need confirmation'))) {
-        try {
-          remember(await Api.updateInstanceSettings(Object.assign({}, payload, { __confirm: true })));
-          paint();
-          toast('Saved.', { type: 'success' });
-        } catch (error2) { toast(error2.message, { type: 'danger' }); }
-        return;
-      }
-      toast(error.message, { type: 'danger' });
-    }
-  }
-
-  load();
-  return host;
-}
-
-// -- database ----------------------------------------------------------------
-
-function databaseBody() {
-  const host = el('div', { class: 'm-stack' });
-  let model = null;
-
-  async function load() {
-    host.replaceChildren(loading('Reading the database configuration'));
-    try { model = await Api.databaseConfig(); paint(); }
-    catch (error) { host.replaceChildren(failure(error, load)); }
-  }
-
-  function engine(config) {
-    return config && config.client === 'mysql' ? 'MySQL or MariaDB' : 'SQLite';
-  }
-
-  function where(config) {
-    if (!config) return 'Nothing is configured yet.';
-    if (config.client === 'sqlite') return config.file;
-    return config.user + '@' + config.host + ':' + config.port + '/' + config.name;
-  }
-
-  function changeForm() {
-    const start = model.effective || (model.saved && model.saved.config) || model.environment || { client: 'sqlite' };
-    const isMysql = start.client === 'mysql';
-    const select = el('select', { class: 'm-input m-input--select', 'aria-label': 'Database engine' },
-      el('option', { value: 'sqlite' }, 'SQLite - a file on this server'),
-      el('option', { value: 'mysql' }, 'MySQL or MariaDB - a database server'));
-    select.value = isMysql ? 'mysql' : 'sqlite';
-    const text = (value, type) => el('input', { class: 'm-input', type: type || 'text', value: value === undefined || value === null ? '' : String(value), autocomplete: 'off' });
-    const file = text(isMysql ? '' : start.file);
-    const dbHost = text(isMysql ? start.host : '');
-    const port = text(isMysql ? start.port : '3306', 'number');
-    const name = text(isMysql ? start.name : '');
-    const user = text(isMysql ? start.user : '');
-    const password = el('input', { class: 'm-input', type: 'password', autocomplete: 'off', 'aria-label': 'Password' });
-    const ssl = switchControl(!!(isMysql && start.ssl), () => {}, 'Require TLS');
-    const limit = text(isMysql ? start.connectionLimit : '10', 'number');
-
-    const sqliteFields = el('div', { class: 'm-stack' }, field('File', file));
-    const mysqlFields = el('div', { class: 'm-stack' },
-      field('Host', dbHost), field('Port', port), field('Database', name),
-      field('User', user), field('Password', password),
-      el('div', { class: 'm-row' },
-        el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__title' }, 'Require TLS')),
-        el('span', { class: 'm-row__actions' }, ssl)),
-      field('Connection limit', limit));
-    function sync() {
-      const mysql = select.value === 'mysql';
-      sqliteFields.hidden = mysql;
-      mysqlFields.hidden = !mysql;
-    }
-    select.addEventListener('change', sync);
-    sync();
-
-    function draft() {
-      if (select.value === 'sqlite') return { client: 'sqlite', file: file.value.trim() };
-      const body = {
-        client: 'mysql', host: dbHost.value.trim(), port: Number(port.value) || 3306,
-        name: name.value.trim(), user: user.value.trim(),
-        ssl: ssl.getAttribute('aria-checked') === 'true', connectionLimit: Number(limit.value) || 10,
-      };
-      if (password.value) body.password = password.value;
-      return body;
-    }
-
-    const result = el('div', { class: 'm-stack' });
-    const test = el('button', {
-      class: 'm-btn m-btn--ghost', type: 'button',
-      onClick: async (event) => {
-        event.currentTarget.disabled = true;
-        try {
-          const out = await Api.testDatabaseConfig(draft());
-          result.replaceChildren(notice(out.ok
-            ? { tone: 'success', title: 'It answered', text: 'Saving will use this connection.' }
-            : { tone: 'danger', title: 'It did not answer', text: out.error || 'The server refused the connection.' }));
-        } catch (error) {
-          result.replaceChildren(notice({ tone: 'danger', title: 'It did not answer', text: error.message }));
-        } finally { event.currentTarget.disabled = false; }
-      },
-    }, 'Test');
-    const save = el('button', {
-      class: 'm-btn m-btn--primary', type: 'button',
-      onClick: async (event) => {
-        const sure = await confirm({
-          title: 'Store this connection?',
-          text: 'The server reaches it first: one that cannot be connected to is never written.',
-          confirmLabel: 'Store it', danger: true,
-        });
-        if (!sure) return;
-        event.currentTarget.disabled = true;
-        try {
-          model = await Api.saveDatabaseConfig(Object.assign(draft(), { __confirm: true }));
-          paint();
-          toast('Stored. Restart the server, or switch now.', { type: 'success' });
-        } catch (error) { toast(error.message, { type: 'danger' }); }
-        finally { event.currentTarget.disabled = false; }
-      },
-    }, 'Store');
-
-    return group('Change the connection', el('div', { class: 'm-stack' },
-      field('Engine', select), sqliteFields, mysqlFields, result,
-      el('div', { class: 'm-actions' }, test, save)));
-  }
-
-  function warnings() {
-    const out = [];
-    if (model.saved && model.saved.problem) {
-      out.push(notice({
-        tone: 'danger', title: 'The saved connection cannot be read',
-        text: model.saved.problem + ' The running server is using whatever it opened at start.',
-      }));
-    }
-    if (!model.runtime || !model.runtime.connected) {
-      const failures = (model.runtime && model.runtime.failures) || [];
-      out.push(notice({
-        tone: 'danger', title: 'There is no database connection',
-        text: failures.length ? failures.map((f) => f.source + ': ' + f.error).join(' ') : 'The server could not open a connection.',
-      }));
-    }
-    if (model.pendingRestart) {
-      out.push(notice({
-        tone: 'warning', title: 'A saved connection is waiting to take over',
-        text: 'The process is still using ' + where(model.effective) + '.',
-        actions: el('div', { class: 'm-actions' },
-          el('button', {
-            class: 'm-btn m-btn--sm m-btn--primary', type: 'button',
-            onClick: async () => {
-              const sure = await confirm({ title: 'Switch the live connection?', text: 'The saved connection is opened first; the running one is left as it is if that fails.', confirmLabel: 'Switch now' });
-              if (!sure) return;
-              try { model = await Api.applyDatabaseConfig(); paint(); toast('Connected.', { type: 'success' }); }
-              catch (error) { toast(error.message, { type: 'danger' }); }
-            },
-          }, 'Switch now'),
-          el('button', { class: 'm-btn m-btn--sm m-btn--ghost', type: 'button', onClick: rereread }, 'Check again')),
-      }));
-    }
-    return out;
-  }
-
-  async function rereread() {
-    try { model = await Api.databaseConfig(); paint(); } catch (error) { toast(error.message, { type: 'danger' }); }
-  }
-
-  function paint() {
-    const live = model.effective;
-    const nodes = warnings();
-    nodes.push(group('In use now', el('div', { class: 'm-list' },
-      el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__title' }, 'Engine')), el('span', { class: 'm-row__actions' }, engine(live))),
-      el('div', { class: 'm-row' }, el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__title' }, 'Location'), el('span', { class: 'm-row__sub' }, where(live)))))));
-    nodes.push(changeForm());
-    if (model.saved && model.saved.previous) {
-      nodes.push(group('Saved configuration', el('div', { class: 'm-list' },
-        el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__title' }, 'Return to the previous connection')),
-          el('span', { class: 'm-row__actions' }, el('button', {
-            class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
-            onClick: async () => {
-              const sure = await confirm({ title: 'Return to the previous connection?', confirmLabel: 'Return' });
-              if (!sure) return;
-              try { model = await Api.rollbackDatabaseConfig(); paint(); toast('Stored.', { type: 'success' }); }
-              catch (error) { toast(error.message, { type: 'danger' }); }
-            },
-          }, 'Return'))))));
-    }
-    if (model.saved && model.saved.present) {
-      nodes.push(group('Saved configuration', el('div', { class: 'm-list' },
-        el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__body' }, el('span', { class: 'm-row__title' }, 'Forget the saved connection')),
-          el('span', { class: 'm-row__actions' }, el('button', {
-            class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
-            onClick: async () => {
-              const sure = await confirm({ title: 'Forget the saved connection?', text: 'The environment decides the database again at the next start.', confirmLabel: 'Forget it', danger: true });
-              if (!sure) return;
-              try { model = await Api.clearDatabaseConfig(); paint(); toast('Forgotten.', { type: 'success' }); }
-              catch (error) { toast(error.message, { type: 'danger' }); }
-            },
-          }, 'Forget'))))));
-    }
-    host.replaceChildren(...nodes);
-  }
-
-  load();
-  return host;
-}
-
-// -- federation ----------------------------------------------------------------
-//
-// The Continuum manager, on the phone. The same truth the desktop console reads:
-// the settings store owns the master switch, discovery owns identity, and the
-// admin routes own the peers, the outbox and the inbox. The add flow runs its
-// check first, so what gets stored is what the remote stated about itself.
-
-function continuumBody() {
-  const host = el('div', { class: 'm-stack' });
-
-  const load = async () => {
-    host.replaceChildren(loading('Reading federation'));
-    try {
-      const catalogue = await Api.instanceSettings();
-      let entry = null;
-      for (const category of (catalogue && catalogue.categories) || []) {
-        const found = (category.settings || []).find((s) => s.key === 'continuum.enabled');
-        if (found) { entry = found; break; }
-      }
-      const enabled = !!(entry && entry.value);
-      const nodes = [];
-
-      const flip = async (on) => {
-        try {
-          await Api.updateInstanceSettings(on
-            ? { 'continuum.enabled': true, __confirm: true }
-            : { 'continuum.enabled': false });
-          toast(on ? 'Continuum is on' : 'Continuum is off');
-          await load();
-        } catch (error) { toast(error.message, { type: 'danger' }); }
-      };
-      const toggle = switchControl(enabled, async (on) => {
-        if (on) {
-          const yes = await confirm({
-            title: 'Turn on Community Continuum?',
-            text: 'From then on this instance accepts federation traffic an operator allows, and its discovery document is public.',
-            confirmLabel: 'Turn on',
-          });
-          if (!yes) return;
-        }
-        await flip(on);
-      }, 'Community Continuum');
-      nodes.push(group('The federation switch', [el('div', { class: 'm-row' }, toggle,
-        el('span', { class: 'm-row__sub' }, 'Signed events exchange with peers, opt-in and admin-managed.'))]));
-      if (entry && entry.source === 'environment') {
-        nodes.push(notice({ tone: 'info', title: 'The deployment has the switch', text: 'The environment forces this value; a change saved here takes over.' }));
-      }
-
-      if (!enabled) {
-        nodes.push(notice({
-          tone: 'info',
-          title: 'Nothing is sent, nothing is accepted',
-          text: 'While federation is off this instance is local-only. The discovery document that tells other operators how to reach it answers that the door is closed.',
-        }));
-        host.replaceChildren(...nodes);
-        return;
-      }
-
-      let doc = null;
-      try { doc = await Api.continuumDiscovery(); } catch { doc = null; }
-      if (doc && doc.public_key) {
-        const copy = ghostButton('Copy public key', async () => {
-          try { await navigator.clipboard.writeText(String(doc.public_key || '')); toast('Public key copied'); }
-          catch (error) { toast('The clipboard refused the copy', { type: 'danger' }); }
-        });
-        nodes.push(group('This instance', [
-          notice({ tone: 'neutral', title: 'Identity', text: 'Instance id ' + (doc.instance_id || 'unknown') + ' · protocol ' + (doc.protocol || '?'), body: el('div', { class: 'm-codes' }, el('div', { class: 'm-code' }, String(doc.public_key || ''))), actions: [copy] }),
-        ]));
-      }
-
-      // Peers.
-      const peersHost = el('div', { class: 'm-list' });
-      nodes.push(group('Connected instances', [peersHost]));
-      const paintPeers = async () => {
-        peersHost.replaceChildren(loading('Reading peers'));
-        try {
-          const peers = await Api.continuumInstances();
-          const rows = Array.isArray(peers) ? peers : [];
-          if (!rows.length) {
-            peersHost.replaceChildren(empty({ icon: 'share', title: 'No peers yet', text: 'Add the first one below. The check verifies the remote before anything is stored.' }));
-            return;
-          }
-          const nodes2 = [];
-          for (const peer of rows) nodes2.push(m(peer));
-          peersHost.replaceChildren(...nodes2);
-          function m(peer) {
-            const status = peer.trust_status || 'pending';
-            const actions = [];
-            if (status !== 'trusted') actions.push(ghostButton('Trust', () => void changeTrust(peer.id, 'trusted')));
-            if (status !== 'pending') actions.push(ghostButton('Unblock', () => void changeTrust(peer.id, 'pending')));
-            if (status !== 'blocked') actions.push(ghostButton('Block', () => void changeTrust(peer.id, 'blocked')));
-            return el('div', { class: 'm-row' },
-              el('span', { class: 'm-row__lead' }, icon('server', { size: 17 })),
-              el('span', { class: 'm-row__body' },
-                el('span', { class: 'm-row__title' }, peer.name || 'An unnamed instance'),
-                el('span', { class: 'm-row__sub' }, (peer.id || '') + ' · ' + (peer.origin || ''))),
-              el('span', { class: 'm-row__side' },
-                el('span', { class: 'm-chip' + (status === 'trusted' ? ' m-chip--active' : status === 'blocked' ? ' m-chip--revoked' : '') }, status),
-                actions.length ? el('span', { class: 'm-actions' }, ...actions) : null));
-          }
-        } catch (error) {
-          peersHost.replaceChildren(failure(error, paintPeers));
-        }
-      };
-      async function changeTrust(id, status) {
-        try {
-          await Api.continuumSetTrust(id, status);
-          toast(status === 'trusted' ? 'Instance trusted' : status === 'blocked' ? 'Instance blocked' : 'Trust reset to pending');
-          await paintPeers();
-        } catch (error) { toast(error.message, { type: 'danger' }); await paintPeers(); }
-      }
-      await paintPeers();
-
-      // Add flow inside a sheet, opened by a button row.
-      const addOpen = el('button', { class: 'm-btn m-btn--block m-btn--primary', type: 'button', onClick: () => openAddSheet(paintPeers) }, 'Add an instance');
-      nodes.push(group('Add an instance', [el('div', { class: 'm-list' },
-        el('div', { class: 'm-row' }, addOpen))]));
-
-      // Traffic.
-      const outboxHost = el('div', { class: 'm-list' });
-      const inboxHost = el('div', { class: 'm-list' });
-      const paintOut = async () => {
-        outboxHost.replaceChildren(loading('Reading the outbox'));
-        try {
-          const events = await Api.continuumEvents();
-          const rows = Array.isArray(events) ? events : [];
-          if (!rows.length) { outboxHost.replaceChildren(empty({ icon: 'send', title: 'Nothing sent yet', text: 'A posted message becomes one signed event, delivered to every trusted peer.' })); return; }
-          outboxHost.replaceChildren(...rows.map((event) => {
-            const status = event.status || 'pending';
-            return el('div', { class: 'm-row' },
-              el('span', { class: 'm-row__lead' }, icon('send', { size: 16 })),
-              el('span', { class: 'm-row__body' },
-                el('span', { class: 'm-row__title' }, event.kind || 'an event'),
-                el('span', { class: 'm-row__sub' }, (event.error ? String(event.error).slice(0, 90) + ' · ' : '') + 'attempt ' + (event.attempts != null ? event.attempts : '?') + ' of ' + (event.max_attempts || '?'))),
-              el('span', { class: 'm-row__side' }, el('span', { class: 'm-chip' + (status === 'delivered' ? ' m-chip--active' : '') }, status)));
-          }));
-        } catch (error) { outboxHost.replaceChildren(failure(error, paintOut)); }
-      };
-      const paintIn = async () => {
-        inboxHost.replaceChildren(loading('Reading the inbox'));
-        try {
-          const box = await Api.continuumInbox();
-          const rows = Array.isArray(box) ? box : [];
-          if (!rows.length) { inboxHost.replaceChildren(empty({ icon: 'inbox', title: 'Nothing arrived yet', text: 'Trusted peers deliver here, and each arrival shows whether it was processed.' })); return; }
-          inboxHost.replaceChildren(...rows.map((item) => el('div', { class: 'm-row' },
-            el('span', { class: 'm-row__lead' }, icon('inbox', { size: 16 })),
-            el('span', { class: 'm-row__body' },
-              el('span', { class: 'm-row__title' }, item.kind || 'an event'),
-              el('span', { class: 'm-row__sub' }, 'from ' + (item.instance_id || 'unknown') + ' · ' + relativeTime(item.received_at))),
-            el('span', { class: 'm-row__side' }, el('span', { class: 'm-chip' + (item.processed ? ' m-chip--active' : '') }, item.processed ? 'processed' : 'held')))));
-        } catch (error) { inboxHost.replaceChildren(failure(error, paintIn)); }
-      };
-      await paintOut();
-      await paintIn();
-      nodes.push(group('Outbox', [outboxHost]));
-      nodes.push(group('Inbox', [inboxHost]));
-
-      host.replaceChildren(...nodes);
-    } catch (error) {
-      host.replaceChildren(failure(error, load));
-    }
-  };
-
-  load();
-  return host;
-}
-
-function openAddSheet(refresh) {
-  const origin = el('input', { class: 'm-input', type: 'url', 'aria-label': 'Remote origin', placeholder: 'https://peer.example.dev' });
-  const out = el('div', { class: 'm-stack' });
-  const body = el('div', { class: 'm-stack' },
-    field('Remote origin', origin, 'The base address of the other instance. Its discovery document is fetched.'),
-    out);
-  const check = async () => {
-    out.replaceChildren(loading('Asking the remote instance'));
-    try {
-      const result = await Api.continuumProbe(origin.value.trim());
-      const doc = (result && result.discovery) || {};
-      out.replaceChildren(
-        notice({ tone: 'success', title: 'The remote answered', text: 'Instance id ' + (doc.instance_id || 'unknown') + (doc.enabled === false ? ' · federation off there' : ' · federation on there') })
-      );
-      const id = el('input', { class: 'm-input', 'aria-label': 'Instance id', value: doc.instance_id || '', placeholder: 'their instance id' });
-      const name = el('input', { class: 'm-input', 'aria-label': 'Display name', value: doc.instance_id || '', placeholder: 'what to call them here' });
-      const key = el('textarea', { class: 'm-input m-input--area', rows: 4, 'aria-label': 'Public key', placeholder: '-----BEGIN PUBLIC KEY-----' });
-      key.value = String(doc.public_key || '').trim();
-      const add = async () => {
-        try {
-          await Api.continuumAddInstance({ id: id.value.trim(), name: name.value.trim() || id.value.trim(), origin: origin.value.trim(), public_key: key.value.trim() });
-          toast('Instance added. Trust it to start exchanging events.');
-          if (refresh) await refresh();
-        } catch (error) { toast(error.message, { type: 'danger' }); }
-      };
-      const sheetLayer = sheet({
-        title: 'Confirm the addition',
-        body: el('div', { class: 'm-stack' },
-          field('Instance id', id),
-          field('Display name', name),
-          field('Public key', key, 'Copied from the remote discovery document.'),
-          primaryButton('Add instance', add, { block: true })),
-      });
-      return sheetLayer;
-    } catch (error) {
-      out.replaceChildren(failure(error, check));
-      return null;
-    }
-  };
-
-  const layer = sheet({
-    title: 'Add an instance',
-    body,
-    footer: el('div', { class: 'm-actions' },
-      primaryButton('Check instance', check, { block: true }),
-      ghostButton('Close', () => { if (layer) layer.close(); }, { block: true })),
-  });
+  const layer = sheet({ title: options.title || 'A reason', note: options.note || null });
+  layer.body.appendChild(field(options.fieldLabel || 'Reason', words));
+  layer.body.appendChild(go);
   return layer;
 }
 
-// -- incidents ----------------------------------------------------------------
-//
-// The incident timeline an operator writes. What is written here is what the
-// status page shows, so the screen says plainly what it will do: it posts what
-// you write.
+function personLead(person) {
+  return avatar(person, { size: 'sm' });
+}
 
-const INCIDENT_STATUSES = [
-  ['investigating', 'Being looked at'],
-  ['identified', 'The cause is known'],
-  ['monitoring', 'Being watched'],
-  ['resolved', 'Resolved'],
-];
+function when(stamp) {
+  if (!stamp) return '';
+  const date = new Date(stamp);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
 
-function incidentsBody() {
-  const host = el('div', { class: 'm-stack' });
-  const list = el('div', { class: 'm-list' });
+// -- sections ------------------------------------------------------------------
 
-  const kind = el('select', { class: 'm-input m-input--select', 'aria-label': 'What kind of entry this is' });
-  kind.appendChild(el('option', { value: 'incident' }, 'An incident'));
-  kind.appendChild(el('option', { value: 'maintenance' }, 'Planned maintenance'));
-  const status = el('select', { class: 'm-input m-input--select', 'aria-label': 'The status' });
-  for (const [value, label] of INCIDENT_STATUSES) {
-    status.appendChild(el('option', { value }, label));
+async function overview(host) {
+  const data = await Api.adminOverview();
+  const counts = cardOf('The queues', [
+    fact('Accounts', data.users),
+    fact('Communities', data.servers),
+    fact('Enforced accounts', data.enforcedUsers),
+    fact('Open reports', data.openReports),
+    fact('Open appeals', data.openAppeals),
+  ]);
+  const reports = data.reports || {};
+  const appeals = data.appeals || {};
+  const distribution = cardOf('Reports by status',
+    Object.keys(reports).length
+      ? Object.entries(reports).map(([status, count]) => fact(statusWord(status), count))
+      : [emptyState('flag', 'No reports yet', 'A filed report arrives here with its status.')]);
+  const appealDistribution = cardOf('Appeals by status',
+    Object.keys(appeals).length
+      ? Object.entries(appeals).map(([status, count]) => fact(statusWord(status), count))
+      : [emptyState('inbox', 'No appeals yet', 'An appeal against an enforcement arrives here.')]);
+  const entries = items(data.recentAudit);
+  const audit = cardOf('Recent audit', entries.length
+    ? entries.map((entry) => row({
+      title: entry.action || 'An action',
+      sub: (entry.targetType || '') + (entry.targetId ? ' · ' + entry.targetId : '') + (entry.createdAt ? ' · ' + when(entry.createdAt) : ''),
+    }))
+    : [emptyState('clock', 'Nothing recorded yet', 'Administrative actions appear here as they happen.')]);
+  host.append(counts, distribution, appealDistribution, audit);
+}
+
+async function people(host) {
+  const search = el('input', {
+    class: 'm-input', type: 'search', placeholder: 'Search by name, handle or address',
+    'aria-label': 'Search accounts',
+  });
+  const list = el('div', { class: 'm-card' });
+  host.append(search, list);
+
+  const paintList = async (query) => {
+    list.replaceChildren(hold());
+    try {
+      const payload = await Api.adminUsers(Object.assign({ limit: '50' }, query ? { q: query } : {}));
+      const rows = items(payload);
+      list.replaceChildren(...(rows.length
+        ? rows.map((user) => row({
+          lead: personLead(user),
+          title: nameOf(user) || user.username || 'An account',
+          sub: '@' + (user.username || '') + (user.enforcement_state ? ' · ' + user.enforcement_state : ''),
+          side: user.enforcement_state ? el('span', { class: 'm-row__note' }, statusWord(user.enforcement_state)) : null,
+          chevron: true,
+          onClick: () => person(host, user, paintList),
+        }))
+        : [emptyState('users', query ? 'Nobody by that name' : 'No accounts', query ? 'Try a different spelling.' : 'Accounts appear here as they are made.')]));
+    } catch (error) {
+      list.replaceChildren(failure(error, () => paintList(query)));
+    }
+  };
+
+  let timer = null;
+  search.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => paintList(search.value.trim()), 250);
+  });
+  await paintList('');
+}
+
+async function person(host, chosen, back) {
+  clear(host);
+  host.appendChild(hold());
+  const dossier = await Api.adminUser(chosen.id);
+  const user = Object.assign({}, chosen, dossier);
+  const actions = items(dossier.actions);
+  const notes = items(dossier.notes);
+  const restrictions = items(dossier.activeRestrictions);
+  const enforced = !!dossier.enforcement_state;
+
+  clear(host);
+  host.appendChild(el('button', { class: 'm-go m-go--quiet', type: 'button', onClick: () => back('') }, 'Back to the list'));
+
+  const head = el('div', { class: 'm-card' },
+    el('div', { class: 'm-row' },
+      personLead(user),
+      el('div', { class: 'm-row__body' },
+        el('div', { class: 'm-row__name' }, nameOf(user) || user.username || 'An account'),
+        el('div', { class: 'm-row__note' }, '@' + (user.username || '')))));
+  host.appendChild(head);
+  host.appendChild(cardOf('The account', [
+    fact('Enforcement', enforced ? statusWord(dossier.enforcement_state) : 'None'),
+    fact('Arrived', when(user.createdAt || user.created_at)),
+    fact('Reports against', dossier.reportCount == null ? '—' : dossier.reportCount),
+  ]));
+
+  if (restrictions.length) {
+    host.appendChild(cardOf('Standing restrictions',
+      restrictions.map((entry) => row({ title: statusWord(entry.type || entry.kind), sub: entry.reason || '' }))));
   }
-  const title = el('input', { class: 'm-input', type: 'text', 'aria-label': 'The title', placeholder: 'What it says at a glance' });
-  const summary = el('input', { class: 'm-input', type: 'text', 'aria-label': 'The summary', placeholder: 'What is happening' });
-  const body = el('input', { class: 'm-input', type: 'text', 'aria-label': 'The note under it', placeholder: 'Anything else people should know' });
-  const scheduled = el('input', { class: 'm-input', type: 'datetime-local', 'aria-label': 'The date the maintenance is planned for' });
-  const note = el('p', { class: 'm-notice__text' });
 
-  function paintScheduled() {
-    scheduled.hidden = kind.value !== 'maintenance';
+  const enforce = async (plan) => {
+    const body = { actionType: plan.actionType };
+    if (plan.hours) body.expiresInHours = plan.hours;
+    if (plan.confirm) body.confirm = true;
+    const yes = await confirm({
+      title: plan.title + ' ' + (user.username || 'this account') + '?',
+      text: plan.text,
+      confirmLabel: plan.title,
+      danger: true,
+    });
+    if (!yes) return;
+    const reason = await new Promise((done) => {
+      reasonSheet({ title: 'The reason', confirmLabel: plan.title, danger: true, placeholder: 'Why, in the words a reviewer reads' }, done);
+    });
+    body.reason = reason;
+    try {
+      await Api.adminEnforceUser(user.id, body);
+      toast(plan.title + ' — recorded');
+      await person(host, chosen, back);
+    } catch (error) { failed(error); }
+  };
+
+  host.appendChild(cardOf('Enforcement', [
+    row({ title: 'Warn', lead: el('span', { class: 'm-row__chevron' }, icon('alert-triangle', { size: 16 })), onClick: () => enforce({ actionType: 'WARNING', title: 'Warn', text: 'A note on the account, and nothing more.' }) }),
+    row({ title: 'Suspend for a day', lead: el('span', { class: 'm-row__chevron' }, icon('clock', { size: 16 })), onClick: () => enforce({ actionType: 'SUSPENSION', hours: 24, title: 'Suspend', text: 'They lose access for a day, or until someone lifts it.' }) }),
+    row({ title: 'Suspend until lifted', lead: el('span', { class: 'm-row__chevron' }, icon('clock', { size: 16 })), onClick: () => enforce({ actionType: 'SUSPENSION', title: 'Suspend', text: 'They lose access until an operator lifts it.' }) }),
+    row({ title: 'Ban the account', danger: true, lead: el('span', { class: 'm-row__chevron' }, icon('ban', { size: 16 })), onClick: () => enforce({ actionType: 'ACCOUNT_BAN', confirm: true, title: 'Ban', text: 'They lose access to everything here, and only an admin can undo it.' }) }),
+    enforced ? row({
+      title: 'Lift the enforcement', lead: el('span', { class: 'm-row__chevron' }, icon('check', { size: 16 })),
+      onClick: async () => {
+        if (!(await confirm({ title: 'Lift the enforcement?', text: 'The account answers for itself again.', confirmLabel: 'Lift' }))) return;
+        try {
+          await Api.adminLiftUser(user.id, 'Lifted by an administrator');
+          toast('Enforcement lifted');
+          await person(host, chosen, back);
+        } catch (error) { failed(error); }
+      },
+    }) : null,
+  ]));
+
+  const noteRow = row({
+    title: 'Add a note', lead: el('span', { class: 'm-row__chevron' }, icon('edit', { size: 16 })), chevron: true,
+    onClick: () => reasonSheet({
+      title: 'A note on the account',
+      note: 'Notes are for staff only.',
+      confirmLabel: 'Add the note',
+      placeholder: 'What the next operator should know',
+    }, async (body) => {
+      await Api.adminAddUserNote(user.id, body);
+      toast('Note added');
+      await person(host, chosen, back);
+    }),
+  });
+  host.appendChild(cardOf('Notes', [noteRow].concat(notes.length
+    ? notes.map((entry) => row({ title: entry.body || 'A note', sub: (entry.authorName || 'An operator') + (entry.createdAt ? ' · ' + when(entry.createdAt) : '') }))
+    : [emptyState('edit', 'No notes yet', 'A note records what an operator knows.')])));
+
+  host.appendChild(cardOf('History', actions.length
+    ? actions.map((entry) => row({
+      title: entry.action || statusWord(entry.actionType) || 'An action',
+      sub: (entry.actorName || 'An operator') + (entry.reason ? ' · ' + entry.reason : '') + (entry.createdAt ? ' · ' + when(entry.createdAt) : ''),
+    }))
+    : [emptyState('clock', 'Nothing recorded', 'Actions taken against this account appear here.')]));
+
+  const roles = await Api.adminRoles().catch(() => []);
+  const roleRows = items(roles).filter((entry) => String(entry.userId || entry.user_id) === String(user.id));
+  host.appendChild(cardOf('Operator roles', [row({
+    title: roleRows.length ? roleRows.map((entry) => entry.role).join(', ') : 'None',
+    sub: 'The roles this account holds on this instance',
+  }), row({
+    title: 'Give the operator role', lead: el('span', { class: 'm-row__chevron' }, icon('shield', { size: 16 })), chevron: true,
+    onClick: () => reasonSheet({
+      title: 'Make them an operator', confirmLabel: 'Give the role', placeholder: 'Why this account is trusted with the console',
+    }, async (reason) => {
+      await Api.adminSetRole(user.id, 'admin');
+      toast('The role is given');
+      await person(host, chosen, back);
+    }),
+  }), roleRows.length ? row({
+    title: 'Take the operator role away', lead: el('span', { class: 'm-row__chevron' }, icon('x', { size: 16 })),
+    onClick: async () => {
+      if (!(await confirm({ title: 'Take the role away?', confirmLabel: 'Take it', danger: true }))) return;
+      try {
+        await Api.adminRemoveRole(user.id);
+        toast('The role is taken');
+        await person(host, chosen, back);
+      } catch (error) { failed(error); }
+    },
+  }) : null]));
+}
+
+async function approvals(host) {
+  const list = el('div', { class: 'm-card' });
+  host.appendChild(list);
+  const paint = async () => {
+    list.replaceChildren(hold());
+    try {
+      const rows = items(await Api.adminApprovals({ limit: '50' }));
+      list.replaceChildren(...(rows.length
+        ? rows.map((user) => {
+          const node = row({
+            lead: personLead(user),
+            title: nameOf(user) || user.username || 'An account',
+            sub: '@' + (user.username || '') + (user.createdAt ? ' · asked ' + when(user.createdAt) : ''),
+          });
+          node.appendChild(el('div', { class: 'm-row__meta' },
+            el('button', {
+              class: 'm-go', type: 'button',
+              onClick: async () => {
+                try {
+                  await Api.approveUser(user.id);
+                  toast('Let in');
+                  await paint();
+                } catch (error) { failed(error); }
+              },
+            }, 'Let in')));
+          return node;
+        })
+        : [emptyState('check', 'Nobody waiting', 'An account that needs approval arrives here.')]));
+    } catch (error) {
+      list.replaceChildren(failure(error, paint));
+    }
+  };
+  await paint();
+}
+
+async function communities(host) {
+  const list = el('div', { class: 'm-card' });
+  host.appendChild(list);
+  const paint = async () => {
+    list.replaceChildren(hold());
+    try {
+      const rows = items(await Api.adminServers({ limit: '50' }));
+      list.replaceChildren(...(rows.length
+        ? rows.map((server) => row({
+          lead: el('span', { class: 'm-row__chevron' }, icon('layers', { size: 16 })),
+          title: server.name || 'A community',
+          sub: (server.memberCount != null ? server.memberCount + ' members · ' : '') + (server.suspended ? 'suspended' : 'running'),
+          chevron: true,
+          onClick: () => community(host, server, paint),
+        }))
+        : [emptyState('layers', 'No communities', 'Communities on this instance appear here.')]));
+    } catch (error) {
+      list.replaceChildren(failure(error, paint));
+    }
+  };
+  await paint();
+}
+
+async function community(host, chosen, back) {
+  clear(host);
+  host.appendChild(hold());
+  const record = await Api.adminServer(chosen.id);
+  const server = Object.assign({}, chosen, record);
+  clear(host);
+  host.appendChild(el('button', { class: 'm-go m-go--quiet', type: 'button', onClick: () => back() }, 'Back to the list'));
+  host.appendChild(cardOf(server.name || 'A community', [
+    fact('State', server.suspended ? 'Suspended' : 'Running'),
+    fact('Members', server.memberCount == null ? '—' : server.memberCount),
+    fact('Channels', server.channelCount == null ? '—' : server.channelCount),
+    fact('Owner', server.ownerName || server.ownerUsername || '—'),
+  ]));
+
+  const act = async (title, text, call, danger) => {
+    if (!(await confirm({ title, text, confirmLabel: title, danger: !!danger }))) return;
+    const reason = await new Promise((done) => {
+      reasonSheet({ title: 'The reason', confirmLabel: title, danger: !!danger, placeholder: 'Why, in the words a reviewer reads' }, done);
+    });
+    try {
+      await call(reason);
+      toast(title + ' — recorded');
+      back();
+    } catch (error) { failed(error); }
+  };
+
+  host.appendChild(cardOf('What you can do', [
+    server.suspended
+      ? row({ title: 'Lift the suspension', lead: el('span', { class: 'm-row__chevron' }, icon('check', { size: 16 })), onClick: () => act('Lift the suspension', 'The community runs again.', (reason) => Api.adminLiftServer(server.id, reason)) })
+      : row({ title: 'Suspend', danger: true, lead: el('span', { class: 'm-row__chevron' }, icon('pause', { size: 16 })), onClick: () => act('Suspend', 'Nobody can read or write here until it is lifted.', (reason) => Api.adminSuspendServer(server.id, { reason, confirm: true }), true) }),
+    server.suspended
+      ? row({ title: 'Bring it back', lead: el('span', { class: 'm-row__chevron' }, icon('rotate-ccw', { size: 16 })), onClick: () => act('Bring it back', 'The community returns, with its content.', (reason) => Api.adminRestoreServer(server.id, reason)) })
+      : null,
+    row({
+      title: 'Remove the community', danger: true,
+      lead: el('span', { class: 'm-row__chevron' }, icon('trash', { size: 16 })),
+      onClick: () => act('Remove the community', 'It disappears for everyone. This cannot be undone by lifting.', (reason) => Api.adminRemoveServer(server.id, { reason, confirm: true }), true),
+    }),
+  ]));
+}
+
+async function reports(host) {
+  const chips = el('div', { class: 'm-chips', role: 'group', 'aria-label': 'Filter reports by status' });
+  const list = el('div', { class: 'm-card' });
+  host.append(chips, list);
+  let status = '';
+
+  const paintChips = () => {
+    chips.replaceChildren(...REPORT_FILTERS.map(([value, label]) => el('button', {
+      class: 'm-chip' + (status === value ? ' m-chip--on' : ''),
+      type: 'button',
+      'aria-pressed': String(status === value),
+      onClick: () => { status = value; paintChips(); paint(); },
+    }, label)));
+  };
+
+  const paint = async () => {
+    list.replaceChildren(hold());
+    try {
+      const rows = items(await Api.adminReports(Object.assign({ limit: '100' }, status ? { status } : {})));
+      list.replaceChildren(...(rows.length
+        ? rows.map((report) => row({
+          lead: el('span', { class: 'm-row__chevron' }, icon('flag', { size: 16 })),
+          title: report.reason || 'A report',
+          sub: (report.reporterName || report.reporter_name ? 'by ' + (report.reporterName || report.reporter_name) : 'by an account')
+            + (report.targetType || report.target_type ? ' · ' + statusWord(report.targetType || report.target_type) : ''),
+          side: el('span', { class: 'm-row__note' }, statusWord(report.status)),
+          chevron: true,
+          onClick: () => report_(host, report, paint),
+        }))
+        : [emptyState('flag', status ? 'Nothing in this state' : 'No reports',
+          status ? 'No report is in this state. The other filters have the rest.' : 'A filed report arrives here, newest first.')]));
+    } catch (error) {
+      list.replaceChildren(failure(error, paint));
+    }
+  };
+
+  paintChips();
+  await paint();
+}
+
+async function report_(host, chosen, back) {
+  clear(host);
+  host.appendChild(hold());
+  const report = await Api.adminReport(chosen.id);
+  const record = report.case || null;
+  const notes = items(record && record.notes);
+  const evidence = items(record && record.evidence);
+  clear(host);
+  host.appendChild(el('button', { class: 'm-go m-go--quiet', type: 'button', onClick: () => back() }, 'Back to the queue'));
+
+  host.appendChild(cardOf('The report', [
+    fact('Status', statusWord(report.status)),
+    fact('Reported by', report.reporterName || report.reporter_name || 'An account'),
+    fact('What is reported', statusWord(report.targetType || report.target_type)),
+    fact('Filed', when(report.createdAt || report.created_at)),
+    fact('Resolution', report.resolution || '—'),
+  ]));
+
+  const snapshot = report.targetSnapshot || null;
+  if (snapshot && (snapshot.content || snapshot.text)) {
+    host.appendChild(cardOf('What was reported', [
+      el('p', { class: 'm-sheet__note' }, String(snapshot.content || snapshot.text).slice(0, 600)),
+    ]));
   }
-  kind.addEventListener('change', paintScheduled);
-  paintScheduled();
 
-  const post = el('button', { class: 'm-btn m-btn--block m-btn--primary', type: 'button' }, 'Post it');
+  const target = report.targetUser || null;
+  if (target) {
+    host.appendChild(row({
+      lead: personLead(target),
+      title: 'The account reported',
+      sub: '@' + (target.username || ''),
+      chevron: true,
+      onClick: () => navigate(path('/users/' + target.id)),
+    }));
+  }
+
+  const moves = REPORT_FILTERS.map(([value]) => value)
+    .filter((value) => value && value !== String(report.status || '').toUpperCase())
+    .map((value) => row({
+      title: REPORT_MOVES[value] || statusWord(value),
+      lead: el('span', { class: 'm-row__chevron' }, icon('arrow-right', { size: 16 })),
+      danger: value === 'DISMISSED',
+      onClick: async () => {
+        if (value === 'RESOLVED' || value === 'DISMISSED') {
+          const yes = await confirm({
+            title: (REPORT_MOVES[value] || value) + ' the report?',
+            text: 'The decision is noted in the audit log.',
+            confirmLabel: REPORT_MOVES[value] || value,
+            danger: value === 'DISMISSED',
+          });
+          if (!yes) return;
+        }
+        try {
+          await Api.adminUpdateReport(report.id, { status: value });
+          toast((REPORT_MOVES[value] || value) + ' — noted in the audit log.');
+          back();
+        } catch (error) { failed(error); }
+      },
+    }));
+  host.appendChild(cardOf('Move it', moves));
+
+  host.appendChild(cardOf('The case', [
+    row({
+      title: 'Add a note', lead: el('span', { class: 'm-row__chevron' }, icon('edit', { size: 16 })), chevron: true,
+      onClick: () => reasonSheet({
+        title: 'A note on the case', note: 'Notes are for staff only.', confirmLabel: 'Add the note',
+        placeholder: 'What the next person looking at this case should know',
+      }, async (body) => {
+        await Api.adminAddReportNote(report.id, body);
+        toast('Note added');
+        back();
+      }),
+    }),
+    row({
+      title: 'Copy in evidence', lead: el('span', { class: 'm-row__chevron' }, icon('paperclip', { size: 16 })), chevron: true,
+      onClick: () => reasonSheet({
+        title: 'Evidence', note: 'Evidence is copied into the case as it looks now, so it stays if the original changes.', confirmLabel: 'Add the evidence',
+        placeholder: 'What you saw, in your own words',
+      }, async (body) => {
+        await Api.adminAddReportEvidence(report.id, { kind: 'NOTE', content: body });
+        toast('Evidence added');
+        back();
+      }),
+    }),
+  ].concat(notes.map((entry) => row({ title: entry.body || 'A note', sub: (entry.authorName || 'An operator') + (entry.createdAt ? ' · ' + when(entry.createdAt) : '') })))
+    .concat(evidence.map((entry) => row({ title: entry.content || 'Evidence', sub: entry.kind || '' })))));
+}
+
+async function appeals(host) {
+  const list = el('div', { class: 'm-card' });
+  host.appendChild(list);
+  const paint = async () => {
+    list.replaceChildren(hold());
+    try {
+      const rows = items(await Api.adminAppeals({ limit: '50' }));
+      list.replaceChildren(...(rows.length
+        ? rows.map((appeal) => row({
+          lead: el('span', { class: 'm-row__chevron' }, icon('inbox', { size: 16 })),
+          title: appeal.username ? '@' + appeal.username : 'An appeal',
+          sub: (appeal.reason || '') + (appeal.createdAt ? ' · ' + when(appeal.createdAt) : ''),
+          side: el('span', { class: 'm-row__note' }, statusWord(appeal.status)),
+          chevron: true,
+          onClick: () => appeal_(host, appeal, paint),
+        }))
+        : [emptyState('inbox', 'No appeals', 'An appeal against an enforcement arrives here.')]));
+    } catch (error) {
+      list.replaceChildren(failure(error, paint));
+    }
+  };
+  await paint();
+}
+
+async function appeal_(host, chosen, back) {
+  clear(host);
+  host.appendChild(hold());
+  const appeal = await Api.adminAppeal(chosen.id);
+  clear(host);
+  host.appendChild(el('button', { class: 'm-go m-go--quiet', type: 'button', onClick: () => back() }, 'Back to the queue'));
+  host.appendChild(cardOf('The appeal', [
+    fact('Status', statusWord(appeal.status)),
+    fact('From', appeal.username ? '@' + appeal.username : '—'),
+    fact('Filed', when(appeal.createdAt || appeal.created_at)),
+    fact('Their words', appeal.reason || '—'),
+  ]));
+
+  const decide = async (decision) => {
+    const approving = decision === 'APPROVED';
+    const answer = await new Promise((done) => {
+      reasonSheet({
+        title: approving ? 'Approve the appeal?' : 'Deny the appeal?',
+        note: approving
+          ? 'The enforcement is lifted on the server, and the decision is recorded with your name.'
+          : 'The enforcement stands, and the decision is recorded with your name and your reason.',
+        confirmLabel: approving ? 'Approve and lift' : 'Deny the appeal',
+        danger: !approving,
+        placeholder: 'The words the person reads with the decision',
+      }, done);
+    });
+    try {
+      await Api.adminDecideAppeal(appeal.id, decision, answer);
+      toast(approving ? 'The appeal is approved and the enforcement lifted.' : 'The appeal is denied.');
+      back();
+    } catch (error) { failed(error); }
+  };
+
+  host.appendChild(cardOf('The decision', [
+    row({ title: 'Approve and lift', lead: el('span', { class: 'm-row__chevron' }, icon('check', { size: 16 })), onClick: () => decide('APPROVED') }),
+    row({ title: 'Deny the appeal', danger: true, lead: el('span', { class: 'm-row__chevron' }, icon('x', { size: 16 })), onClick: () => decide('DENIED') }),
+  ]));
+}
+
+async function audit(host) {
+  const list = el('div', { class: 'm-card' });
+  host.appendChild(list);
+  const paint = async () => {
+    list.replaceChildren(hold());
+    try {
+      const rows = items(await Api.adminAudit({ limit: '100' }));
+      list.replaceChildren(...(rows.length
+        ? rows.map((entry) => row({
+          title: entry.action || 'An action',
+          sub: (entry.actorName || 'An operator') + (entry.targetType ? ' · ' + statusWord(entry.targetType) : '') + (entry.createdAt ? ' · ' + when(entry.createdAt) : ''),
+        }))
+        : [emptyState('clock', 'Nothing recorded', 'Administrative actions appear here.')]));
+    } catch (error) {
+      list.replaceChildren(failure(error, paint));
+    }
+  };
+  await paint();
+  host.appendChild(el('button', {
+    class: 'm-go m-go--quiet', type: 'button',
+    onClick: async () => {
+      try {
+        const verdict = await Api.adminVerifyAudit();
+        const ok = verdict && (verdict.ok !== undefined ? verdict.ok : verdict.valid);
+        toast(ok ? 'The chain holds.' : 'The chain does not hold — look at the entries.', { type: ok ? 'success' : 'danger' });
+      } catch (error) { failed(error); }
+    },
+  }, 'Check the chain'));
+}
+
+async function gdpr(host) {
+  const list = el('div', { class: 'm-card' });
+  host.appendChild(list);
+  const paint = async () => {
+    list.replaceChildren(hold());
+    try {
+      const rows = items(await Api.adminGdprRequests({ limit: '50' }));
+      list.replaceChildren(...(rows.length
+        ? rows.map((request) => {
+          const node = row({
+            lead: el('span', { class: 'm-row__chevron' }, icon('shield', { size: 16 })),
+            title: (request.kind || 'A request') + (request.username ? ' · @' + request.username : ''),
+            sub: when(request.createdAt || request.created_at),
+            side: el('span', { class: 'm-row__note' }, statusWord(request.status)),
+          });
+          const actions = el('div', { class: 'm-row__meta' },
+            el('button', {
+              class: 'm-go', type: 'button',
+              onClick: () => reasonSheet({
+                title: 'Review the request', confirmLabel: 'Approve', placeholder: 'The note the decision carries',
+              }, async (note) => {
+                await Api.adminReviewGdprRequest(request.id, 'APPROVED', note);
+                toast('Approved');
+                await paint();
+              }),
+            }, 'Approve'),
+            el('button', {
+              class: 'm-go m-go--quiet', type: 'button',
+              onClick: () => reasonSheet({
+                title: 'Deny the request', confirmLabel: 'Deny', danger: true, placeholder: 'Why the request is refused',
+              }, async (note) => {
+                await Api.adminReviewGdprRequest(request.id, 'DENIED', note);
+                toast('Denied');
+                await paint();
+              }),
+            }, 'Deny'));
+          node.appendChild(actions);
+          if (request.status === 'APPROVED') {
+            node.appendChild(el('div', { class: 'm-row__meta' },
+              el('button', {
+                class: 'm-go m-go--danger', type: 'button',
+                onClick: async () => {
+                  if (!(await confirm({ title: 'Erase the account?', text: 'This removes the account and its data. It cannot be undone.', confirmLabel: 'Erase', danger: true }))) return;
+                  try {
+                    await Api.adminProcessGdprRequest(request.id);
+                    toast('Erased');
+                    await paint();
+                  } catch (error) { failed(error); }
+                },
+              }, 'Erase')));
+          }
+          return node;
+        })
+        : [emptyState('shield', 'No data requests', 'An export or erasure request arrives here.')]));
+    } catch (error) {
+      list.replaceChildren(failure(error, paint));
+    }
+  };
+  await paint();
+}
+
+async function settings(host) {
+  host.appendChild(hold());
+  const data = await Api.instanceSettings();
+  clear(host);
+  const categories = items(data.categories);
+  if (data.envAuthority) {
+    host.appendChild(el('p', { class: 'm-sheet__note' }, 'Some values are forced by the deployment environment. A value saved here takes over once it is saved.'));
+  }
+  for (const category of categories) {
+    host.appendChild(cardOf(category.label || category.id,
+      items(category.settings).map((entry) => settingRow(entry))));
+  }
+}
+
+function settingRow(entry) {
+  const node = el('div', { class: 'm-row' },
+    el('div', { class: 'm-row__body' },
+      el('div', { class: 'm-row__name' }, entry.label || entry.key),
+      entry.description ? el('div', { class: 'm-row__note' }, entry.description) : null,
+      el('div', { class: 'm-row__note' }, entry.source === 'environment' ? 'Set by the environment' : 'Value: ' + describe(entry.value))));
+  node.appendChild(el('div', { class: 'm-row__meta' },
+    el('button', {
+      class: 'm-go m-go--quiet', type: 'button',
+      onClick: () => editSetting(entry),
+    }, 'Change')));
+  return node;
+}
+
+function describe(value) {
+  if (value === true) return 'on';
+  if (value === false) return 'off';
+  if (value == null || value === '') return '—';
+  return String(value);
+}
+
+async function editSetting(entry) {
+  const control = typeof entry.value === 'boolean'
+    ? el('input', { class: 'm-input', type: 'checkbox', 'aria-label': entry.label || entry.key })
+    : el('input', { class: 'm-input', type: String(entry.type) === 'number' ? 'number' : 'text', value: entry.value == null ? '' : String(entry.value), 'aria-label': entry.label || entry.key });
+  if (typeof entry.value === 'boolean') control.checked = !!entry.value;
+  const layer = sheet({ title: entry.label || entry.key, note: entry.description || null });
+  layer.body.appendChild(field('The value', control));
+  const save = el('button', { class: 'm-go m-go--block', type: 'button' }, 'Save');
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    const value = control.type === 'checkbox' ? control.checked : control.value;
+    try {
+      await Api.updateInstanceSettings({ [entry.key]: value });
+      toast('Saved');
+      closeSheet();
+    } catch (error) {
+      failed(error);
+      save.disabled = false;
+    }
+  });
+  layer.body.appendChild(save);
+}
+
+async function announcements(host) {
+  const list = el('div', { class: 'm-card' });
+  host.appendChild(list);
+  const paint = async () => {
+    list.replaceChildren(hold());
+    try {
+      const rows = items(await Api.allAnnouncements());
+      list.replaceChildren(...(rows.length
+        ? rows.map((announcement) => row({
+          lead: el('span', { class: 'm-row__chevron' }, icon('bell', { size: 16 })),
+          title: announcement.title || 'An announcement',
+          sub: announcement.body ? String(announcement.body).slice(0, 90) : '',
+          side: el('button', {
+            class: 'm-go m-go--quiet', type: 'button', 'aria-label': 'Delete ' + (announcement.title || ''),
+            onClick: async () => {
+              if (!(await confirm({ title: 'Delete this announcement?', text: 'Everyone stops seeing it at once.', confirmLabel: 'Delete', danger: true }))) return;
+              try {
+                await Api.deleteAnnouncement(announcement.id);
+                toast('Removed');
+                await paint();
+              } catch (error) { failed(error); }
+            },
+          }, 'Delete'),
+        }))
+        : [emptyState('bell', 'Nothing announced', 'An announcement reaches everyone who opens this instance.')]));
+    } catch (error) {
+      list.replaceChildren(failure(error, paint));
+    }
+  };
+  await paint();
+
+  const title = el('input', { class: 'm-input', type: 'text', placeholder: 'What it says at a glance', 'aria-label': 'Announcement title' });
+  const body = el('textarea', { class: 'm-area', rows: '3', placeholder: 'The words everyone reads', 'aria-label': 'Announcement body' });
+  const post = el('button', { class: 'm-go m-go--block', type: 'button' }, 'Announce it');
   post.addEventListener('click', async () => {
-    if (!title.value.trim() || !summary.value.trim()) {
-      note.textContent = 'An incident needs a title and a summary.';
+    if (!title.value.trim()) {
+      toast('A title first.', { type: 'danger' });
       return;
     }
-    if (kind.value === 'maintenance' && !scheduled.value) {
-      note.textContent = 'Planned maintenance needs the date it is planned for.';
-      return;
-    }
-    note.textContent = '';
     post.disabled = true;
     try {
-      await Api.createIncident({
-        kind: kind.value,
-        status: kind.value === 'maintenance' ? 'scheduled' : status.value,
-        title: title.value.trim(),
-        summary: summary.value.trim(),
-        body: body.value.trim() || undefined,
-        scheduledFor: kind.value === 'maintenance' ? scheduled.value : undefined,
-      });
+      await Api.createAnnouncement({ title: title.value.trim(), body: body.value.trim() });
       title.value = '';
-      summary.value = '';
       body.value = '';
-      scheduled.value = '';
-      toast('Posted. It is on the status page now.', { type: 'success' });
+      toast('Announced');
       await paint();
-    } catch (error) { toast(error.message, { type: 'danger' }); }
-    finally { post.disabled = false; }
+    } catch (error) {
+      failed(error);
+      post.disabled = false;
+    }
+  });
+  host.appendChild(cardOf('Write one', [field('Title', title), field('The words', body), post]));
+}
+
+async function incidents(host) {
+  const list = el('div', { class: 'm-card' });
+  host.appendChild(list);
+  const paint = async () => {
+    list.replaceChildren(hold());
+    try {
+      const rows = items(await Api.incidents({ limit: '50' }));
+      list.replaceChildren(...(rows.length
+        ? rows.map((incident) => row({
+          lead: el('span', { class: 'm-row__chevron' }, icon('activity', { size: 16 })),
+          title: incident.title || 'An incident',
+          sub: statusWord(incident.status || incident.kind) + (incident.createdAt ? ' · ' + when(incident.createdAt) : ''),
+        }))
+        : [emptyState('activity', 'Nothing on the timeline', 'An incident or maintenance window appears here.')]));
+    } catch (error) {
+      list.replaceChildren(failure(error, paint));
+    }
+  };
+  await paint();
+  host.appendChild(row({
+    title: 'Put something on the timeline', lead: el('span', { class: 'm-row__chevron' }, icon('plus', { size: 16 })), chevron: true,
+    onClick: () => reasonSheet({
+      title: 'A timeline entry', confirmLabel: 'Post it', placeholder: 'What happened, and what it means for readers',
+    }, async (body) => {
+      await Api.createIncident({ title: body.slice(0, 80), body, status: 'INVESTIGATING' });
+      toast('On the timeline');
+      await paint();
+    }),
+  }));
+}
+
+async function diagnostics(host) {
+  host.appendChild(hold());
+  const report = await Api.adminDiagnostics();
+  clear(host);
+  const subsystems = report.subsystems || report.checks || report;
+  host.appendChild(cardOf('What was checked',
+    Object.entries(subsystems).map(([name, entry]) => row({
+      title: name,
+      sub: entry && entry.message ? entry.message : '',
+      side: el('span', { class: 'm-row__note' }, entry && entry.ok === false ? 'not well' : 'well'),
+    }))));
+}
+
+async function voice(host) {
+  host.appendChild(hold());
+  const settings = await Api.voiceSettings();
+  clear(host);
+  const entries = settings.settings || settings;
+  host.appendChild(cardOf('The voice server',
+    Object.entries(entries).map(([key, entry]) => row({
+      title: (entry && entry.label) || key,
+      sub: describe(entry && entry.value),
+      side: el('button', {
+        class: 'm-go m-go--quiet', type: 'button',
+        onClick: () => editSetting({ key, label: (entry && entry.label) || key, value: entry && entry.value, description: entry && entry.description, type: entry && entry.type }),
+      }, 'Change'),
+    }))));
+}
+
+async function database(host) {
+  const list = el('div', { class: 'm-card' });
+  host.appendChild(list);
+  const paint = async () => {
+    list.replaceChildren(hold());
+    try {
+      const rows = items(await Api.adminBackups());
+      list.replaceChildren(...(rows.length
+        ? rows.map((backup) => row({
+          lead: el('span', { class: 'm-row__chevron' }, icon('database', { size: 16 })),
+          title: backup.name || 'A backup',
+          sub: when(backup.createdAt || backup.created_at) + (backup.size ? ' · ' + backup.size : ''),
+        }))
+        : [emptyState('database', 'No backups yet', 'A backup is a copy of the data as it stands.')]));
+    } catch (error) {
+      list.replaceChildren(failure(error, paint));
+    }
+  };
+  await paint();
+  host.appendChild(el('button', {
+    class: 'm-go', type: 'button',
+    onClick: async () => {
+      try {
+        await Api.adminTakeBackup();
+        toast('Taken');
+        await paint();
+      } catch (error) { failed(error); }
+    },
+  }, 'Take a backup now'));
+}
+
+async function continuum(host) {
+  host.appendChild(hold());
+  const [memberships, federated] = await Promise.all([
+    Api.continuumMemberships().catch(() => []),
+    Api.continuumFederated().catch(() => []),
+  ]);
+  clear(host);
+  const catalogue = await Api.instanceSettings().catch(() => null);
+  let entry = null;
+  for (const category of items(catalogue && catalogue.categories)) {
+    entry = items(category.settings).find((s) => s.key === 'continuum.enabled') || entry;
+  }
+  host.appendChild(cardOf('Community Continuum', [
+    fact('State', entry && entry.value ? 'on' : 'off'),
+    fact('Source', entry && entry.source === 'environment' ? 'the deployment environment' : 'saved here'),
+  ]));
+  host.appendChild(el('button', {
+    class: 'm-go' + (entry && entry.value ? ' m-go--quiet' : ''), type: 'button',
+    onClick: async () => {
+      const on = !(entry && entry.value);
+      if (on && !(await confirm({ title: 'Turn on Community Continuum?', text: 'Trusted peers receive signed events from this instance, and this one accepts events from instances an operator added.', confirmLabel: 'Turn on' }))) return;
+      try {
+        await Api.updateInstanceSettings(on ? { 'continuum.enabled': true, __confirm: true } : { 'continuum.enabled': false });
+        toast(on ? 'Continuum is on' : 'Continuum is off');
+        host.replaceChildren();
+        await continuum(host);
+      } catch (error) { failed(error); }
+    },
+  }, entry && entry.value ? 'Turn it off' : 'Turn it on'));
+
+  const mine = items(memberships);
+  const peers = items(federated);
+  host.appendChild(cardOf('Communities joined through Continuum',
+    mine.length ? mine.map((entry_) => row({ title: entry_.name || entry_.communityId || 'A community', sub: entry_.instanceId || '' }))
+      : [emptyState('layers', 'None', 'Communities this instance joined through a peer appear here.')]));
+  host.appendChild(cardOf('Peers',
+    peers.length ? peers.map((entry_) => row({ title: entry_.name || entry_.instanceId || 'A peer', sub: entry_.status || '' }))
+      : [emptyState('globe', 'No peers', 'Instances an operator added appear here.')]));
+}
+
+async function pages(host) {
+  const list = el('div', { class: 'm-card' });
+  host.appendChild(list);
+  const paint = async () => {
+    list.replaceChildren(hold());
+    try {
+      const payload = await Api.adminPages();
+      const rows = items(payload.pages || payload);
+      list.replaceChildren(...(rows.length
+        ? rows.map((entry) => row({
+          lead: el('span', { class: 'm-row__chevron' }, icon('file-text', { size: 16 })),
+          title: entry.title || entry.route,
+          sub: entry.route + (entry.publishedAt ? ' · published ' + when(entry.publishedAt) : ' · draft'),
+          chevron: true,
+          onClick: () => pageEditor(host, entry.route, paint),
+        }))
+        : [emptyState('file-text', 'No public pages', 'The pages this instance serves appear here.')]));
+    } catch (error) {
+      list.replaceChildren(failure(error, paint));
+    }
+  };
+  await paint();
+}
+
+async function pageEditor(host, route, back) {
+  clear(host);
+  host.appendChild(hold());
+  const current = await Api.adminPage(route);
+  clear(host);
+  host.appendChild(el('button', { class: 'm-go m-go--quiet', type: 'button', onClick: () => back() }, 'Back to the pages'));
+  host.appendChild(cardOf('/' + route, [
+    fact('State', current.publishedAt ? 'published' : 'draft'),
+    fact('Legal page', current.legal ? 'yes — publishing asks for the route' : 'no'),
+  ]));
+  const body = el('textarea', { class: 'm-area', rows: '10', 'aria-label': 'The page body' }, current.body || current.draft || '');
+  host.appendChild(cardOf('The body', [field('HTML', body)]));
+
+  const save = el('button', { class: 'm-go', type: 'button' }, 'Save the draft');
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    try {
+      await Api.savePageDraft(route, { body: body.value });
+      toast('Draft saved');
+      save.disabled = false;
+    } catch (error) { failed(error); save.disabled = false; }
   });
 
-  async function paint() {
-    clear(list);
-    list.appendChild(loading('Reading the timeline'));
-    try {
-      const rows = await Api.incidents({ limit: 100 });
-      const entries = Array.isArray(rows) ? rows : [];
-      clear(list);
-      if (!entries.length) {
-        list.appendChild(empty({
-          icon: 'activity',
-          title: 'Nothing has been recorded',
-          text: 'An instance with nothing recorded says so.',
-        }));
+  const publish = el('button', { class: 'm-go m-go--block', type: 'button' }, 'Publish');
+  publish.addEventListener('click', async () => {
+    let confirmRoute = true;
+    if (current.legal) {
+      const typed = window.prompt('Type the route to confirm publishing: ' + route);
+      if (typed === null) return;
+      if (typed !== route) {
+        toast('The route did not match, so nothing was published', { type: 'danger' });
         return;
       }
-      for (const entry of entries) {
-        const next = INCIDENT_STATUSES[INCIDENT_STATUSES.findIndex(([value]) => value === entry.status) + 1];
-        list.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title truncate' }, entry.title),
-            el('span', { class: 'm-row__sub truncate' },
-              (INCIDENT_STATUSES.find(([value]) => value === entry.status) || [null, entry.status])[1]
-              + ' · ' + relativeTime(entry.startedAt))),
-          el('span', { class: 'm-row__actions' },
-            next ? el('button', {
-              class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
-              onClick: async () => {
-                try {
-                  await Api.updateIncident(entry.id, { status: next[0] });
-                  toast('Moved to ' + next[1].toLowerCase() + '.', { type: 'success' });
-                  await paint();
-                } catch (error) { toast(error.message, { type: 'danger' }); }
-              },
-            }, 'Next') : null,
-            entry.status !== 'resolved' ? el('button', {
-              class: 'm-btn m-btn--sm m-btn--ghost', type: 'button',
-              onClick: async () => {
-                const sure = await confirm({
-                  title: 'Close this incident?',
-                  text: 'It stays on the timeline, marked resolved. Nothing is deleted.',
-                  confirmLabel: 'Close it',
-                });
-                if (!sure) return;
-                try {
-                  await Api.updateIncident(entry.id, { status: 'resolved' });
-                  toast('Closed.', { type: 'success' });
-                  await paint();
-                } catch (error) { toast(error.message, { type: 'danger' }); }
-              },
-            }, 'Close') : null)));
-      }
-    } catch (error) {
-      clear(list);
-      list.appendChild(failure(error, paint));
+      confirmRoute = typed;
     }
-  }
-
-  host.append(
-    group('Post an incident', el('div', { class: 'm-stack' },
-      field('Kind', kind),
-      field('Status', status),
-      field('Title', title),
-      field('Summary', summary),
-      field('Note', body),
-      field('Planned for', scheduled),
-      note,
-      post)),
-    group('The timeline', list));
-
-  paint();
-  return host;
+    publish.disabled = true;
+    try {
+      await Api.savePageDraft(route, { body: body.value });
+      await Api.publishPage(route, confirmRoute);
+      toast('Published /' + route);
+      await back();
+    } catch (error) {
+      failed(error);
+      publish.disabled = false;
+    }
+  });
+  host.appendChild(cardOf('What next', [save, publish]));
 }
 
-// -- federation reports -------------------------------------------------------
-//
-// The reports other instances sent about this one, and the other half of the
-// relay: what the members of this instance's communities wrote on other
-// instances. That is the owner's to moderate, and the platform administrator
-// moderates every community of the instance, so it is drawn here in full.
+const SECTIONS = {
+  'admin': overview,
+  'admin.users': people,
+  'admin.approvals': approvals,
+  'admin.communities': communities,
+  'admin.reports': reports,
+  'admin.appeals': appeals,
+  'admin.audit': audit,
+  'admin.gdpr': gdpr,
+  'admin.announcements': announcements,
+  'admin.pages': pages,
+  'admin.settings': settings,
+  'admin.database': database,
+  'admin.continuum': continuum,
+  'admin.voice': voice,
+  'admin.diagnostics': diagnostics,
+  'admin.incidents': incidents,
+  'admin.federation': federation,
+};
 
-function federationBody() {
-  const host = el('div', { class: 'm-stack' });
-  const list = el('div', { class: 'm-list' });
-  const moderation = el('div', { class: 'm-stack' });
-  // What the server answered the last time. It lives here rather than in the
-  // surface, so that re-reading the surface after an action does not take the
-  // answer with it.
-  const answer = el('div', { class: 'm-stack' });
-
-  function say(title, text, tone) {
-    answer.replaceChildren(notice({ tone: tone || 'info', role: 'status', title, text }));
-  }
-
-  async function paint() {
-    clear(list);
-    list.appendChild(loading('Reading the reports'));
+async function federation(host) {
+  const list = el('div', { class: 'm-card' });
+  host.appendChild(list);
+  const paint = async () => {
+    list.replaceChildren(hold());
     try {
-      const rows = await Api.inboundFederationReports(100);
-      const reports = Array.isArray(rows) ? rows : [];
-      clear(list);
-      if (!reports.length) {
-        list.appendChild(empty({
-          icon: 'share',
-          title: 'No reports have arrived',
-          text: 'When another instance sends a report about something here, it is listed here.',
-        }));
-        return;
-      }
-      for (const entry of reports) {
-        list.appendChild(el('div', { class: 'm-row' },
-          el('span', { class: 'm-row__lead' }, icon('flag', { size: 17 })),
-          el('span', { class: 'm-row__body' },
-            el('span', { class: 'm-row__title truncate' }, entry.reason),
-            el('span', { class: 'm-row__sub truncate' },
-              'about a ' + (entry.contentType || 'message') + ' on this instance')),
-          el('span', { class: 'm-row__actions' },
-            el('span', { class: 'm-chip' }, entry.actionable ? 'actionable' : 'no content here'))));
-      }
+      const rows = items(await Api.inboundFederationReports(100));
+      list.replaceChildren(...(rows.length
+        ? rows.map((report) => row({
+          lead: el('span', { class: 'm-row__chevron' }, icon('globe', { size: 16 })),
+          title: report.reason || 'A report from another instance',
+          sub: (report.instanceName || report.instanceId || '') + (report.createdAt ? ' · ' + when(report.createdAt) : ''),
+          side: el('span', { class: 'm-row__note' }, statusWord(report.status)),
+        }))
+        : [emptyState('globe', 'Nothing from the peers', 'Reports other instances filed with this one appear here.')]));
     } catch (error) {
-      clear(list);
-      list.appendChild(failure(error, paint));
+      list.replaceChildren(failure(error, paint));
     }
-  }
-
-  // What the members of this instance's communities wrote on other instances.
-  //
-  // The whole instance is in scope here: the platform administrator moderates
-  // every community of it, so the relay is read without naming a community.
-  async function paintModeration() {
-    clear(moderation);
-    moderation.appendChild(loading('Reading what the members of this instance wrote elsewhere'));
-    try {
-      const [servers, messages, members] = await Promise.all([
-        Api.adminServers({ limit: '100' }),
-        continuum.moderationMessages(),
-        continuum.moderationMembers(),
-      ]);
-      const names = {};
-      for (const server of Array.isArray(servers) ? servers : []) names[server.id] = server.name;
-      clear(moderation);
-      moderation.appendChild(moderationSurface({
-        messages: Array.isArray(messages) ? messages : [],
-        members: Array.isArray(members) ? members : [],
-        names,
-        refresh: paintModeration,
-        answer,
-        say,
-      }));
-    } catch (error) {
-      clear(moderation);
-      // Federation switched off is not a failure: the instance says so.
-      if (error && error.status === 404) {
-        moderation.appendChild(empty({
-          icon: 'share',
-          title: 'Nothing to show',
-          text: 'Federation is not enabled on this instance.',
-        }));
-        return;
-      }
-      moderation.appendChild(failure(error, paintModeration));
-    }
-  }
-
-  host.append(
-    group('Reports received', list),
-    moderation,
-    group('What a report carries', el('p', { class: 'm-lede' },
-      'A reference and a reason. The content stays where it was written, and nothing '
-      + 'about the person who reported it crosses either.')));
-
-  paint();
-  paintModeration();
-  return host;
+  };
+  await paint();
 }
-
-// -- the admin shell ---------------------------------------------------------
 
 export function renderAdmin(ctx) {
-  const page = ctx.page;
-  const initial = ctx.query.get('section') || page.id;
-
-  const bodies = {
-    admin: overviewBody,
-    'admin.users': usersBody,
-    'admin.approvals': approvalsBody,
-    'admin.communities': communitiesBody,
-    'admin.reports': reportsBody,
-    'admin.appeals': appealsBody,
-    'admin.audit': auditBody,
-    'admin.gdpr': gdprBody,
-    'admin.announcements': announcementsBody,
-    'admin.pages': pagesBody,
-    'admin.settings': instanceSettingsBody,
-    'admin.database': databaseBody,
-    'admin.continuum': continuumBody,
-    'admin.voice': voiceBody,
-    'admin.diagnostics': diagnosticsBody,
-    'admin.incidents': incidentsBody,
-    'admin.federation': federationBody,
-  };
-  const active = bodies[initial] ? initial : 'admin';
-
-  const strip = el('div', { class: 'm-seg m-seg--scroll', role: 'tablist', 'aria-label': 'Instance administration' });
-  for (const group of scopeNav('admin')) {
-    for (const item of group.items) {
-      strip.appendChild(el('a', {
-        class: 'm-seg__item' + (item.id === active ? ' is-active' : ''), role: 'tab',
-        href: item.route ? path(item.route) : path('/admin'),
-        'aria-selected': item.id === active ? 'true' : 'false',
-      }, item.label));
-    }
-  }
-
   const host = el('div', { class: 'm-stack' });
-  const node = screen(
-    el('div', { class: 'm-hero m-hero--quiet' },
-      el('h1', { class: 'm-hero__title' }, page.label || 'Administration'),
-      el('div', { class: 'm-hero__sub' }, page.blurb || 'This instance.')),
-    strip, host);
-
-  return { node, head: { lead: 'back', title: page.label || 'Administration' }, onMount() { host.replaceChildren(bodies[active]()); } };
+  const draw = SECTIONS[ctx.page.id] || overview;
+  return {
+    node: host,
+    onMount: async () => {
+      if (!(await isOperator())) {
+        host.appendChild(refusal());
+        return;
+      }
+      try {
+        await draw(host);
+      } catch (error) {
+        host.replaceChildren(failure(error, () => {
+          host.replaceChildren();
+          return draw(host);
+        }));
+      }
+    },
+  };
 }
-
-export default { renderAdmin };

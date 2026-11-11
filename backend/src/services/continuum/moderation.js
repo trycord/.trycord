@@ -11,23 +11,20 @@
 // local moderation writes to.
 
 const db = require('../../db');
-const { now, uuid } = require('../../util');
+const { now } = require('../../util');
 const enforcement = require('../enforcement');
 const permissions = require('../permissions');
+const auditTrail = require('../audit');
 const store = require('./store');
 
 // The trail. A moderation action that happened is a fact about the instance,
 // and a fact that is not recorded is a fact nobody can act on.
 async function recordAudit(actor, action, targetType, targetId, reason, serverId) {
   try {
-    await db.run(
-      'INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, reason, server_id, created_at) '
-      + 'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [
-        uuid(), actor.id, action, targetType, targetId ? String(targetId) : null,
-        reason ? String(reason).slice(0, 500) : null, serverId || null, now(),
-      ]
-    );
+    await auditTrail.record(actor.id, action, targetType,
+      targetId ? String(targetId) : null,
+      reason ? String(reason).slice(0, 500) : null,
+      { serverId: serverId || null });
   } catch (e) {
     // The trail is never worth failing the action it records, but a trail
     // that silently stopped recording is worse than a noisy one.

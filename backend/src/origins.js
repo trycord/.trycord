@@ -69,6 +69,31 @@ function originCovers(pattern, origin) {
 // backend must allowlist it by name like any other client.
 const DESKTOP_ORIGIN = 'trycord://app';
 
+// A browser on the operator's own machine.
+//
+// The documented production allowlist is explicit, and an explicit allowlist
+// used to disable the development loopback rule entirely. The result was a
+// public site served at http://127.0.0.1:9971 asking an API on another origin
+// for a sign-in, and the browser reporting an opaque network failure because
+// the preflight came back without an Access-Control-Allow-Origin header.
+//
+// Loopback is safe to answer alongside an explicit allowlist: a page served
+// from localhost is already running on the reader's machine, and this API
+// authenticates with bearer tokens rather than ambient cookies. It is not a
+// wildcard and it cannot name a remote host.
+function isLoopbackOrigin(origin) {
+  try {
+    const u = new URL(String(origin || ''));
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    if (u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]') return true;
+    const v4 = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(u.hostname);
+    return !!v4 && [v4[1], v4[2], v4[3]].every((part) => Number(part) <= 255);
+  } catch {
+    return false;
+  }
+}
+
+
 // Origins already explained, so a misconfiguration is logged once rather than
 // on every request.
 const refusedOrigins = new Set();
@@ -106,6 +131,7 @@ function corsOptions(clientOrigins, ownOrigins) {
   return {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true); // curl, same-origin navigations, health probes
+      if (isLoopbackOrigin(origin)) return cb(null, true);
       if (own.some((p) => originCovers(p, origin))) return cb(null, true);
       if (clientOrigins.length) {
         if (clientOrigins.some((p) => originCovers(p, origin))) return cb(null, true);
@@ -128,11 +154,51 @@ function corsOptions(clientOrigins, ownOrigins) {
         return cb(new Error('CORS: origin not allowed'));
       }
     },
+    // The same-origin answer rides with the request: the cors middleware
+    // only hands the policy the Origin header, so the Host comparison
+    // happens here, in the delegate it calls per request.
+    credentials: true,
+  };
+}
+
+// The delegate cors calls per request, so the same-origin question - "is
+// this origin the address the request arrived at?" - can see the Host
+// header. Without it, the instance refused its own LAN address: the page
+// loaded, and every write from it was refused at the door, which read as an
+// app that only worked after a reload. A request whose Origin is the very
+// address it arrived at is the instance's own site speaking to itself -
+// same-origin, never a cross-origin question.
+function sameHostOf(origin, reqHost) {
+  try {
+    const u = new URL(origin);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    const host = String(reqHost || '');
+    const bracket = host.startsWith('[');
+    const name = bracket ? host.slice(1, host.indexOf(']')) : host.split(':')[0];
+    const port = bracket ? (host.includes(']:') ? host.slice(host.indexOf(']:') + 2) : undefined)
+      : (host.slice(name.length).startsWith(':') ? host.slice(name.length + 1) : undefined);
+    if (u.hostname !== name) return false;
+    const originPort = u.port || (u.protocol === 'https:' ? '443' : '80');
+    const hostPort = port || (originPort === '443' ? '443' : '80');
+    return String(originPort) === String(hostPort);
+  } catch {
+    return false;
+  }
+}
+
+function corsDelegate(policy) {
+  return (req, cb) => {
+    const origin = req.headers.origin;
+    if (origin && req.headers.host && sameHostOf(origin, req.headers.host)) {
+      return cb(null, { origin: true, credentials: policy.credentials });
+    }
+    policy.origin(origin, cb);
   };
 }
 
 module.exports = {
   corsOptions,
+  corsDelegate,
   originCovers,
   // The desktop app's own origin, which cannot be inferred and has to be named.
   DESKTOP_ORIGIN,

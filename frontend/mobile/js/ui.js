@@ -1,184 +1,204 @@
-// Mobile overlays.
+// The phone's interaction kit.
 //
-// A phone has no room for a dialog in the middle of the screen, so everything the
-// reader has to acknowledge or choose is a bottom sheet: it comes up from the edge
-// a thumb can reach, traps focus while it is open, and gives focus back where it
-// found it. One manager, so only the topmost layer answers Escape.
+// A bottom sheet for every action, a long-press for every context, a toast for
+// every answer. The primitives are small and one-way: open a sheet, it closes;
+// press and hold, the actions come.
 
-import { el, trapFocus, prefersReducedMotion } from '../../packages/dom.js';
+import { el, clear } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
-import { attachSheetDismiss } from '../js/gestures.js';
 
-const stack = [];
+// --- bottom sheet -----------------------------------------------------------
 
-function present(node, options) {
-  const opts = options || {};
-  const scrim = el('div', { class: 'm-scrim' });
-  document.body.appendChild(scrim);
-  document.body.appendChild(node);
+let sheetLive = null;
 
-  const layer = {
-    node,
-    scrim,
-    release: trapFocus(node),
-    close() {
-      const index = stack.indexOf(layer);
-      if (index !== -1) stack.splice(index, 1);
-      try { layer.release(); } catch { /* element already gone */ }
-      node.classList.remove('is-open');
-      scrim.classList.remove('is-open');
-      const remove = () => { node.remove(); scrim.remove(); };
-      if (prefersReducedMotion()) remove();
-      else setTimeout(remove, 200);
-      if (typeof opts.onClose === 'function') opts.onClose();
-    },
-  };
-  stack.push(layer);
-
-  // Pulling a sheet down past the threshold dismisses it. The layer has to
-  // exist first: the gesture is the layer's own close, and a layer that is
-  // still being declared cannot be reached.
-  attachSheetDismiss(node, layer.close);
-
-  scrim.addEventListener('click', () => layer.close());
-  // Opening on the next frame lets the transition run from the off-screen position.
-  requestAnimationFrame(() => { scrim.classList.add('is-open'); node.classList.add('is-open'); });
-  const focusable = node.querySelector('input, textarea, button');
-  if (focusable && !prefersReducedMotion()) setTimeout(() => { try { focusable.focus(); } catch { /* nothing to focus */ } }, 60);
-
-  return layer;
-}
-
+/**
+ * Open a bottom sheet. Returns { close, body } — the caller fills `body` and
+ * calls close() when it is done.
+ * @param {{ title: string, note?: string }} options
+ */
 export function sheet(options) {
-  const opts = options || {};
-  const node = el('div', {
-    class: 'm-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': opts.title || 'Options',
-  },
-    el('div', { class: 'm-sheet__grip', 'aria-hidden': 'true' }),
-    el('div', { class: 'm-sheet__head' },
-      el('div', { class: 'm-sheet__title' }, opts.title || ''),
-      el('button', {
-        class: 'm-iconbtn', type: 'button', 'aria-label': 'Close',
-        onClick: () => { const top = stack[stack.length - 1]; if (top) top.close(); },
-      }, icon('x', { size: 20 }))),
-    el('div', { class: 'm-sheet__body' }, opts.body || null),
-    opts.footer ? el('div', { class: 'm-sheet__foot' }, opts.footer) : null);
-  return present(node, opts);
-}
+  closeSheet();
+  const veil = el('div', { class: 'm-sheet-veil' });
+  const grip = el('div', { class: 'm-sheet__grip' });
+  const title = el('div', { class: 'm-sheet__title' }, (options && options.title) || '');
+  const quit = el('button', {
+    class: 'm-bar__btn', type: 'button', 'aria-label': 'Close',
+    onClick: () => close(),
+  }, icon('x', { size: 20 }));
+  const head = el('div', { class: 'm-sheet__head' }, title, quit);
+  const body = el('div', { class: 'm-sheet__body' });
+  if (options && options.note) body.appendChild(el('p', { class: 'm-sheet__note' }, options.note));
+  const panel = el('div', { class: 'm-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': title.textContent },
+    grip, head, body);
 
-// A sheet of choices. Selecting one closes the sheet and calls its handler.
-export function menu(options) {
-  const opts = options || {};
-  const menuNode = el('div', { class: 'm-menu', role: 'menu' });
-  let layer = null;
-  for (const item of opts.items || []) {
-    if (!item) continue;
-    if (item.separator) { menuNode.appendChild(el('div', { class: 'm-menu__sep' })); continue; }
-    if (item.header) { menuNode.appendChild(el('div', { class: 'm-menu__header' }, item.header)); continue; }
-    menuNode.appendChild(el('button', {
-      class: 'm-menu__item' + (item.danger ? ' is-danger' : ''),
-      type: 'button', role: 'menuitem', disabled: item.disabled || null,
-      onClick: () => { const fn = item.onSelect; if (layer) layer.close(); if (fn) fn(); },
-    },
-      item.icon ? icon(item.icon, { size: 20 }) : null,
-      el('span', { class: 'truncate' }, item.label),
-      item.checked ? el('span', { class: 'm-menu__check' }, icon('check', { size: 18 })) : null));
+  // While the sheet is open, the keyboard belongs to it: Tab stays inside the
+  // panel, and the reader's place is given back when it closes.
+  let returnFocus = null;
+  function trapFocus(event) {
+    if (event.key !== 'Tab') return;
+    const focusable = panel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    else if (!panel.contains(document.activeElement)) { event.preventDefault(); first.focus(); }
   }
-  layer = present(el('div', { class: 'm-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': opts.title || 'Menu' },
-    el('div', { class: 'm-sheet__grip', 'aria-hidden': 'true' }),
-    opts.title ? el('div', { class: 'm-sheet__head' }, el('div', { class: 'm-sheet__title' }, opts.title)) : null,
-    el('div', { class: 'm-sheet__body' }, menuNode)), opts);
-  return layer;
+  function onKeydown(event) {
+    if (event.key === 'Escape') { event.stopPropagation(); close(); }
+    else trapFocus(event);
+  }
+  function close() {
+    if (!sheetLive || sheetLive.panel !== panel) return;
+    sheetLive = null;
+    panel.classList.remove('is-open');
+    veil.style.opacity = '0';
+    veil.style.transition = 'opacity 120ms var(--tc-ease)';
+    setTimeout(() => { veil.remove(); panel.remove(); }, 160);
+    document.removeEventListener('keydown', onKeydown, true);
+    if (returnFocus && returnFocus.focus) returnFocus.focus();
+  }
+  veil.addEventListener('click', close);
+  document.addEventListener('keydown', onKeydown, true);
+  document.body.appendChild(veil);
+  document.body.appendChild(panel);
+  requestAnimationFrame(() => {
+    panel.classList.add('is-open');
+    returnFocus = document.activeElement;
+    const first = panel.querySelector('button, [href], input, select, textarea');
+    if (first) first.focus();
+  });
+  sheetLive = { panel, close };
+  return { close, body };
 }
 
+export function closeSheet() {
+  if (sheetLive) sheetLive.close();
+}
+
+// --- confirm ------------------------------------------------------------------
+
+/** A question the reader answers with one press. Resolves true/false. */
 export function confirm(options) {
-  const opts = options || {};
   return new Promise((resolve) => {
-    let decided = false;
-    const finish = (value) => { if (!decided) { decided = true; resolve(value); } };
-    const layer = present(el('div', { class: 'm-sheet', role: 'alertdialog', 'aria-modal': 'true', 'aria-label': opts.title || 'Confirm' },
-      el('div', { class: 'm-sheet__grip', 'aria-hidden': 'true' }),
-      el('div', { class: 'm-sheet__head' }, el('div', { class: 'm-sheet__title' }, opts.title || 'Are you sure?')),
-      el('div', { class: 'm-sheet__body' },
-        el('p', { class: 'm-lede' }, opts.text || ''),
-        opts.body || null),
-      el('div', { class: 'm-sheet__foot' },
-        el('div', { class: 'm-actions' },
-          el('button', { class: 'm-btn m-btn--block' + (opts.danger ? ' m-btn--danger' : ' m-btn--primary'), type: 'button',
-            onClick: () => { finish(true); layer.close(); } }, opts.confirmLabel || 'Confirm'),
-          el('button', { class: 'm-btn m-btn--block m-btn--ghost', type: 'button',
-            onClick: () => { finish(false); layer.close(); } }, opts.cancelLabel || 'Cancel')))), {
-      onClose: () => finish(false),
-    });
+    const layer = sheet({ title: (options && options.title) || 'Are you sure?' });
+    const text = el('p', { class: 'm-sheet__note' }, (options && options.text) || '');
+    const no = el('button', { class: 'm-go m-go--quiet', type: 'button', onClick: () => answer(false) }, (options && options.cancelLabel) || 'Keep it');
+    const yes = el('button', {
+      class: 'm-go' + ((options && options.danger) ? ' m-go--danger' : ''),
+      type: 'button', onClick: () => answer(true),
+    }, (options && options.confirmLabel) || 'Confirm');
+    function answer(out) { layer.close(); resolve(out); }
+    layer.body.append(text, el('div', { class: 'm-stack' }, no, yes));
   });
 }
 
-// -- the long press ------------------------------------------------------------
-//
-// A phone has no right-click, so the gesture that opens an entity's actions is
-// a long press. It raises the same sheet of choices a right-click raises on a
-// desk: the module's own bottom sheet, thumb-reachable.
+// --- toast ---------------------------------------------------------------------
 
-const LONG_PRESS_MS = 480;
-const LONG_PRESS_SLOP = 10;
+export function toast(message, options) {
+  const kind = options && options.type;
+  const host = document.getElementById('m-toasts');
+  if (!host) return;
+  const node = el('div', { class: 'm-toast' + (kind ? ' m-toast--' + kind : '') },
+    el('span', { class: 'm-toast__text' }, message));
+  host.appendChild(node);
+  setTimeout(() => {
+    node.style.transition = 'opacity 160ms var(--tc-ease)';
+    node.style.opacity = '0';
+    setTimeout(() => node.remove(), 180);
+  }, 3200);
+}
 
-export function attachLongPress(node, build, options) {
-  const opts = options || {};
+/** The one-line answer to a refused request: the sentence the server sent. */
+export function failed(error) {
+  toast((error && error.message) || 'That did not go through.', { type: 'danger' });
+}
+
+// --- long press ------------------------------------------------------------------
+
+/**
+ * Attach a long-press that opens a menu of actions at the finger. The same
+ * primitive the desktop uses for touch, kept under the same name: press and
+ * hold a row, a message, a face.
+ */
+export function attachLongPress(target, builder) {
   let timer = null;
-  let startX = 0;
-  let startY = 0;
+  let startX = 0; let startY = 0;
+  const CANCEL_MS = 460;
 
-  function cancel() {
-    if (timer) clearTimeout(timer);
-    timer = null;
+  function openAt(x, y) {
+    const items = builder();
+    if (!items || !items.length) return;
+    const menu = el('div', {
+      class: 'm-menu', role: 'menu',
+      style: { left: Math.min(x, window.innerWidth - 232) + 'px', top: Math.min(y, window.innerHeight - 40 - items.length * 44) + 'px' },
+    });
+    for (const item of items) {
+      if (!item) continue;
+      menu.appendChild(el('button', {
+        class: 'm-menu__item' + (item.danger ? ' m-menu__item--danger' : ''),
+        type: 'button', role: 'menuitem',
+        onClick: () => { menu.remove(); veil.remove(); if (item.onClick) item.onClick(); },
+      }, item.icon ? icon(item.icon, { size: 17 }) : null, item.label));
+    }
+    const veil = el('div', { class: 'm-sheet-veil' });
+    veil.addEventListener('click', () => { veil.remove(); menu.remove(); });
+    document.addEventListener('keydown', function onKey(event) {
+      if (event.key === 'Escape') { veil.remove(); menu.remove(); document.removeEventListener('keydown', onKey, true); }
+    }, true);
+    document.body.appendChild(veil);
+    document.body.appendChild(menu);
   }
 
-  function summon() {
-    Promise.resolve(build({ target: node })).then((items) => {
-      if (items && items.length) menu({ title: opts.title, items });
-    }).catch(() => { /* a sheet that cannot be built simply does not open */ });
-  }
-
-  node.addEventListener('touchstart', (event) => {
-    if (event.touches.length !== 1) { cancel(); return; }
-    startX = event.touches[0].clientX;
-    startY = event.touches[0].clientY;
-    cancel();
-    timer = setTimeout(() => { timer = null; summon(); }, LONG_PRESS_MS);
+  target.addEventListener('touchstart', (event) => {
+    const touch = event.touches[0];
+    startX = touch.clientX; startY = touch.clientY;
+    timer = setTimeout(() => {
+      timer = null;
+      if (navigator.vibrate) { try { navigator.vibrate(8); } catch { /* no vibration */ } }
+      openAt(startX, startY);
+    }, CANCEL_MS);
   }, { passive: true });
-
-  node.addEventListener('touchmove', (event) => {
+  target.addEventListener('touchmove', (event) => {
     if (!timer) return;
     const touch = event.touches[0];
-    if (Math.abs(touch.clientX - startX) > LONG_PRESS_SLOP
-      || Math.abs(touch.clientY - startY) > LONG_PRESS_SLOP) cancel();
+    if (Math.abs(touch.clientX - startX) > 12 || Math.abs(touch.clientY - startY) > 12) {
+      clearTimeout(timer); timer = null;
+    }
   }, { passive: true });
+  target.addEventListener('touchend', () => { if (timer) { clearTimeout(timer); timer = null; } }, { passive: true });
+  target.addEventListener('touchcancel', () => { if (timer) { clearTimeout(timer); timer = null; } }, { passive: true });
+}
 
-  node.addEventListener('touchend', cancel);
-  node.addEventListener('touchcancel', cancel);
-  node.addEventListener('scroll', cancel, { passive: true });
+// --- small builders ---------------------------------------------------------------
+
+/** A labelled section: kicker over a card. */
+export function section(kicker, ...children) {
+  return el('section', { class: 'm-stack' },
+    el('div', { class: 'm-kicker' }, kicker),
+    ...children);
+}
+
+/** The state pages: nothing here yet, could not read it, still working. */
+export function emptyState(icon_0, title, text) {
+  return el('div', { class: 'm-empty' },
+    el('div', { class: 'm-empty__icon' }, icon(icon_0, { size: 24 })),
+    el('div', { class: 'm-empty__title' }, title),
+    text ? el('p', { class: 'm-empty__text' }, text) : null);
+}
+
+export function failure(error, retry) {
+  const node = el('div', { class: 'm-fault' },
+    el('p', { class: 'm-fault__text' }, (error && error.message) || 'Could not read that.'));
+  if (retry) node.appendChild(el('button', { class: 'm-go m-go--quiet', type: 'button', onClick: retry }, 'Try again'));
   return node;
 }
 
-let toastRoot = null;
-export function toast(message, options) {
-  const opts = options || {};
-  // The root is made once and kept. If the document's body has been replaced
-  // since it was made - a page that swaps the body out, a check that clears
-  // it - the old root is no longer in the document, and a toast put into it
-  // would be seen by nobody. So the root is remade when it has left.
-  if (!toastRoot || !toastRoot.parentNode) {
-    toastRoot = el('div', { class: 'm-toast-root', role: 'status', 'aria-live': 'polite' });
-    document.body.appendChild(toastRoot);
-  }
-  const node = el('div', { class: 'm-toast' + (opts.type ? ' m-toast--' + opts.type : '') }, message);
-  toastRoot.appendChild(node);
-  setTimeout(() => node.remove(), opts.duration || 3400);
-  return node;
+export function hold() {
+  return el('div', { class: 'm-hold' }, el('div', { class: 'spinner' }));
 }
 
-export function closeAll() {
-  while (stack.length) stack[stack.length - 1].close();
+/** A form field: label over control. */
+export function field(label, control) {
+  return el('label', { class: 'm-field' }, el('span', { class: 'm-field__label' }, label), control);
 }
-
-export default { sheet, menu, confirm, toast, closeAll, attachLongPress };

@@ -1353,10 +1353,9 @@ async function save(entries, adminId, options) {
     // The log records what changed and nothing sensitive. Written inside the same
     // transaction as the values, so an audit trail can never claim a change that was
     // rolled back.
-    await t.run(
-      `INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, reason, created_at)
-       VALUES (?, ?, 'update_settings', 'instance', NULL, ?, ?)`,
-      [uuid(), adminId, JSON.stringify(Object.keys(before)), now()]
+    await require('./audit').record(
+      adminId, 'update_settings', 'instance', null, JSON.stringify(Object.keys(before)),
+      { conn: t }
     );
   });
 
@@ -1460,10 +1459,8 @@ async function reset(key, adminId, options) {
 
   await db.transaction(async (t) => {
     await t.run('DELETE FROM instance_settings WHERE `key` = ?', [key]);
-    await t.run(
-      `INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, reason, created_at)
-       VALUES (?, ?, 'reset_setting', 'instance', ?, NULL, ?)`,
-      [uuid(), adminId, key, now()]
+    await require('./audit').record(
+      adminId, 'reset_setting', 'instance', key, null, { conn: t }
     );
   });
 

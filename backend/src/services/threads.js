@@ -61,8 +61,11 @@ async function resolveRoot(kind, scopeId, messageId) {
 // files, so a thread costs the same whatever its size.
 async function fetch(kind, scopeId, rootId) {
   const s = SCOPES[kind];
+  // The same author columns the history read carries.
+  const authorFields = 'u.username AS author_name, u.display_name AS author_display,'
+    + ' u.avatar_url AS author_avatar, u.banner_url AS author_banner, u.is_bot AS author_is_bot';
   const root = await db.get(
-    `SELECT m.*, u.username AS author_name, u.display_name AS author_display
+    `SELECT m.*, ${authorFields}
      FROM ${s.table} m JOIN users u ON u.id = m.${s.author}
      WHERE m.id = ? AND m.${s.scope} = ?`,
     [rootId, scopeId]
@@ -73,7 +76,7 @@ async function fetch(kind, scopeId, rootId) {
     throw e;
   }
   const replies = await db.all(
-    `SELECT m.*, u.username AS author_name, u.display_name AS author_display
+    `SELECT m.*, ${authorFields}
      FROM ${s.table} m JOIN users u ON u.id = m.${s.author}
      WHERE m.thread_root_id = ? AND m.${s.scope} = ?
      ORDER BY m.seq ASC`,

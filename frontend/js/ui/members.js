@@ -32,7 +32,7 @@ import { avatar } from './primitives.js';
 import { icon } from '../../packages/icons.js';
 import { row, blank, card, fault, fold, hold } from './page.js';
 import { personSheet, personContextMenu } from './person.js';
-import { confirmDialog, errorToast, toast, openDialog } from './overlays.js';
+import { askReason, errorToast, toast, openDialog } from './overlays.js';
 
 const PAGE_SIZE = 50;
 
@@ -40,6 +40,7 @@ export const PRESENCE_LABEL = {
   online: 'Online',
   idle: 'Idle',
   dnd: 'Do not disturb',
+  invisible: 'Invisible',
   offline: 'Offline',
 };
 
@@ -58,32 +59,47 @@ export function memberActions(serverId, member, repaint) {
   // are and what they are called; this says what they do here.
   const handlers = {
     timeout: () => {
-      Api.timeoutMember(serverId, member.id, 10)
-        .then(() => { toast('Timed out for 10 minutes.', { type: 'success' }); repaint(); })
-        .catch((e) => errorToast(e));
+      const minutes = 10;
+      return askReason({
+        title: 'Timeout ' + name + '?',
+        body: 'They keep their words but lose their voice for a while.',
+        confirmLabel: 'Timeout',
+        danger: true,
+        fieldLabel: 'Reason',
+        placeholder: 'Why this timeout is in place',
+      }).then((reason) => {
+        if (!reason) return;
+        Api.timeoutMember(serverId, member.id, minutes, reason)
+          .then(() => { toast('Timed out for ' + minutes + ' minutes.', { type: 'success' }); repaint(); })
+          .catch((e) => errorToast(e));
+      });
     },
     kick: () => {
-      confirmDialog({
+      askReason({
         title: 'Remove ' + name + '?',
         body: 'They can come back if there is a place for them.',
         confirmLabel: 'Remove',
         danger: true,
-      }).then((yes) => {
-        if (!yes) return;
-        Api.kickMember(serverId, member.id)
+        fieldLabel: 'Reason',
+        placeholder: 'Why this removal is in place',
+      }).then((reason) => {
+        if (!reason) return;
+        Api.kickMember(serverId, member.id, reason)
           .then(() => { toast('Removed.', { type: 'success' }); repaint(); })
           .catch((e) => errorToast(e));
       });
     },
     ban: () => {
-      confirmDialog({
+      askReason({
         title: 'Ban ' + name + '?',
         body: 'A ban keeps them out until it is lifted on purpose.',
         confirmLabel: 'Ban',
         danger: true,
-      }).then((yes) => {
-        if (!yes) return;
-        Api.banMember(serverId, member.id, '')
+        fieldLabel: 'Reason',
+        placeholder: 'Why this ban is in place',
+      }).then((reason) => {
+        if (!reason) return;
+        Api.banMember(serverId, member.id, reason)
           .then(() => { toast('Banned.', { type: 'success' }); repaint(); })
           .catch((e) => errorToast(e));
       });
@@ -370,6 +386,12 @@ export function memberList(serverId, options) {
   // Presence changes on their own: the realtime channel says who arrived and
   // who left, and the rows are redrawn rather than left claiming the old state.
   const offStore = onStore('presence', paint);
+  // The roster also follows its community's membership: a join, a leave or a
+  // role change that happened elsewhere is a row that changed here.
+  const offMembers = onStore('members', (event) => {
+    if (event && event.serverId !== undefined && String(event.serverId) !== String(serverId)) return;
+    if (!loading) load();
+  });
   const offRealtime = onRealtime(EVENTS.PRESENCE, () => paint());
 
   const node = el('div', { class: 'member-panel' },
@@ -385,6 +407,7 @@ export function memberList(serverId, options) {
     cleanup() {
       if (searchTimer) clearTimeout(searchTimer);
       offStore();
+      offMembers();
       offRealtime();
     },
   };

@@ -15,6 +15,7 @@ const auth = require('../middleware/auth');
 const { singleFile } = require('../middleware/upload');
 const rateLimit = require('../middleware/ratelimit');
 const { fail } = require('../errors');
+const db = require('../db');
 const { visibleChannel } = require('../util');
 const { hasChannelPermission } = require('../services/permissions');
 const memberships = require('../services/memberships');
@@ -134,6 +135,27 @@ router.get('/attachments/profile/:id', auth, async (req, res, next) => {
     res.setHeader('Cache-Control', 'private, max-age=3600');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     const stream = uploads.openProfileMedia(row);
+    stream.on('error', () => { if (!res.headersSent) fail(res, 'NOT_FOUND', 'attachment not found'); });
+    stream.pipe(res);
+  } catch (e) { next(e); }
+});
+
+// A group conversation's picture. Unlike a user avatar, it is only for the
+// people in the conversation: the id is unguessable, but an id is not an
+// authorization check.
+router.get('/attachments/conversation/:id', auth, async (req, res, next) => {
+  try {
+    const row = await uploads.conversationMedia(req.params.id);
+    if (!row) return fail(res, 'NOT_FOUND', 'attachment not found');
+    const member = await db.get(
+      'SELECT 1 FROM dm_members WHERE conversation_id = ? AND user_id = ?',
+      [row.conversation_id, req.user.id]
+    );
+    if (!member) return fail(res, 'NOT_FOUND', 'attachment not found');
+    res.setHeader('Content-Type', row.mime);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    const stream = uploads.openConversationMedia(row);
     stream.on('error', () => { if (!res.headersSent) fail(res, 'NOT_FOUND', 'attachment not found'); });
     stream.pipe(res);
   } catch (e) { next(e); }

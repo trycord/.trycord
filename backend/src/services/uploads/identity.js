@@ -21,6 +21,7 @@ const COMMUNITY_MEDIA_KINDS = ['icon', 'banner'];
 // that accepts an id is the thing that enforces it.
 const PROFILE_ID = /^pf-[a-f0-9-]{1,64}$/;
 const COMMUNITY_ID = /^sv-[a-f0-9-]{1,64}$/i;
+const CONVERSATION_ID = /^cv-[a-f0-9-]{1,64}$/i;
 
 function sniffImage(buffer, message) {
   if (!buffer || buffer.length === 0) return { error: 'VALIDATION_ERROR', message: 'Empty file' };
@@ -118,6 +119,59 @@ function openServerMedia(row) {
   return storage.createReadStream(storage.key.communityMedia(row.server_id, row.kind, row.id));
 }
 
+// --- group conversation media ----------------------------------------------
+//
+// A group's picture is identity for the conversation, not for any one member.
+// It is stored beside the other identity media but keyed by conversation, and
+// the fetch route checks membership: unlike a public avatar, a group's picture
+// is only for the people in the group.
+
+async function storeConversationMedia({ conversationId, kind, buffer, originalName }) {
+  if (kind !== 'avatar') {
+    return { error: 'VALIDATION_ERROR', message: 'Unknown conversation media kind.' };
+  }
+  const sniffed = sniffImage(buffer, 'images must be PNG, JPEG, GIF, or WebP');
+  if (sniffed.error) return sniffed;
+  const id = 'cv-' + uuid();
+  const storageKey = storage.key.conversationMedia(conversationId, kind, id);
+  await storage.put(storageKey, buffer, sniffed.mime);
+  try {
+    await db.run(
+      'INSERT INTO conversation_media (id, conversation_id, kind, filename, mime, size, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, conversationId, kind, cleanFilename(originalName) || kind, sniffed.mime, buffer.length, now()]
+    );
+  } catch (e) {
+    await storage.delete(storageKey).catch(() => {});
+    throw e;
+  }
+  return {
+    id,
+    url: '/api/attachments/conversation/' + id,
+    mime: sniffed.mime,
+    size: buffer.length,
+    kind,
+  };
+}
+
+async function conversationMedia(id) {
+  if (!CONVERSATION_ID.test(String(id || ''))) return null;
+  return db.get('SELECT * FROM conversation_media WHERE id = ?', [id]);
+}
+
+async function removeConversationFile(urlOrId) {
+  const s = String(urlOrId || '');
+  const idMatch = s.match(/^(?:.*\/)+?(cv-[a-f0-9-]{1,64})$/);
+  const id = idMatch ? idMatch[1] : (CONVERSATION_ID.test(s) ? s : null);
+  if (!id) return;
+  const row = await db.get('SELECT conversation_id, kind FROM conversation_media WHERE id = ?', [id]);
+  if (row) await storage.delete(storage.key.conversationMedia(row.conversation_id, row.kind, id)).catch(() => {});
+  try { await db.run('DELETE FROM conversation_media WHERE id = ?', [id]); } catch { /* row already gone */ }
+}
+
+function openConversationMedia(row) {
+  return storage.createReadStream(storage.key.conversationMedia(row.conversation_id, row.kind, row.id));
+}
+
 module.exports = {
   storeProfileMedia,
   profileMedia,
@@ -127,4 +181,8 @@ module.exports = {
   serverMedia,
   removeServerFile,
   openServerMedia,
+  storeConversationMedia,
+  conversationMedia,
+  removeConversationFile,
+  openConversationMedia,
 };

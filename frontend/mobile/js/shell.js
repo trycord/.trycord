@@ -1,335 +1,224 @@
-// The Mobile shell.
+// The Trycord Mobile shell.
 //
-// The module's own shell, not the desktop one at a different width: an app bar, a
-// scrolling view, an optional composer, and a bottom tab bar. It shares nothing
-// with the desktop shell except the platform packages. Views never reach into it;
-// they return a description and the router paints it.
+// The concept: one hand, three doors. A bar that names where you are, one
+// screen at a time, and a bottom row of doors — Chats, Places, You — with the
+// bell riding the bar, because alerts belong to everywhere. Actions live in
+// sheets, not in pages. Views never reach into the shell; they hand it a
+// description and the shell paints it.
 
-import { el } from '../../packages/dom.js';
+import { el, clear } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import { brandMark } from '../../packages/brand.js';
-import { path, currentRoute, navigate } from '../../packages/nav.js';
-import { mobilePages } from '../../packages/registry.js';
-import { attachViewSwipe } from '../js/gestures.js';
-import { State } from '../../packages/store.js';
-import { readPrefs, applyDensity, onPrefsChange } from './prefs.js';
-import { buildRail, buildDrawer, isWide } from './rail.js';
+import { path, navigate } from '../../packages/nav.js';
+import { State, nameOf, signedIn } from '../../packages/store.js';
+import { avatar } from '../../js/ui/primitives.js';
 
 let refs = null;
-let tabRecords = [];
+let doors = [];
 
+// The screen a view hands over. Every part is optional except `node`.
+//   head   { back:bool, title, sub, face, actions:[nodes] }
+//   door   the tab the screen belongs to, so the bar can light it
+//   bare   the screen manages its own padding (conversations, auth)
+//   raw    the shell chrome hides entirely (auth), `node` stands alone
 export function mountShell() {
-  const lead = el('div', { class: 'm-appbar__lead' });
-  const title = el('div', { class: 'm-appbar__title' });
-  // The bell is the shell's own, not a screen's: alerts follow the reader
-  // everywhere, so their door does not live behind a tab that may not be on
-  // the bar. The badge is the store's own unread count.
-  const bellBadge = el('span', { class: 'm-tab__badge', hidden: true });
+  const barFace = el('button', { class: 'm-bar__face', type: 'button', hidden: true, 'aria-label': 'Who this is' });
+  const backBtn = el('button', {
+    class: 'm-bar__btn', type: 'button', hidden: true,
+    'aria-label': 'Back', onClick: () => history.back(),
+  }, icon('arrow-left', { size: 22 }));
+  const mark = el('a', {
+    class: 'm-bar__btn', href: path('/home'), 'aria-label': 'Trycord home',
+  }, brandMark({ size: 26 }));
+  const titles = el('div', { class: 'm-bar__titles' },
+    el('div', { class: 'm-bar__title' }),
+    el('div', { class: 'm-bar__sub', hidden: true }));
+  const bellBadge = el('span', { class: 'm-bar__badge', hidden: true }, '');
   const bell = el('a', {
-    class: 'm-iconbtn m-appbar__bell', href: path('/notifications'),
-    'aria-label': 'Alerts',
+    class: 'm-bar__btn m-bar__mark', href: path('/notifications'), 'aria-label': 'Alerts',
   }, icon('bell', { size: 22 }), bellBadge);
-  // The narrow phone's door to the communities rail. On a wide phone the rail
-  // is always drawn, so the button is not; on a narrow one this overlay is
-  // how a reader switches community from inside a conversation without
-  // leaving it.
-  const railBtn = el('button', {
-    class: 'm-iconbtn m-appbar__railbtn', type: 'button', hidden: true,
-    'aria-label': 'Your communities', 'aria-expanded': 'false',
-    onClick: () => toggleRailOverlay(),
-  }, icon('globe', { size: 22 }));
-  const actions = el('div', { class: 'm-appbar__actions' });
+  const actions = el('div', { class: 'm-bar__actions' });
+  const bar = el('header', { class: 'm-bar' },
+    backBtn, mark, barFace, titles, actions, bell);
+
   const banner = el('div', { class: 'm-banner', hidden: true, role: 'status' });
-  const view = el('main', { class: 'm-view', id: 'm-view', tabindex: '-1' });
-  const composer = el('div', { id: 'm-composer', hidden: true });
-  const tabs = el('nav', { class: 'm-tabs', id: 'm-tabs', 'aria-label': 'Primary' });
+  const screen = el('main', { class: 'm-screen', id: 'm-screen', tabindex: '-1' });
+  const composerSlot = el('div', { class: 'm-send-slot', hidden: true });
+  const doorsRow = el('nav', { class: 'm-doors', 'aria-label': 'Primary' });
 
-  // The columns a wide phone grows: the communities, and the channels of the
-  // community that is open. On a narrow phone they are not drawn at all -
-  // the bottom tabs do that job, and they have always done it.
-  const rail = el('div', { class: 'm-railwrap', id: 'm-rail', hidden: true });
-  const drawer = el('div', { class: 'm-drawerwrap', id: 'm-drawer', hidden: true });
+  const root = el('div', { class: 'm-root' },
+    el('div', { class: 'm-chrome' }, banner, bar, screen, composerSlot, doorsRow));
+  const toasts = el('div', { class: 'm-toasts', id: 'm-toasts' });
+  root.appendChild(toasts);
 
-  // The narrow phone's rail, as an overlay. It is the same list the wide
-  // phone draws as a column: one rail, two presentations.
-  const railPanel = el('div', {
-    class: 'm-railoverlay__panel', role: 'dialog', 'aria-modal': 'true',
-    'aria-label': 'Your communities', tabindex: '-1',
-  });
-  const railOverlay = el('div', { class: 'm-railoverlay', hidden: true },
-    el('button', {
-      class: 'm-railoverlay__backdrop', type: 'button', tabindex: '-1',
-      'aria-label': 'Close communities', onClick: () => toggleRailOverlay(),
-    }),
-    railPanel);
-
-  const root = el('div', { class: 'm-app', id: 'm-shell' },
-    el('a', { class: 'm-skip', href: '#m-view' }, 'Skip to content'),
-    rail, drawer, railOverlay,
-    el('header', { class: 'm-appbar' }, lead, title, railBtn, bell, actions),
-    banner, view, composer, tabs);
-
-  refs = { root, lead, title, actions, banner, view, composer, tabs, rail, drawer, bell, bellBadge, railBtn, railOverlay, railPanel };
-
-  // The overlay's own lifecycle: open builds the rail, focuses it, and
-  // listens for Escape; close returns focus to the button that opened it.
-  let railOpen = false;
-  const onKeydown = (event) => {
-    if (!railOpen) return;
-    if (event.key === 'Escape') { toggleRailOverlay(); return; }
-    if (event.key !== 'Tab') return;
-    // The rail is a dialog over the screen, so Tab stays inside it until it is
-    // closed. Without this a reader tabs out of the communities and into the
-    // page the overlay is covering, where they cannot see the focus.
-    const focusables = Array.from(railPanel.querySelectorAll(
-      'a[href], button, input, select, textarea, [tabindex]',
-    )).filter((node) => !node.disabled && node.getAttribute('tabindex') !== '-1');
-    if (!focusables.length) {
-      event.preventDefault();
-      railPanel.focus();
-      return;
-    }
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-    if (!railPanel.contains(document.activeElement)) {
-      event.preventDefault();
-      first.focus();
-    } else if (event.shiftKey
-      && (document.activeElement === first || document.activeElement === railPanel)) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
-  if (typeof window !== 'undefined' && window.addEventListener) {
-    window.addEventListener('keydown', onKeydown);
-  }
-
-  function toggleRailOverlay() {
-    railOpen = !railOpen;
-    if (railOpen) {
-      railPanel.replaceChildren(buildRail());
-      railOverlay.hidden = false;
-      railBtn.setAttribute('aria-expanded', 'true');
-      railPanel.focus({ preventScroll: true });
-    } else {
-      railOverlay.hidden = true;
-      railBtn.setAttribute('aria-expanded', 'false');
-      railBtn.focus({ preventScroll: true });
-    }
-  }
-  applyDensity();
-  buildTabs();
-  refreshTabs();
-
-  // The reader's choices about the phone's own composition take effect at
-  // once, not at the next launch.
-  onPrefsChange(() => {
-    applyDensity();
-    buildTabs();
-    refreshTabs();
-  });
-
-  // The columns follow the window: a phone turned sideways has room for
-  // them, and a phone held upright does not.
-  const onResize = () => refreshColumns();
-  if (typeof window !== 'undefined' && window.addEventListener) {
-    window.addEventListener('resize', onResize);
-  }
-  refreshColumns();
-
-  // Horizontal swipe on the view (started at the top of the scroll) hops between
-  // the bottom-tab destinations. Vertical scrolling always wins.
-  attachViewSwipe(view, (delta) => {
-    const pages = mobilePages().filter((p) => p.nav && p.nav.mobile);
-    const here = currentRoute();
-    const idx = pages.findIndex((p) => p.route === here);
-    if (idx === -1) return;
-    const target = pages[(idx + delta + pages.length) % pages.length];
-    navigate(target.route);
-  });
-
+  refs = { banner, bar, backBtn, mark, barFace, titles, actions, bell, bellBadge, screen, composerSlot, doorsRow, toasts, node: root };
+  paintDoors();
+  watchKeyboard();
   return root;
 }
 
-export function shellRoot() { return refs && refs.root; }
-export function viewHost() { return refs && refs.view; }
-
-/** The document's own name for the screen it is showing. */
-export function setTitle(text) {
-  try {
-    document.title = text ? text + ' - Trycord' : 'Trycord';
-  } catch { /* no document */ }
+// The keyboard.
+//
+// The viewport units describe the screen, not the part of it a person can
+// see. When the on-screen keyboard opens, the bottom of the layout viewport
+// is behind it, and the shell's bottom row - the composer - goes with it. The
+// covered height is kept in a variable on the shell's root, and the root's
+// height takes it off, so the composer rides up with the keyboard instead of
+// disappearing behind it. Where there is no keyboard the variable is zero, and
+// the shell is exactly the screen.
+function watchKeyboard() {
+  const viewport = typeof window !== 'undefined' && window.visualViewport;
+  if (!viewport || !refs) return;
+  const measure = () => {
+    const covered = Math.max(0, Math.round(window.innerHeight - (viewport.height + viewport.offsetTop)));
+    refs.node.style.setProperty('--m-keyboard', covered + 'px');
+  };
+  viewport.addEventListener('resize', measure);
+  viewport.addEventListener('scroll', measure);
+  measure();
 }
 
-export function setAppBar(head) {
+function doorButton(label, glyph, address) {
+  return el('a', {
+    class: 'm-door', href: path(address), 'data-door': address,
+  }, el('span', { class: 'm-door__icon' }, icon(glyph, { size: 22 })),
+    el('span', { class: 'm-door__label' }, label),
+    el('span', { class: 'm-door__pip', hidden: true }));
+}
+
+function paintDoors() {
+  doors = [
+    { address: '/dms', node: doorButton('Chats', 'message', '/dms') },
+    { address: '/communities', node: doorButton('Places', 'globe', '/communities') },
+    { address: '/you', node: doorButton('You', 'settings', '/you') },
+  ];
+  clear(refs.doorsRow);
+  for (const door of doors) refs.doorsRow.appendChild(door.node);
+}
+
+function lightDoors(address) {
+  for (const door of doors) {
+    const on = address === door.address || address.startsWith(door.address + '/');
+    if (on) door.node.setAttribute('aria-current', 'page');
+    else door.node.removeAttribute('aria-current');
+  }
+}
+
+// The screen painter. `screen` is the description from the view above.
+export function paintScreen(screen) {
+  const s = screen || {};
+  const bare = !!s.bare;
+  const raw = !!s.raw;
+
+  // The chrome's mode is the shell's to hold, and both modes are set here.
+  // The class was toggled on the shell's root before, and toggled to false
+  // whatever the screen asked for, so a raw screen was painted with the
+  // shell's bar sitting over it.
+  const chrome = refs.node.querySelector('.m-chrome');
+  if (chrome) {
+    chrome.classList.toggle('m-chrome--bare', bare);
+    chrome.classList.toggle('m-chrome--raw', raw);
+  }
+
+  refs.backBtn.hidden = !s.head || !s.head.back;
+  refs.barFace.hidden = !(s.head && s.head.face);
+  clear(refs.barFace);
+  if (s.head && s.head.face) {
+    refs.barFace.appendChild(s.head.face);
+    refs.barFace.onclick = s.head.onFace || null;
+  }
+
+  const titleNode = refs.titles.children[0];
+  const subNode = refs.titles.children[1];
+  titleNode.textContent = (s.head && s.head.title) || 'Trycord';
+  if (s.head && s.head.sub) { subNode.textContent = s.head.sub; subNode.hidden = false; }
+  else subNode.hidden = true;
+
+  clear(refs.actions);
+  if (s.head && s.head.actions) for (const node of s.head.actions) refs.actions.appendChild(node);
+
+  refs.bell.hidden = raw || !signedIn();
+
+  clear(refs.screen);
+  // A bare screen manages its own padding, and a raw one is not the shell's
+  // at all: the page it paints fills the screen it is given.
+  refs.screen.classList.toggle('m-screen--bare', bare || raw);
+  refs.screen.appendChild(s.node || el('div'));
+  if (!raw) {
+    // The reader's place moves to the screen: to its heading when the screen
+    // names itself, and to the screen itself when it does not.
+    const heading = refs.screen.querySelector('h1, h2');
+    if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
+    else refs.screen.focus({ preventScroll: true });
+  }
+
+  lightDoors(s.door || '');
+  // The doors are hidden by the chrome's own mode, not by this painter: a
+  // full-bleed screen and a raw one both have no doors, and the stylesheet is
+  // where that is said.
+  refs.doorsRow.style.display = '';
+  refs.mark.style.visibility = raw ? 'hidden' : 'visible';
+  setTitle(s.head && s.head.title !== undefined ? s.head.title : '');
+}
+
+// The composer slot beneath the screen. A conversation hands its form over;
+// every other screen hides it.
+export function paintComposer(node) {
+  clear(refs.composerSlot);
+  refs.composerSlot.hidden = !node;
+  if (node) refs.composerSlot.appendChild(node);
+}
+
+// The unread pip on the bar's bell.
+export function paintBell(count) {
   if (!refs) return;
-  const h = head || {};
-  setTitle(h.title || '');
-  refs.lead.replaceChildren();
-  if (h.lead === undefined || h.lead === 'brand') {
-    // The monogram's address and box are packages/brand.js's business; the link
-    // is this shell's, because the app bar is the Mobile module's control.
-    refs.lead.appendChild(el('a', { class: 'm-brandmark', href: path('/home'), 'aria-label': 'Home' },
-      brandMark({ size: 28 })));
-  } else if (h.lead === 'back') {
-    refs.lead.appendChild(el('button', {
-      class: 'm-iconbtn', type: 'button', 'aria-label': 'Back',
-      onClick: () => {
-        if (window.history && window.history.length > 1) window.history.back();
-        else window.dispatchEvent(new window.CustomEvent('trycord:navigate', { detail: { route: '/home', options: {} } }));
-      },
-    }, icon('chevron-left', { size: 22 })));
-  } else if (h.lead instanceof Node) {
-    refs.lead.appendChild(h.lead);
-  }
-
-  refs.title.replaceChildren(el('div', { class: 'm-appbar__stack' },
-    h.mark || null,
-    el('div', { class: 'm-appbar__text' },
-      el('div', { class: 'm-appbar__name truncate' }, h.title || ''),
-      h.sub ? el('div', { class: 'm-appbar__sub truncate' }, h.sub) : null)));
-
-  refs.actions.replaceChildren();
-  for (const node of [].concat(h.actions || [])) if (node) refs.actions.appendChild(node);
+  refs.bellBadge.hidden = !count;
+  refs.bellBadge.textContent = count > 99 ? '99+' : String(count || '');
 }
 
-export function setView(node) {
-  refs.view.replaceChildren();
-  if (node) refs.view.appendChild(node);
-  refs.view.scrollTop = 0;
-  if (!node) return;
-  // Move the reader's focus to the new screen so it is announced instead of the
-  // tab that was just tapped. The screen's own heading is the best name for it;
-  // a screen without one falls back to the view container.
-  const heading = refs.view.querySelector('h1');
-  const target = heading || refs.view;
-  if (heading && !heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
-  try {
-    target.focus({ preventScroll: true });
-  } catch {
-    try { target.focus(); } catch { /* nothing to focus */ }
-  }
+export function shellRoot() { return refs && refs.node; }
+export function screenHost() { return refs && refs.screen; }
+
+// The document names the screen it is on.
+export function setTitle(title) {
+  try { document.title = title ? title + ' - Trycord' : 'Trycord'; } catch { /* no document */ }
 }
 
-export function setComposer(node) {
-  refs.composer.replaceChildren();
-  if (node) { refs.composer.hidden = false; refs.composer.appendChild(node); }
-  else refs.composer.hidden = true;
-}
-
-export function setLayout(name) {
-  refs.root.dataset.layout = name || 'default';
-}
-
+// The banner above the bar names what the connection is doing, because words
+// that silently stop arriving are words the reader keeps typing into a wall.
 export function setConnection(state, label) {
-  if (!state) { refs.banner.hidden = true; refs.banner.replaceChildren(); return; }
+  if (!refs || !state) { if (refs && refs.banner) { refs.banner.hidden = true; refs.banner.replaceChildren(); } return; }
   refs.banner.hidden = false;
   refs.banner.dataset.state = state;
   refs.banner.replaceChildren(
     icon(state === 'offline' ? 'wifi-off' : 'loader', { size: 16 }), el('span', {}, label || ''));
 }
 
-// The bottom bar carries the destinations the reader kept, in the order they
-// chose. The registry says what exists; the phone's own preferences say which
-// of them are here.
-function buildTabs() {
-  refs.tabs.replaceChildren();
-  const wanted = readPrefs().tabs;
-  const pages = mobilePages().filter((page) => wanted.indexOf(page.id) !== -1);
-  tabRecords = pages.map((page) => {
-    const nav = page.nav || {};
-    const label = page.nav.tabLabel || page.nav.short || page.nav.label || page.label;
-    const badgeHost = el('span', { class: 'm-tab__badge', hidden: true });
-    const link = el('a', { class: 'm-tab', href: path(page.route), dataset: { page: page.id } },
-      el('span', { class: 'm-tab__icon' }, icon(page.nav.icon || 'circle-dot', { size: 22 }), badgeHost),
-      el('span', { class: 'm-tab__label' }, (page.nav && (page.nav.tabLabel || page.nav.short || page.nav.label)) || page.label));
-    refs.tabs.appendChild(link);
-    return { page, link, badge: badgeHost };
-  });
-}
-
-export function refreshTabs() {
+// A door's pip: the number of words waiting behind it.
+function paintDoorPip(address, count) {
   if (!refs) return;
-  const here = currentRoute();
-  for (const record of tabRecords) {
-    const route = record.page.route;
-    const active = here === route || here.startsWith(route + '/');
-    record.link.classList.toggle('is-active', active);
-    if (active) record.link.setAttribute('aria-current', 'page');
-    else record.link.removeAttribute('aria-current');
-    const count = badgeCount(record.page.id);
-    if (count) record.badge.hidden = false;
-    else record.badge.hidden = true;
-    record.badge.textContent = count ? (count > 99 ? '99+' : String(count)) : '';
-  }
-  // The bell in the app bar shows the same count the alerts tab used to
-  // carry: one number, two doors into the same list.
-  const alerts = badgeCount('notifications');
-  if (alerts) {
-    refs.bellBadge.hidden = false;
-    refs.bellBadge.textContent = alerts > 99 ? '99+' : String(alerts);
-    refs.bell.setAttribute('aria-label', 'Alerts, ' + alerts + ' unread');
-  } else {
-    refs.bellBadge.hidden = true;
-    refs.bell.setAttribute('aria-label', 'Alerts');
-  }
+  const door = refs.doorsRow.querySelector('[data-door="' + address + '"]');
+  if (!door) return;
+  const pip = door.querySelector('.m-door__pip');
+  if (!pip) return;
+  pip.hidden = !count;
+  pip.textContent = count > 9 ? '9+' : String(count || '');
 }
 
-function badgeCount(pageId) {
-  if (pageId === 'notifications') return State.notifications.unreadCount || 0;
-  if (pageId === 'friends') return (State.friendRequests.incoming || []).length;
-  return 0;
-}
-
-// The columns of a wide phone.
-//
-// The communities on the left, and the channels of the community that is
-// open next to them. They are drawn only when there is room for them, and
-// they are drawn from the same state the rest of the phone reads, so they
-// cannot disagree with the menu screen about which communities there are.
-export function refreshColumns() {
-  if (!refs) return;
-  const wide = isWide();
-  refs.root.classList.toggle('m-app--wide', wide);
-  // The rail button is the narrow phone's door; on a wide phone the rail is
-  // already drawn, so the button steps aside and the overlay, if open, is
-  // put away.
-  refs.railBtn.hidden = wide;
-  if (wide && refs.railOverlay) {
-    refs.railOverlay.hidden = true;
-    refs.railBtn.setAttribute('aria-expanded', 'false');
-  }
-  if (!wide) {
-    refs.rail.hidden = true;
-    refs.drawer.hidden = true;
-    refs.rail.replaceChildren();
-    refs.drawer.replaceChildren();
-    return;
-  }
-  refs.rail.hidden = false;
-  refs.rail.replaceChildren(buildRail());
-
-  // The community that is open, if there is one.
-  const route = currentRoute() || '';
-  const match = /^\/server\/([^/]+)/.exec(route);
-  const serverId = match ? match[1] : null;
-  const column = serverId ? buildDrawer(serverId) : null;
-  if (column) {
-    refs.drawer.hidden = false;
-    refs.drawer.replaceChildren(column);
-  } else {
-    refs.drawer.hidden = true;
-    refs.drawer.replaceChildren();
-  }
-}
-
+// The chrome refreshes the parts that read the store directly: the bell's
+// count and the doors' pips. Both are numbers the store already holds, so a
+// paint is a read and never a request.
 export function refreshChrome() {
   if (!refs) return;
-  refreshTabs();
-  refreshColumns();
+  // The store keeps the inbox as a page, not as a list: the items, the count
+  // and the cursor are its own. Reading it as a list found nothing to count,
+  // so the bell never lit.
+  const inbox = State.notifications || {};
+  const unread = inbox.unreadCount !== undefined
+    ? inbox.unreadCount
+    : (inbox.items || []).filter((n) => !n.read).length;
+  paintBell(unread);
+  const dms = Array.isArray(State.dms) ? State.dms : [];
+  const waiting = dms.reduce((sum, dm) => sum + Number((dm && dm.unread) || 0), 0);
+  paintDoorPip('/dms', waiting);
 }
-
-export default { mountShell, setAppBar, setView, setComposer, setLayout, setConnection, refreshChrome };

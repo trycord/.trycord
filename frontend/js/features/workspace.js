@@ -25,6 +25,7 @@ import { documentsList, documentsDetail } from './workspace/documents.js';
 import { boardsList, boardsDetail } from './workspace/boards.js';
 import { eventsList, eventsDetail } from './workspace/events.js';
 import { pollsList, pollsDetail } from './workspace/polls.js';
+import { filesList, filesDetail } from './workspace/files.js';
 
 // The surface each address belongs to. The landing is its own thing: it is
 // what the workspace opens on, and it shows what the community holds rather
@@ -41,6 +42,8 @@ const SURFACE_OF_PAGE = {
   'community.workspace.event': 'events',
   'community.workspace.polls': 'polls',
   'community.workspace.poll': 'polls',
+  'community.workspace.files': 'files',
+  'community.workspace.file': 'files',
 };
 
 const VIEWS = {
@@ -49,6 +52,7 @@ const VIEWS = {
   boards: { list: boardsList, detail: boardsDetail },
   events: { list: eventsList, detail: eventsDetail },
   polls: { list: pollsList, detail: pollsDetail },
+  files: { list: filesList, detail: filesDetail },
 };
 
 // The doors: the five surfaces, with the one that is open marked. The door is

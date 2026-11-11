@@ -90,7 +90,6 @@ const HEADER = `<header class="site-header">
 ${group('Product', [
   ['/features', 'Features', 'Channels, roles, moderation and more.'],
   ['/download', 'Download', 'Get the desktop app for your computer.'],
-  ['/demo', 'Demo', 'Try Trycord without an account.'],
   ['/status', 'Status', 'Live health for this instance.'],
 ], true)}
 
@@ -124,6 +123,8 @@ ${group('About', [
 
         <div class="nav-mobile-actions">
           <a class="btn btn-ghost btn-sm" href="/app/" data-app-link>Open the app</a>
+          <a class="btn btn-ghost btn-sm" href="/register">Create account</a>
+          <a class="btn btn-primary btn-sm" href="/login" data-signin>Sign in</a>
         </div>
       </nav>
 
@@ -132,8 +133,8 @@ ${group('About', [
           ${SUN}
           ${MOON}
         </button>
-        <a class="btn btn-ghost btn-sm" href="/app/register" data-app-link>Create account</a>
-        <a class="btn btn-primary btn-sm" href="/app/" data-app-link>Open the app</a>
+        <a class="btn btn-ghost btn-sm" href="/register">Create account</a>
+        <a class="btn btn-primary btn-sm" href="/login" data-signin>Sign in</a>
       </div>
     </div>
   </header>`;
@@ -148,13 +149,15 @@ const FOOTER = `<footer class="site-footer">
           <span class="brand-word">Trycord</span>
         </a>
         <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
-        <a class="btn btn-primary btn-sm" href="/app/register" data-app-link>Create account</a>
+        <div class="footer-actions">
+          <a class="btn btn-primary btn-sm" href="/register">Create account</a>
+          <a class="btn btn-ghost btn-sm" href="/login" data-signin>Sign in</a>
+        </div>
       </div>
       <nav class="footer-col" aria-label="Product">
         <h2 class="footer-heading">Product</h2>
         <a href="/features">Features</a>
         <a href="/download">Desktop app</a>
-        <a href="/demo">Demo</a>
         <a href="/status">Status</a>
       </nav>
       <nav class="footer-col" aria-label="Docs">

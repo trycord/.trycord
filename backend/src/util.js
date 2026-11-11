@@ -65,6 +65,13 @@ async function visibleChannel(channelId, userId, serverId) {
     ch = await db.get('SELECT * FROM channels WHERE id = ?', [channelId]);
   }
   if (!ch || !(await isMember(userId, ch.server_id))) return null;
+  // A removed community has no reachable channels. Resolving the server here
+  // closes the direct channel, message, attachment and search paths that do not
+  // pass through the /api/servers access chain.
+  const srv = await db.get(
+    'SELECT enforcement_state, deleted_at FROM servers WHERE id = ?', [ch.server_id]
+  );
+  if (!srv || srv.deleted_at || srv.enforcement_state === 'removed') return null;
   return ch;
 }
 

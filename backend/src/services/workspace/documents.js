@@ -75,15 +75,23 @@ function plainText(blocks) {
 
 // Keep the index in step with the document. The old words go first, so an
 // edit cannot leave a word behind that the document no longer contains.
+//
+// One transaction, and the words in a fixed order: two saves of the same
+// document racing each other used to trade DELETEs and INSERTs in a way that
+// colliding on a word could only lose - a document that repeated a word was
+// enough to fail the save. Inside one transaction the second save waits, and
+// a fixed order cannot deadlock against itself.
 async function indexDocument(documentId, serverId, title, blocks, createdAt) {
-  await db.run('DELETE FROM document_search_words WHERE document_id = ?', [documentId]);
-  const words = searchIndex.wordsOf(title + ' ' + plainText(blocks));
-  for (const word of words) {
-    await db.run(
-      'INSERT INTO document_search_words (document_id, word, server_id, created_at) VALUES (?, ?, ?, ?)',
-      [documentId, word, serverId, createdAt || now()]
-    );
-  }
+  const words = [...new Set(searchIndex.wordsOf(title + ' ' + plainText(blocks)))].sort();
+  await db.transaction(async (t) => {
+    await t.run('DELETE FROM document_search_words WHERE document_id = ?', [documentId]);
+    for (const word of words) {
+      await t.run(
+        'INSERT INTO document_search_words (document_id, word, server_id, created_at) VALUES (?, ?, ?, ?)',
+        [documentId, word, serverId, createdAt || now()]
+      );
+    }
+  });
 }
 
 async function get(serverId, documentId) {

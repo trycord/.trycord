@@ -25,6 +25,7 @@
 
 const WebSocket = require('ws');
 const db = require('./db');
+const { now } = require('./util');
 const { tokenStale, enforced: authEnforced } = require('./middleware/auth');
 const voiceMesh = require('./services/voice-mesh');
 const gateway = require('./services/developer/gateway');
@@ -51,9 +52,24 @@ function createGateway(server) {
   // The registry cannot call presence directly without the two importing each other. The
   // gateway owns the wiring, so the dependency runs one way: registry knows a hook
   // exists, presence knows a registry exists, and neither knows about the other.
+  //
+  // Connection is also the honest moment to record "last seen": a socket opening
+  // is real activity, while writing the column on every HTTP request would be a
+  // row update per page load for a value that only orders an offline friend list.
+  // Failures are swallowed; a timestamp that cannot be written must not cost the
+  // socket that was just accepted.
+  const touchActive = (userId) => {
+    db.run('UPDATE users SET last_active_at = ? WHERE id = ?', [now(), String(userId)]).catch(() => {});
+  };
   registry.setPresenceHooks({
-    onFirstOpen: (userId) => presence.announceQuiet(userId, 'online'),
-    onLastClose: (userId) => presence.announceQuiet(userId, 'offline'),
+    onFirstOpen: (userId) => {
+      touchActive(userId);
+      presence.announceQuiet(userId, 'online');
+    },
+    onLastClose: (userId) => {
+      touchActive(userId);
+      presence.announceQuiet(userId, 'offline');
+    },
   });
 
   // An application's handshake.
@@ -239,6 +255,12 @@ function createGateway(server) {
     sendToUser: registry.sendToUser,
     isOnline: registry.isOnline,
     getPresence: registry.getPresence,
+    // Push a new effective presence to everyone who is allowed to see this
+    // account. Used when the account changes its own state while connected;
+    // the connect/disconnect hooks call the same path.
+    announcePresence: (userId) => presence.announceQuiet(userId, registry.isOnline(userId) ? 'online' : 'offline'),
+    // Re-evaluate who may see this account after a privacy preference changed.
+    refreshPresence: (userId) => presence.refreshQuiet(userId),
     issueTicket: tickets.issue,
     disconnectUser: registry.disconnectUser,
     evictUserFromServer: rooms.evictUserFromServer,

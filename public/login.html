@@ -1,0 +1,1194 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111216">
+
+  <title>Sign in | Trycord</title>
+  <meta name="description" content="Sign in to your Trycord instance.">
+  <meta name="robots" content="noindex, nofollow">
+
+  <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/css/design-tokens.css">
+  <link rel="stylesheet" href="/css/site.css">
+
+  <script src="/js/theme.js"></script>
+
+  <style>
+    :root {
+      --login-bg: #111216;
+      --login-surface: #191b22;
+      --login-surface-2: #20232c;
+      --login-border: rgba(255,255,255,.09);
+      --login-text: #f4f4f6;
+      --login-muted: #999ba8;
+      --login-orange: #ff4d24;
+      --login-orange-hover: #ff6845;
+      --login-radius: 16px;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body.login-body {
+      min-height: 100vh;
+      margin: 0;
+      color: var(--login-text);
+      background:
+        radial-gradient(
+          ellipse at 12% 50%,
+          rgba(255,77,36,.09),
+          transparent 38%
+        ),
+        var(--login-bg);
+    }
+
+    /* HEADER */
+
+    .site-header {
+      position: relative;
+      z-index: 20;
+      background: rgba(17,18,22,.92);
+      border-bottom: 1px solid var(--login-border);
+      backdrop-filter: blur(18px);
+    }
+
+    .masthead {
+      min-height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--login-text);
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+
+    .brand .mark {
+      width: 30px;
+      height: 30px;
+      color: var(--login-orange);
+    }
+
+    .brand-word {
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+
+    .site-nav {
+      display: flex;
+      align-items: center;
+      gap: 25px;
+    }
+
+    .nav-group {
+      position: relative;
+    }
+
+    .nav-trigger {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 0;
+      border: 0;
+      background: transparent;
+      color: #b7b8c1;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .nav-trigger:hover {
+      color: white;
+    }
+
+    .nav-trigger .icon {
+      width: 14px;
+      height: 14px;
+    }
+
+    .nav-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 8px);
+      left: -16px;
+      width: 245px;
+      padding: 9px;
+      border: 1px solid var(--login-border);
+      border-radius: 12px;
+      background: #1b1d24;
+      box-shadow: 0 15px 45px rgba(0,0,0,.35);
+    }
+
+    .nav-menu--wide {
+      width: 350px;
+    }
+
+    .nav-group:hover .nav-menu,
+    .nav-group:focus-within .nav-menu,
+    .nav-group[data-open="true"] .nav-menu {
+      display: block;
+    }
+
+    .nav-menu-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+
+    .nav-menu a {
+      display: block;
+      padding: 11px;
+      border-radius: 8px;
+      color: var(--login-text);
+      text-decoration: none;
+      font-size: 12px;
+    }
+
+    .nav-menu a:hover {
+      background: rgba(255,255,255,.05);
+    }
+
+    .nav-menu a strong,
+    .nav-menu a span {
+      display: block;
+    }
+
+    .nav-menu a span {
+      margin-top: 5px;
+      color: var(--login-muted);
+      line-height: 1.5;
+    }
+
+    .masthead-actions {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 16px;
+      border-radius: 9px;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .btn-primary {
+      border: 1px solid var(--login-orange);
+      background: var(--login-orange);
+      color: #17120f;
+    }
+
+    .btn-primary:hover {
+      background: var(--login-orange-hover);
+    }
+
+    .btn-ghost {
+      border: 1px solid var(--login-border);
+      background: transparent;
+      color: var(--login-text);
+    }
+
+    .btn-ghost:hover {
+      background: rgba(255,255,255,.06);
+    }
+
+    .theme-toggle {
+      width: 39px;
+      height: 39px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--login-border);
+      border-radius: 50%;
+      background: var(--login-surface);
+      color: var(--login-text);
+      cursor: pointer;
+    }
+
+    .theme-toggle .icon {
+      width: 18px;
+      height: 18px;
+    }
+
+    .menu-toggle,
+    .nav-mobile-actions {
+      display: none;
+    }
+
+    /* LOGIN LAYOUT */
+
+    .login-page {
+      min-height: calc(100vh - 66px);
+      display: flex;
+      align-items: center;
+      padding: 75px 24px 90px;
+    }
+
+    .login-grid {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(380px, .8fr);
+      align-items: center;
+      gap: clamp(50px, 8vw, 110px);
+    }
+
+    /* BRANDING */
+
+    .login-brand {
+      max-width: 560px;
+    }
+
+    .login-brand-mark {
+      margin-bottom: 43px;
+    }
+
+    .login-brand-mark .mark {
+      width: 43px;
+      height: 43px;
+    }
+
+    .login-brand-mark .brand-word {
+      font-size: 28px;
+    }
+
+    .kicker {
+      color: var(--login-orange);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .login-brand h1 {
+      max-width: 540px;
+      margin: 18px 0;
+      font-size: clamp(40px, 4.5vw, 60px);
+      line-height: 1.08;
+      letter-spacing: -2.8px;
+      font-weight: 800;
+    }
+
+    .login-brand .lede {
+      max-width: 480px;
+      color: #a9abb6;
+      font-size: 15px;
+      line-height: 1.85;
+      margin-bottom: 32px;
+    }
+
+    .login-points {
+      display: grid;
+      gap: 19px;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .login-points li {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      color: #aeb0bb;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .login-points strong {
+      color: var(--login-text);
+    }
+
+    .login-point-mark {
+      flex: 0 0 35px;
+      height: 35px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255,77,36,.25);
+      border-radius: 10px;
+      background: rgba(255,77,36,.08);
+      color: var(--login-orange);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .login-instance-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 36px;
+      color: var(--login-muted);
+      font-size: 13px;
+    }
+
+    .login-instance-line strong {
+      color: var(--login-text);
+    }
+
+    .login-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #45c98b;
+      box-shadow: 0 0 12px rgba(69,201,139,.45);
+    }
+
+    /* AUTHENTICATION CARD */
+
+    .login-card {
+      width: 100%;
+      padding: 38px;
+      border: 1px solid var(--login-border);
+      border-radius: var(--login-radius);
+      background: var(--login-surface);
+      box-shadow:
+        0 30px 90px rgba(0,0,0,.28),
+        0 1px 0 rgba(255,255,255,.035) inset;
+    }
+
+    .login-form h2,
+    .login-signed-in h2 {
+      margin: 13px 0 11px;
+      font-size: 29px;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+
+    .login-lede,
+    .login-signed-in > p:not(.kicker) {
+      margin-bottom: 29px;
+      color: var(--login-muted);
+      font-size: 13px;
+      line-height: 1.75;
+    }
+
+    /* INPUTS */
+
+    .field {
+      display: block;
+      margin-bottom: 20px;
+    }
+
+    .field-label {
+      display: block;
+      margin-bottom: 9px;
+      color: #c8c9d1;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .login-input {
+      width: 100%;
+      min-height: 49px;
+      padding: 0 14px;
+      border: 1px solid #343743;
+      border-radius: 9px;
+      outline: none;
+      background: #111319;
+      color: var(--login-text);
+      font: inherit;
+      font-size: 14px;
+      transition: border-color .18s, box-shadow .18s;
+    }
+
+    .login-input:hover {
+      border-color: #555967;
+    }
+
+    .login-input:focus {
+      border-color: var(--login-orange);
+      box-shadow: 0 0 0 3px rgba(255,77,36,.13);
+    }
+
+    .login-input::placeholder {
+      color: #6f7280;
+    }
+
+    .login-password {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .login-password .login-input {
+      padding-right: 70px;
+    }
+
+    .login-password-toggle {
+      position: absolute;
+      right: 9px;
+      padding: 8px;
+      border: 0;
+      background: transparent;
+      color: #aeb0bb;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .login-password-toggle:hover {
+      color: var(--login-orange);
+    }
+
+    .field-hint {
+      display: block;
+      margin-top: 9px;
+      color: var(--login-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    /* LINKS AND BUTTONS */
+
+    .login-forgot {
+      display: inline-block;
+      margin-top: 11px;
+      color: var(--login-orange);
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .login-forgot:hover {
+      color: var(--login-orange-hover);
+      text-decoration: underline;
+    }
+
+    .login-submit {
+      width: 100%;
+      min-height: 49px;
+      margin-top: 8px;
+      border: 0;
+      border-radius: 9px;
+      background: var(--login-orange);
+      color: #17120f;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .login-submit:hover {
+      background: var(--login-orange-hover);
+      box-shadow: 0 8px 25px rgba(255,77,36,.2);
+      transform: translateY(-1px);
+    }
+
+    .login-submit:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .login-alt {
+      margin-top: 25px;
+      color: var(--login-muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .login-alt a {
+      color: var(--login-orange);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .login-alt a:hover {
+      text-decoration: underline;
+    }
+
+    /* ALERTS */
+
+    .login-alert {
+      padding: 13px 15px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255,90,90,.25);
+      border-radius: 9px;
+      background: rgba(255,70,70,.08);
+      color: #ff9999;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .login-alert[data-tone="success"] {
+      border-color: rgba(69,201,139,.25);
+      background: rgba(69,201,139,.08);
+      color: #75d9a7;
+    }
+
+    /* EXISTING SESSION */
+
+    .login-signed-in-actions {
+      display: grid;
+      gap: 13px;
+      margin-top: 24px;
+    }
+
+    .login-signed-in-actions .btn {
+      width: 100%;
+    }
+
+    .text-link {
+      padding: 10px;
+      border: 0;
+      background: transparent;
+      color: var(--login-orange);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* SECURITY FOOTNOTE */
+
+    .login-footnote {
+      margin-top: 25px;
+      padding-top: 19px;
+      border-top: 1px solid var(--login-border);
+      color: #858895;
+      font-size: 11px;
+      line-height: 1.8;
+    }
+
+    /* FOOTER */
+
+    .site-footer {
+      border-top: 1px solid var(--login-border);
+    }
+
+    /* RESPONSIVE */
+
+    @media (max-width: 900px) {
+      .site-nav {
+        gap: 15px;
+      }
+
+      .login-grid {
+        gap: 45px;
+      }
+    }
+
+    @media (max-width: 780px) {
+      .masthead {
+        min-height: 62px;
+      }
+
+      .site-nav {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        padding: 18px 22px;
+        border-bottom: 1px solid var(--login-border);
+        background: #17181e;
+      }
+
+      .site-nav[data-open="true"] {
+        display: block;
+      }
+
+      .nav-group {
+        margin-bottom: 8px;
+      }
+
+      .nav-menu {
+        position: static;
+        width: 100%;
+        margin-top: 5px;
+      }
+
+      .menu-toggle {
+        width: 39px;
+        height: 39px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--login-border);
+        border-radius: 9px;
+        background: var(--login-surface);
+        color: white;
+        cursor: pointer;
+      }
+
+      .menu-toggle .icon {
+        width: 19px;
+        height: 19px;
+      }
+
+      .masthead-actions > .btn {
+        display: none;
+      }
+
+      .nav-mobile-actions {
+        display: flex;
+        gap: 9px;
+        margin-top: 15px;
+      }
+
+      .login-page {
+        padding: 55px 20px 75px;
+      }
+
+      .login-grid {
+        grid-template-columns: minmax(0, 1fr);
+        max-width: 520px;
+        gap: 42px;
+      }
+
+      .login-brand {
+        max-width: none;
+      }
+
+      .login-brand h1 {
+        font-size: 43px;
+      }
+
+      .login-brand-mark {
+        margin-bottom: 26px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .login-page {
+        padding: 38px 16px 55px;
+      }
+
+      .login-grid {
+        gap: 32px;
+      }
+
+      .login-brand h1 {
+        font-size: 35px;
+        letter-spacing: -1.7px;
+      }
+
+      .login-brand .lede {
+        font-size: 14px;
+      }
+
+      .login-card {
+        padding: 25px 20px;
+        border-radius: 13px;
+      }
+
+      .login-form h2 {
+        font-size: 25px;
+      }
+    }
+
+    /* LIGHT THEME */
+
+    [data-theme="light"] body.login-body,
+    body[data-theme="light"].login-body {
+      --login-bg: #f5f5f7;
+      --login-surface: #ffffff;
+      --login-surface-2: #f0f1f4;
+      --login-border: rgba(20,20,30,.11);
+      --login-text: #171820;
+      --login-muted: #70727e;
+
+      background:
+        radial-gradient(
+          ellipse at 12% 50%,
+          rgba(255,77,36,.08),
+          transparent 38%
+        ),
+        var(--login-bg);
+    }
+
+    [data-theme="light"] .site-header,
+    body[data-theme="light"] .site-header {
+      background: rgba(255,255,255,.92);
+    }
+
+    [data-theme="light"] .nav-menu,
+    body[data-theme="light"] .nav-menu {
+      background: white;
+    }
+
+    [data-theme="light"] .nav-menu a:hover,
+    body[data-theme="light"] .nav-menu a:hover {
+      background: #f1f1f4;
+    }
+
+    [data-theme="light"] .nav-trigger,
+    body[data-theme="light"] .nav-trigger {
+      color: #555765;
+    }
+
+    [data-theme="light"] .login-input,
+    body[data-theme="light"] .login-input {
+      background: #f7f7f9;
+      color: #171820;
+      border-color: #dedfe5;
+    }
+
+    [data-theme="light"] .login-points li,
+    body[data-theme="light"] .login-points li {
+      color: #666875;
+    }
+
+    [data-theme="light"] .login-points strong,
+    body[data-theme="light"] .login-points strong {
+      color: #171820;
+    }
+
+    [data-theme="light"] .site-nav,
+    body[data-theme="light"] .site-nav {
+      background: #fff;
+    }
+  </style>
+</head>
+
+<body class="login-body">
+
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="wrap masthead">
+      <a class="brand" href="/">
+        <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+          <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+          <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+          <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+          <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+        </svg>
+        <span class="brand-word">Trycord</span>
+      </a>
+
+      <button class="menu-toggle" type="button" data-menu-toggle aria-controls="site-nav" aria-expanded="false" aria-label="Open menu">
+        <svg class="icon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></g></svg>
+      </button>
+
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Product
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/features"><strong>Features</strong><span>Channels, roles, moderation and more.</span></a>
+              <a href="/download"><strong>Download</strong><span>Get the desktop app for your computer.</span></a>
+              <a href="/status"><strong>Status</strong><span>Live health for this instance.</span></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Docs
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/docs"><strong>Documentation</strong><span>Run and configure your own instance.</span></a>
+              <a href="/install"><strong>Install</strong><span>The short version of the install.</span></a>
+              <a href="/faq"><strong>FAQ</strong><span>The questions people ask most.</span></a>
+              <a href="/support"><strong>Support</strong><span>Get help and reach the project.</span></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Developers
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/developers"><strong>Developer guide</strong><span>Build a bot with the API and the SDK.</span></a>
+            <a href="/developers#the-api-reference"><strong>API reference</strong><span>The routes a bot uses.</span></a>
+            <a href="/developers#the-sdk-trycord-botjs"><strong>SDK</strong><span>The client for those routes.</span></a>
+            <a href="https://github.com/trycord/.trycord" target="_blank" rel="noopener"><strong>Source code</strong><span>The whole repository.</span></a>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            Community
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu nav-menu--wide">
+            <div class="nav-menu-grid">
+              <a href="/communities"><strong>Communities</strong><span>Browse public communities.</span></a>
+              <a href="/instances"><strong>Instances</strong><span>Find an instance to join.</span></a>
+              <a href="https://discord.gg/dSF7eqsJuP" target="_blank" rel="noopener"><strong>Discord</strong><span>Join the community chat.</span></a>
+              <a href="/trust-and-safety"><strong>Trust and safety</strong><span>Rules, reporting, and appeals.</span></a>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group>
+          <button class="nav-trigger" type="button" data-nav-trigger aria-expanded="false" aria-haspopup="true">
+            About
+            <svg class="icon chevron" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></g></svg>
+          </button>
+          <div class="nav-menu">
+            <a href="/about"><strong>About Trycord</strong><span>Why Trycord exists and how it's built.</span></a>
+            <a href="/changelog"><strong>Changelog</strong><span>What's shipped recently.</span></a>
+            <a href="/roadmap"><strong>Roadmap</strong><span>Where the project is going.</span></a>
+            <a href="/security"><strong>Security</strong><span>How to report a vulnerability.</span></a>
+          </div>
+        </div>
+
+        <div class="nav-mobile-actions">
+          <a class="btn btn-ghost btn-sm" href="/app/" data-app-link>Open the app</a>
+          <a class="btn btn-ghost btn-sm" href="/register">Create account</a>
+          <a class="btn btn-primary btn-sm" href="/login" data-signin>Sign in</a>
+        </div>
+      </nav>
+
+      <div class="masthead-actions">
+        <button class="theme-toggle" type="button" data-theme-toggle hidden aria-pressed="false" aria-label="Switch between the light and dark theme">
+          <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
+          <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
+        </button>
+        <a class="btn btn-ghost btn-sm" href="/register">Create account</a>
+        <a class="btn btn-primary btn-sm" href="/login" data-signin>Sign in</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main id="main" class="login-page">
+    <div class="wrap login-grid">
+
+      <!-- BRANDING -->
+      <section class="login-brand" aria-labelledby="login-title">
+
+        <a class="brand login-brand-mark" href="/" aria-label="Trycord home">
+          <svg class="mark" viewBox="0 0 100 100" aria-hidden="true">
+            <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+            <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+            <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+            <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+          </svg>
+          <span class="brand-word">Trycord</span>
+        </a>
+
+        <p class="kicker">The front door</p>
+
+        <h1 id="login-title">Your people are already here.</h1>
+
+        <p class="lede">
+          One account for every community on this instance.
+          Sign in once, then step straight into the conversations
+          waiting for you.
+        </p>
+
+        <ul class="login-points">
+          <li>
+            <span class="login-point-mark">01</span>
+            <span><strong>Your communities.</strong>
+              The servers you joined, the channels you follow,
+              and the people you talk to.</span>
+          </li>
+
+          <li>
+            <span class="login-point-mark">02</span>
+            <span><strong>Your session, your device.</strong>
+              The app keeps the session in this browser.
+              It is never written into a link.</span>
+          </li>
+
+          <li>
+            <span class="login-point-mark">03</span>
+            <span><strong>One instance, your rules.</strong>
+              This account belongs to this instance,
+              and this instance answers for it.</span>
+          </li>
+        </ul>
+
+        <p class="login-instance-line">
+          <span class="login-dot" aria-hidden="true"></span>
+          Signing in to <strong data-instance-name>this instance</strong>
+        </p>
+
+      </section>
+
+      <!-- AUTHENTICATION -->
+      <section class="login-card">
+
+        <!-- ALREADY SIGNED IN -->
+        <div class="login-signed-in" data-already hidden
+          aria-labelledby="login-already-title">
+
+          <p class="kicker">A session is ready</p>
+
+          <h2 id="login-already-title">You're already signed in.</h2>
+
+          <p>
+            This browser holds a session for this instance.
+            Continue into the app, or use another account below.
+          </p>
+
+          <div class="login-signed-in-actions">
+            <a class="btn btn-primary" href="/app/"
+              data-app-link data-continue>
+              Continue to the app
+            </a>
+
+            <button class="text-link" type="button" data-switch>
+              Use another account
+            </button>
+          </div>
+        </div>
+
+        <!-- LOGIN FORM -->
+        <form class="login-form" data-login-form
+          aria-labelledby="login-form-title" novalidate>
+
+          <p class="kicker">Sign in</p>
+
+          <h2 id="login-form-title">Welcome back.</h2>
+
+          <p class="login-lede">
+            Use the account you have on this instance.
+            You'll be taken straight into the app.
+          </p>
+
+          <div class="login-alert" data-login-alert
+            role="alert" hidden></div>
+
+          <label class="field">
+            <span class="field-label">Username or email</span>
+            <input
+              class="login-input"
+              name="username"
+              type="text"
+              autocomplete="username"
+              spellcheck="false"
+              autocapitalize="none"
+              placeholder="Enter your username or email"
+              required>
+          </label>
+
+          <div class="field">
+            <label class="field-label" for="login-password">
+              Password
+            </label>
+
+            <div class="login-password">
+              <input
+                class="login-input"
+                id="login-password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Enter your password"
+                required>
+
+              <button
+                class="login-password-toggle"
+                type="button"
+                data-password-toggle
+                aria-controls="login-password"
+                aria-pressed="false">
+                Show
+              </button>
+            </div>
+
+            <a class="login-forgot" href="/forgot" data-forgot>
+              Forgot your password?
+            </a>
+          </div>
+
+          <!-- TWO-FACTOR AUTHENTICATION -->
+          <label class="field" data-code-field hidden>
+            <span class="field-label">Two-step verification</span>
+
+            <input
+              class="login-input"
+              name="code"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              spellcheck="false"
+              placeholder="Enter your verification code">
+
+            <span class="field-hint">
+              Enter the six digits from your authenticator app,
+              or use a recovery code.
+            </span>
+          </label>
+
+          <button class="login-submit" type="submit" data-submit>
+            Sign in
+          </button>
+
+          <p class="login-alt">
+            New to this instance?
+            <a href="/register" data-register>Create an account</a>
+          </p>
+
+          <noscript>
+            <p class="login-alert" data-tone="error">
+              Signing in requires JavaScript.
+              <a href="/app/login" data-app-link>
+                Use the app's sign-in page instead.
+              </a>
+            </p>
+          </noscript>
+
+        </form>
+
+        <p class="login-footnote">
+          Your password goes only to this instance.
+          The app keeps the session token in this browser,
+          never in the address bar.
+        </p>
+
+      </section>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <div class="footer-col footer-brand">
+        <a class="brand" href="/">
+          <svg class="mark" viewBox="0 0 100 100" role="img" aria-hidden="true" focusable="false">
+          <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+          <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+          <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+          <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+        </svg>
+          <span class="brand-word">Trycord</span>
+        </a>
+        <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
+        <div class="footer-actions">
+          <a class="btn btn-primary btn-sm" href="/register">Create account</a>
+          <a class="btn btn-ghost btn-sm" href="/login" data-signin>Sign in</a>
+        </div>
+      </div>
+      <nav class="footer-col" aria-label="Product">
+        <h2 class="footer-heading">Product</h2>
+        <a href="/features">Features</a>
+        <a href="/download">Desktop app</a>
+        <a href="/status">Status</a>
+      </nav>
+      <nav class="footer-col" aria-label="Docs">
+        <h2 class="footer-heading">Docs</h2>
+        <a href="/docs">Self-hosting guide</a>
+        <a href="/install">Install</a>
+        <a href="/faq">FAQ</a>
+        <a href="/support">Support</a>
+      </nav>
+      <nav class="footer-col" aria-label="Developers">
+        <h2 class="footer-heading">Developers</h2>
+        <a href="/developers">Developer guide</a>
+        <a href="/developers#the-api-reference">API reference</a>
+        <a href="/developers#the-sdk-trycord-botjs">SDK</a>
+        <a href="https://github.com/trycord/.trycord" rel="noopener">Source code</a>
+      </nav>
+      <nav class="footer-col" aria-label="Community">
+        <h2 class="footer-heading">Community</h2>
+        <a href="/communities">Communities</a>
+        <a href="/instances">Instances</a>
+        <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">Discord</a>
+        <a href="/trust-and-safety">Trust and safety</a>
+      </nav>
+      <nav class="footer-col" aria-label="About">
+        <h2 class="footer-heading">About</h2>
+        <a href="/about">About the project</a>
+        <a href="/changelog">Changelog</a>
+        <a href="/roadmap">Roadmap</a>
+        <a href="/licenses">Licences</a>
+      </nav>
+      <nav class="footer-col" aria-label="Legal">
+        <h2 class="footer-heading">Legal</h2>
+        <a href="/terms">Terms of service</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/cookies">Cookies</a>
+        <a href="/instances-terms">Instance terms</a>
+        <a href="/community-guidelines">Community rules</a>
+        <a href="/guidelines">Acceptable use</a>
+        <a href="/federation-policy">Federation policy</a>
+        <a href="/security">Security</a>
+      </nav>
+    </div>
+    <div class="wrap footer-bottom">
+      <span>&copy; <span data-year>2026</span> Trycord</span>
+      <span class="muted">Your instance, your conversations, your rules.</span>
+    </div>
+  </footer>
+
+  <!-- EXISTING APPLICATION SCRIPTS -->
+  <script src="/js/public-api.js"></script>
+  <script src="/js/login.js"></script>
+  <script src="/js/site.js"></script>
+
+  <!-- NAVIGATION INTERACTION -->
+  <script>
+    (() => {
+      const menuToggle = document.querySelector("[data-menu-toggle]");
+      const nav = document.querySelector("#site-nav");
+
+      if (menuToggle && nav) {
+        menuToggle.addEventListener("click", () => {
+          const isOpen = nav.dataset.open !== "true";
+
+          nav.dataset.open = String(isOpen);
+          menuToggle.setAttribute("aria-expanded", String(isOpen));
+          menuToggle.setAttribute(
+            "aria-label",
+            isOpen ? "Close menu" : "Open menu"
+          );
+        });
+      }
+
+      document.querySelectorAll("[data-nav-trigger]").forEach(trigger => {
+        trigger.addEventListener("click", () => {
+          const group = trigger.closest("[data-nav-group]");
+          if (!group) return;
+
+          const isOpen = group.dataset.open !== "true";
+
+          document.querySelectorAll("[data-nav-group]").forEach(item => {
+            item.dataset.open = "false";
+            item.querySelector("[data-nav-trigger]")
+              ?.setAttribute("aria-expanded", "false");
+          });
+
+          group.dataset.open = String(isOpen);
+          trigger.setAttribute("aria-expanded", String(isOpen));
+        });
+      });
+
+      document.addEventListener("click", event => {
+        if (!event.target.closest("[data-nav-group]")) {
+          document.querySelectorAll("[data-nav-group]").forEach(group => {
+            group.dataset.open = "false";
+            group.querySelector("[data-nav-trigger]")
+              ?.setAttribute("aria-expanded", "false");
+          });
+        }
+      });
+
+      const year = document.querySelector("[data-year]");
+      if (year) year.textContent = new Date().getFullYear();
+    })();
+  </script>
+
+</body>
+</html>

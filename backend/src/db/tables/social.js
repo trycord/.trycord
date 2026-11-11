@@ -35,6 +35,12 @@ module.exports = (engine) => [
       type         VARCHAR(32) NOT NULL,
       actor_id     VARCHAR(64),
       reference_id VARCHAR(64),
+      -- Idempotency for events that can be attempted more than once. A
+      -- moderation retry must not deliver the same decision twice.
+      dedupe_key   VARCHAR(128),
+      -- A short, server-authored explanation. Moderation decisions need to
+      -- say what happened without leaking investigation notes.
+      detail       VARCHAR(500),
       created_at   VARCHAR(64) NOT NULL,
       read_at      VARCHAR(64),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -71,6 +77,9 @@ module.exports = (engine) => [
     dms             VARCHAR(16) NOT NULL DEFAULT 'anyone',
     -- Who may see this user's online state.
     presence        VARCHAR(16) NOT NULL DEFAULT 'everyone',
+    -- Who may open this user's profile at all. 'everyone', 'friends' or
+    -- 'nobody'; enforced on the profile route, not only in the interface.
+    profile_visibility VARCHAR(16) NOT NULL DEFAULT 'everyone',
     -- Whether this user appears in user search.
     discoverable    INTEGER NOT NULL DEFAULT 1,
     updated_at      VARCHAR(64) NOT NULL,

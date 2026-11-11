@@ -10,7 +10,7 @@
 // worth writing to.
 
 const db = require('../../db');
-const { now, uuid } = require('../../util');
+const auditTrail = require('../audit');
 
 // The actions this surface writes. Named here rather than spelled at the call
 // sites so a reader can see the whole vocabulary in one place, and so a typo
@@ -44,11 +44,7 @@ const ACTIONS = {
  * @param {string} [reason] what was asked for, in words
  */
 async function record(actorId, action, targetType, targetId, reason) {
-  await db.run(
-    'INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, reason, created_at) ' +
-    'VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [uuid(), actorId, action, targetType || null, targetId || null, reason || null, now()]
-  );
+  await auditTrail.record(actorId, action, targetType || null, targetId || null, reason || null);
 }
 
 // The audit trail for one target, newest first. Bounded: the list an

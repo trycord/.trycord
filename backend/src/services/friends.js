@@ -50,27 +50,33 @@ async function request(fromId, toId) {
 
 async function incoming(userId) {
   const rows = await db.all(
-    `SELECT r.*, u.username, u.display_name, u.created_at AS user_created
+    `SELECT r.*, u.username, u.display_name, u.avatar_url, u.created_at AS user_created
      FROM friend_requests r JOIN users u ON u.id = r.from_user_id
      WHERE r.to_user_id = ? AND r.status = 'pending' ORDER BY r.created_at DESC`,
     [userId]
   );
   return rows.map((r) => ({
     id: r.id, status: r.status, createdAt: r.created_at,
-    from: { id: r.from_user_id, username: r.username, displayName: r.display_name, createdAt: r.user_created },
+    from: {
+      id: r.from_user_id, username: r.username, displayName: r.display_name,
+      avatarUrl: r.avatar_url || null, createdAt: r.user_created,
+    },
   }));
 }
 
 async function outgoing(userId) {
   const rows = await db.all(
-    `SELECT r.*, u.username, u.display_name, u.created_at AS user_created
+    `SELECT r.*, u.username, u.display_name, u.avatar_url, u.created_at AS user_created
      FROM friend_requests r JOIN users u ON u.id = r.to_user_id
      WHERE r.from_user_id = ? AND r.status = 'pending' ORDER BY r.created_at DESC`,
     [userId]
   );
   return rows.map((r) => ({
     id: r.id, status: r.status, createdAt: r.created_at,
-    to: { id: r.to_user_id, username: r.username, displayName: r.display_name, createdAt: r.user_created },
+    to: {
+      id: r.to_user_id, username: r.username, displayName: r.display_name,
+      avatarUrl: r.avatar_url || null, createdAt: r.user_created,
+    },
   }));
 }
 
@@ -115,14 +121,19 @@ async function cancel(userId, requestId) {
 
 async function list(userId) {
   const rows = await db.all(
-    `SELECT u.id, u.username, u.display_name, u.created_at, f.created_at AS friends_since
+    `SELECT u.id, u.username, u.display_name, u.avatar_url, u.status_text,
+            u.created_at, u.last_active_at, f.created_at AS friends_since
      FROM friendships f JOIN users u ON u.id = f.friend_id
      WHERE f.user_id = ? ORDER BY u.username`,
     [userId]
   );
   return rows.map((r) => ({
     id: r.id, username: r.username, displayName: r.display_name,
-    createdAt: r.created_at, friendsSince: r.friends_since,
+    avatarUrl: r.avatar_url || null,
+    statusText: r.status_text || null,
+    createdAt: r.created_at,
+    friendsSince: r.friends_since,
+    lastActiveAt: r.last_active_at || null,
   }));
 }
 

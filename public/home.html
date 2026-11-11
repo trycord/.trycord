@@ -46,7 +46,6 @@
             <div class="nav-menu-grid">
               <a href="/features"><strong>Features</strong><span>Channels, roles, moderation and more.</span></a>
               <a href="/download"><strong>Download</strong><span>Get the desktop app for your computer.</span></a>
-              <a href="/demo"><strong>Demo</strong><span>Try Trycord without an account.</span></a>
               <a href="/status"><strong>Status</strong><span>Live health for this instance.</span></a>
             </div>
           </div>
@@ -110,6 +109,8 @@
 
         <div class="nav-mobile-actions">
           <a class="btn btn-ghost btn-sm" href="/app/" data-app-link>Open the app</a>
+          <a class="btn btn-ghost btn-sm" href="/register">Create account</a>
+          <a class="btn btn-primary btn-sm" href="/login" data-signin>Sign in</a>
         </div>
       </nav>
 
@@ -118,19 +119,18 @@
           <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
           <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
         </button>
-        <a class="btn btn-ghost btn-sm" href="/app/register" data-app-link>Create account</a>
-        <a class="btn btn-primary btn-sm" href="/app/" data-app-link>Open the app</a>
+        <a class="btn btn-ghost btn-sm" href="/register">Create account</a>
+        <a class="btn btn-primary btn-sm" href="/login" data-signin>Sign in</a>
       </div>
     </div>
   </header>
 
   <main id="main">
     <!--
-      The hero is the brand's own geometry laid out flat, with the product
-      floating over it: the desktop client in a window and the phone beside it,
-      both turned a few degrees so they read as objects rather than as boxes.
-      The window holds the real miniature client, mounted from the same script
-      the demo page uses, so what a visitor sees is the product.
+      The hero is the brand's own geometry: the desktop client in a window and
+      the phone beside it, laid out flat in a single frame. Both are drawn from
+      the same miniatures the rest of the page uses - a picture of the product,
+      not a claim to be running it.
     -->
     <section class="hero">
       <div class="wrap">
@@ -146,61 +146,77 @@
             </p>
             <div class="cta">
               <a class="btn btn-primary btn--pill" href="/app/register" data-app-link>Create an account</a>
-              <a class="btn btn-ghost btn--pill" href="/demo">Try the demo</a>
-            </div>
-            <div class="marks" aria-hidden="true">
-              <span class="marks__line"></span>
-              <span class="marks__dots"><span></span><span></span><span></span></span>
+              <a class="btn btn-ghost btn--pill" href="/features">See the features</a>
             </div>
           </div>
 
-          <div class="stack">
-            <div class="stack__frame" aria-hidden="true"></div>
-
-            <div class="stack__card stack__card--back">
-              <div class="device device--phone">
-                <div class="device__screen">
-                  <div class="mock-speaker" aria-hidden="true"></div>
-                  <div class="mock-appbar">
-                    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-                      <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
-                      <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
-                      <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
-                      <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
-                    </svg>
-                    <div>
-                      <div class="mock-appbar__name">Studio Twelve</div>
-                      <div class="mock-appbar__sub">128 members &middot; 4 channels</div>
+          <div class="showcase showcase--hero">
+            <div class="showcase__body">
+              <div class="hero-preview">
+                <div class="device device--desktop">
+                  <div class="app-window">
+                    <div class="app-titlebar">
+                      <span class="dot" aria-hidden="true"></span>
+                      <span class="dot" aria-hidden="true"></span>
+                      <span class="dot" aria-hidden="true"></span>
+                      <span class="app-url">Trycord</span>
+                    </div>
+                    <div class="mini-channel-group" aria-hidden="true">
+                      <p class="mini-channel-label">Studio Twelve</p>
+                      <div class="mini-channel"><span class="hash">#</span><span>general</span></div>
+                      <div class="mini-channel"><span class="hash">#</span><span>showcase</span></div>
+                      <div class="mini-channel"><span class="hash">#</span><span>feedback</span></div>
+                      <div class="mini-channel"><span class="hash">#</span><span>off-topic</span></div>
+                    </div>
+                    <div class="mini-messages" role="presentation">
+                      <div class="mini-msg">
+                        <div class="mini-avatar av-1" aria-hidden="true">M</div>
+                        <div>
+                          <div class="mini-msg-head"><span class="who">Mira</span><span class="when">Today at 9:09</span></div>
+                          <p>The build went out this morning &mdash; changelog is in the usual channel.</p>
+                        </div>
+                      </div>
+                      <div class="mini-msg">
+                        <div class="mini-avatar av-2" aria-hidden="true">K</div>
+                        <div>
+                          <div class="mini-msg-head"><span class="who">Kai</span><span class="when">Today at 9:11</span></div>
+                          <p>Nice. Locking the release thread once CI is green.</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div class="mock-body">
-                    <p class="mock-label">Channels</p>
-                    <div class="mock-row mock-row--active"><span class="hash">#</span> general <span class="mock-badge">3</span></div>
-                    <div class="mock-row"><span class="hash">#</span> showcase</div>
-                    <div class="mock-row"><span class="hash">#</span> feedback</div>
-                    <div class="mock-row"><span class="hash">#</span> off-topic</div>
-                  </div>
-                  <nav class="mock-tabs" aria-hidden="true">
-                    <span class="is-active"><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></g></svg></span>
-                    <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></g></svg></span>
-                    <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></g></svg></span>
-                    <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></g></svg></span>
-                    <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></g></svg></span>
-                  </nav>
                 </div>
-              </div>
-            </div>
 
-            <div class="stack__card stack__card--front">
-              <div class="device device--desktop">
-                <div class="app-window">
-                  <div class="app-titlebar">
-                    <span class="dot" aria-hidden="true"></span>
-                    <span class="dot" aria-hidden="true"></span>
-                    <span class="dot" aria-hidden="true"></span>
-                    <span class="app-url">Trycord</span>
+                <div class="device device--phone">
+                  <div class="device__screen">
+                    <div class="mock-speaker" aria-hidden="true"></div>
+                    <div class="mock-appbar">
+                      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
+                        <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
+                        <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
+                        <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
+                        <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
+                      </svg>
+                      <div>
+                        <div class="mock-appbar__name">Studio Twelve</div>
+                        <div class="mock-appbar__sub">128 members &middot; 4 channels</div>
+                      </div>
+                    </div>
+                    <div class="mock-body">
+                      <p class="mock-label">Channels</p>
+                      <div class="mock-row mock-row--active"><span class="hash">#</span> general <span class="mock-badge">3</span></div>
+                      <div class="mock-row"><span class="hash">#</span> showcase</div>
+                      <div class="mock-row"><span class="hash">#</span> feedback</div>
+                      <div class="mock-row"><span class="hash">#</span> off-topic</div>
+                    </div>
+                    <nav class="mock-tabs" aria-hidden="true">
+                      <span class="is-active"><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></g></svg></span>
+                      <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></g></svg></span>
+                      <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></g></svg></span>
+                      <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></g></svg></span>
+                      <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></g></svg></span>
+                    </nav>
                   </div>
-                  <div data-demo="compact"></div>
                 </div>
               </div>
             </div>
@@ -241,9 +257,8 @@
     </section>
 
     <!--
-      The cinematic band: the type set like a poster over the brand's horizon,
-      and three product surfaces floating in front of it at different depths.
-      Each card holds the client's own interface, at the scale a card can carry.
+      The feature band: three cards over the sunken surface, each holding a
+      piece of the client's interface at the scale a card can carry.
     -->
     <section class="cinema">
       <div class="wrap">
@@ -286,14 +301,14 @@
                   <div class="mini-avatar av-1" aria-hidden="true">M</div>
                   <div>
                     <div class="mini-msg-head"><span class="who">Mira</span><span class="when">Today at 9:09</span></div>
-                    <p>Try switching channels, changing the theme, or joining the community.</p>
+                    <p>Replies, reactions, files and search &mdash; in channels or one to one.</p>
                   </div>
                 </div>
                 <div class="mini-msg">
                   <div class="mini-avatar av-2" aria-hidden="true">K</div>
                   <div>
                     <div class="mini-msg-head"><span class="who">Kai</span><span class="when">Today at 9:11</span></div>
-                    <p>Settings on this page change the demo for this session only.</p>
+                    <p>And the server checks every permission, not the browser.</p>
                   </div>
                 </div>
               </div>
@@ -497,14 +512,11 @@ curl -fsS localhost:9971/api/health</code></pre>
     </section>
 
     <!--
-      The closing statement, with the brand's eclipse behind it and the light
-      running round its edges.
+      The closing statement, on the sunken band the sections share.
     -->
     <section class="section">
       <div class="wrap">
         <div class="band band--eclipse">
-          <span class="streak streak--ember" style="top:-120px;left:-90px;width:320px;height:320px" aria-hidden="true"></span>
-          <span class="streak streak--warm" style="bottom:-140px;right:-80px;width:380px;height:380px" aria-hidden="true"></span>
           <p class="kicker">Your call</p>
           <h2>Join a community, or run the server yourself.</h2>
           <p>
@@ -534,13 +546,15 @@ curl -fsS localhost:9971/api/health</code></pre>
           <span class="brand-word">Trycord</span>
         </a>
         <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
-        <a class="btn btn-primary btn-sm" href="/app/register" data-app-link>Create account</a>
+        <div class="footer-actions">
+          <a class="btn btn-primary btn-sm" href="/register">Create account</a>
+          <a class="btn btn-ghost btn-sm" href="/login" data-signin>Sign in</a>
+        </div>
       </div>
       <nav class="footer-col" aria-label="Product">
         <h2 class="footer-heading">Product</h2>
         <a href="/features">Features</a>
         <a href="/download">Desktop app</a>
-        <a href="/demo">Demo</a>
         <a href="/status">Status</a>
       </nav>
       <nav class="footer-col" aria-label="Docs">
@@ -590,8 +604,6 @@ curl -fsS localhost:9971/api/health</code></pre>
   </footer>
 
   <script src="/js/public-api.js"></script>
-  <script src="/js/sample-data.js"></script>
-  <script src="/js/demo.js"></script>
   <script src="/js/site.js"></script>
 </body>
 </html>

@@ -25,7 +25,12 @@ const SCOPES = ['anyone', 'friends', 'nobody'];
 const DEFAULTS = {
   friendRequests: 'anyone',
   dms: 'anyone',
-  presence: 'everyone',
+  // The same vocabulary as every other scope. A default spelled 'everyone'
+  // while a saved row normalised to 'anyone' made the default and the saved
+  // choice two different values to the check that reads them, and the loser
+  // was the account that never opened the setting.
+  presence: 'anyone',
+  profileVisibility: 'anyone',
   discoverable: true,
 };
 
@@ -61,6 +66,9 @@ async function getPrivacy(userId, conn = db) {
     friendRequests: scope(row.friend_requests, DEFAULTS.friendRequests),
     dms: scope(row.dms, DEFAULTS.dms),
     presence: scope(row.presence, DEFAULTS.presence),
+    // The column may be absent on a database that has not taken the additive
+    // migration yet; DEFAULTS is the answer either way.
+    profileVisibility: scope(row.profile_visibility, DEFAULTS.profileVisibility),
     discoverable: intBool(row.discoverable),
   };
 }
@@ -73,18 +81,20 @@ async function setPrivacy(userId, patch) {
     friendRequests: scope(patch.friendRequests, current.friendRequests),
     dms: scope(patch.dms, current.dms),
     presence: scope(patch.presence, current.presence),
+    profileVisibility: scope(patch.profileVisibility, current.profileVisibility),
     discoverable: patch.discoverable === undefined ? current.discoverable : !!patch.discoverable,
   };
   const ts = now();
   await db.upsert(
     'privacy_settings',
-    ['user_id', 'friend_requests', 'dms', 'presence', 'discoverable', 'updated_at'],
-    [userId, next.friendRequests, next.dms, next.presence, boolInt(next.discoverable), ts],
+    ['user_id', 'friend_requests', 'dms', 'presence', 'profile_visibility', 'discoverable', 'updated_at'],
+    [userId, next.friendRequests, next.dms, next.presence, next.profileVisibility, boolInt(next.discoverable), ts],
     ['user_id'],
     {
       friend_requests: db.newRef('friend_requests'),
       dms: db.newRef('dms'),
       presence: db.newRef('presence'),
+      profile_visibility: db.newRef('profile_visibility'),
       discoverable: db.newRef('discoverable'),
       updated_at: db.newRef('updated_at'),
     }
@@ -139,10 +149,6 @@ async function block(userId, blockedId, reason) {
   await db.run(
     'DELETE FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)',
     [userId, blockedId, blockedId, userId]
-  );
-  await db.run(
-    'UPDATE server_members SET nickname = nickname WHERE user_id = ? AND server_id IN (SELECT server_id FROM servers WHERE id = ?)',
-    [blockedId, blockedId]
   );
 
   return { userId, blockedId, reason: reason || null, createdAt: ts };
@@ -222,13 +228,40 @@ async function canSeePresence(viewerId, subjectId, conn = db) {
   if (String(viewerId) === String(subjectId)) return true;
   if (await isBlocked(viewerId, subjectId, conn)) return false;
   const pref = await getPrivacy(subjectId, conn);
-  if (pref.presence === 'everyone') return true;
+  // 'everyone' is still accepted from a row written before the vocabulary was
+  // normalised; getPrivacy() rewrites it, but the check does not rely on that.
+  if (pref.presence === 'anyone' || pref.presence === 'everyone') return true;
   if (pref.presence === 'nobody') return false;
   const row = await conn.get(
     'SELECT 1 FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)',
     [subjectId, viewerId, viewerId, subjectId]
   );
   return !!row;
+}
+
+// Whether one account may open another's profile.
+//
+// A block always wins, in either direction: it is the standing answer about
+// the pair, not a preference one side can bypass. Otherwise the subject's
+// profile_visibility decides. A missing row is DEFAULTS, which is 'anyone',
+// so this changes nothing for accounts that never touched the setting.
+async function canViewProfile(viewerId, subjectId, conn = db) {
+  if (String(viewerId) === String(subjectId)) return { allowed: true };
+  if (await isBlocked(viewerId, subjectId, conn)) {
+    // A block is not a reason to reveal that a block exists; the profile
+    // route answers as though the account were private.
+    return { allowed: false, reason: 'private' };
+  }
+  const pref = await getPrivacy(subjectId, conn);
+  if (pref.profileVisibility === 'anyone' || pref.profileVisibility === 'everyone') {
+    return { allowed: true };
+  }
+  if (pref.profileVisibility === 'nobody') return { allowed: false, reason: 'private' };
+  const row = await conn.get(
+    'SELECT 1 FROM friendships WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)',
+    [subjectId, viewerId, viewerId, subjectId]
+  );
+  return row ? { allowed: true } : { allowed: false, reason: 'friends' };
 }
 
 async function canDiscover(viewerId, subjectId, conn = db) {
@@ -251,5 +284,6 @@ module.exports = {
   canOpenDm,
   canSendFriendRequest,
   canSeePresence,
+  canViewProfile,
   canDiscover,
 };

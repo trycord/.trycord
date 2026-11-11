@@ -56,7 +56,7 @@ router.get('/mine/:id', auth, rateLimit(30), async (req, res, next) => {
 });
 
 // The reports that arrived here.
-router.get('/', adminGuard, rateLimit(30), async (req, res, next) => {
+router.get('/', adminGuard.any, rateLimit(30), async (req, res, next) => {
   try {
     res.json(await reports.listInbound({ limit: req.query.limit }));
   } catch (e) { serviceError(res, e); }

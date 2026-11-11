@@ -42,6 +42,13 @@ export const RENDERERS = {
   communities: () => renderMenu(),
   extensions: lazy('./extensions.js', 'renderExtensions'),
   developer: lazy('./developer.js', 'renderDeveloper'),
+  'applications': lazy('./developer.js', 'renderApplicationsPortal'),
+  'applications.keys': lazy('./developer.js', 'renderDeveloper'),
+  'applications.applications': lazy('./developer.js', 'renderDeveloper'),
+  'applications.dashboard': lazy('./developer.js', 'renderDeveloperPortal'),
+  'applications.documentation': lazy('./developer.js', 'renderDeveloper'),
+  // The console's own sections answer to addresses of their own; the bare
+  // developer page and these three are the same console, addressed differently.
   'developer.keys': lazy('./developer.js', 'renderDeveloper'),
   'developer.applications': lazy('./developer.js', 'renderDeveloper'),
   'developer.documentation': lazy('./developer.js', 'renderDeveloper'),
@@ -83,6 +90,8 @@ export const RENDERERS = {
   'community.workspace.event': (ctx) => renderWorkspace(ctx),
   'community.workspace.polls': (ctx) => renderWorkspace(ctx),
   'community.workspace.poll': (ctx) => renderWorkspace(ctx),
+  'community.workspace.files': (ctx) => renderWorkspace(ctx),
+  'community.workspace.file': (ctx) => renderWorkspace(ctx),
   'community.new': () => renderServerCreate(),
 
   // A community that lives on another instance.

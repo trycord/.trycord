@@ -9,10 +9,12 @@ import { el, replaceChildren } from '../../packages/dom.js';
 import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { State, nameOf } from '../../packages/store.js';
-import { navigate } from '../../packages/nav.js';
-import { avatar, bannerNode } from '../ui/primitives.js';
-import { head, card, blank, fault, fold, facts } from '../ui/page.js';
+import { navigate, path } from '../../packages/nav.js';
+import { avatar, bannerNode, serverMark } from '../ui/primitives.js';
+import { head, card, row, blank, fault, fold, facts } from '../ui/page.js';
 import { errorToast, confirmDialog, toast } from '../ui/overlays.js';
+import { personSheet } from '../ui/person.js';
+import { presenceLabel } from '../ui/members.js';
 import { roleNames, roleChips as roleChipList } from '../../packages/roles.js';
 import { displayNameOf, usernameOf } from '../../packages/identity.js';
 
@@ -25,6 +27,22 @@ const relationText = (p) => {
     default: return 'Not connected yet.';
   }
 };
+
+// A friend request is named by its own id, never by the person on the other
+// side. The old button passed the profile id to a route that reads a request
+// id; the two are different rows, so withdrawing somebody else's request was
+// refused and the button looked broken.
+function requestIdFor(profile, page) {
+  const entries = [].concat(
+    (page && page.outgoing) || [],
+    (State.friendRequests && State.friendRequests.outgoing) || []
+  );
+  const match = entries.find((entry) => {
+    const target = entry.user || entry.to || entry.receiver || {};
+    return String(target.id || entry.userId || entry.user_id) === String(profile.id);
+  });
+  return match ? match.id : null;
+}
 
 function actionFor(profile, refresh) {
   const me = State.user && State.user.id;
@@ -48,7 +66,18 @@ function actionFor(profile, refresh) {
         class: 'btn btn--ghost btn--sm', type: 'button',
         onClick: async () => {
           try {
-            await Api.cancelFriendRequest(profile.id);
+            let page = null;
+            let requestId = requestIdFor(profile, null);
+            if (!requestId) {
+              page = await Api.friendRequests();
+              requestId = requestIdFor(profile, page);
+            }
+            if (!requestId) {
+              toast('That request is already gone.');
+              refresh();
+              return;
+            }
+            await Api.cancelFriendRequest(requestId);
             toast('Request withdrawn');
             refresh();
           } catch (e) { errorToast(e); }
@@ -114,6 +143,13 @@ function actionFor(profile, refresh) {
           } catch (e) { errorToast(e); }
         },
       }, 'Block'));
+    // Reporting and the rest of the person actions live in one menu, so the
+    // profile does not become a wall of destructive buttons.
+    actions.push(el('button', {
+      class: 'btn btn--ghost btn--sm', type: 'button',
+      'aria-label': 'More actions for ' + (nameOf(profile) || profile.username),
+      onClick: (event) => personSheet(event.currentTarget, profile),
+    }, icon('more', { size: 15 }), 'More'));
   }
 
   if (self) {
@@ -160,6 +196,11 @@ export function renderProfile(ctx) {
       const roleChips = profile.membership && profile.membership.roles
         ? roleChipList({ roles: profile.membership.roles || [] }) : null;
       const isSelf = String(profile.id) === String(State.user && State.user.id);
+      const presence = profile.presence === undefined ? null : profile.presence;
+      const presenceNode = el('span', {
+        class: 'profile-presence member-presence',
+        dataset: { presence: presence || 'offline' },
+      }, presence ? presenceLabel(presence) : 'Presence hidden');
 
       // The head names the person, and carries what can be done about them.
       const next = head({
@@ -185,6 +226,10 @@ export function renderProfile(ctx) {
               profile.isBot
                 ? el('span', { class: 'botflag', title: 'This is a bot' }, 'BOT')
                 : null),
+            el('p', { class: 'profile-presence-line' }, presenceNode,
+              presence === 'invisible' && isSelf
+                ? el('span', { class: 'profile-presence-note' }, 'Only you can see this.')
+                : null),
             profile.statusText ? el('p', { class: 'profile-status' }, profile.statusText) : null,
             roleChips
               ? el('p', { class: 'profile-roles' }, roleChips)
@@ -198,13 +243,48 @@ export function renderProfile(ctx) {
               profile.membership && profile.membership.joinedAt
                 ? { value: new Date(profile.membership.joinedAt).toLocaleDateString(), label: 'In this community' }
                 : null,
-              profile.statusText ? { value: profile.statusText, label: 'Status' } : null,
+              { value: String(profile.mutualFriendCount || 0), label: 'Mutual friends' },
             ]),
           }),
           profile.bio ? card({
             label: 'About', glyph: 'file',
             body: el('p', { class: 'lede' }, profile.bio),
           }) : null,
+          // Both lists are facts about the viewer's own relationships as much
+          // as the subject's. They are the bridge from a stranger's page to a
+          // place the two already share.
+          profile.mutualFriends && profile.mutualFriends.length
+            ? card({
+              label: 'Mutual friends',
+              glyph: 'users',
+              note: String(profile.mutualFriendCount || profile.mutualFriends.length),
+              tight: true,
+              body: el('div', { class: 'rowlist' },
+                ...profile.mutualFriends.map((friend) => row({
+                  lead: avatar(friend, { size: 'sm', rounded: true }),
+                  title: nameOf(friend) || friend.username,
+                  sub: '@' + (friend.username || ''),
+                  href: path('/users/' + friend.id),
+                  link: true,
+                }))),
+            })
+            : null,
+          profile.sharedCommunities && profile.sharedCommunities.length
+            ? card({
+              label: 'Communities you share',
+              glyph: 'globe',
+              note: String(profile.sharedCommunities.length),
+              tight: true,
+              body: el('div', { class: 'rowlist' },
+                ...profile.sharedCommunities.map((community) => row({
+                  lead: serverMark(community, { size: 'sm' }),
+                  title: community.name,
+                  sub: 'Community',
+                  href: path('/server/' + community.id),
+                  link: true,
+                }))),
+            })
+            : null,
           // The community they are in, and what they are in it - said once,
           // and not twice.
           profile.membership && profile.membership.roles && profile.membership.roles.length
@@ -219,6 +299,26 @@ export function renderProfile(ctx) {
             : null));
     } catch (e) {
       if (mine !== version) return;
+      if (e && e.code === 'PROFILE_PRIVATE') {
+        // A block and a private profile answer the same way on purpose: the
+        // blocked person must not learn which of the two doors closed.
+        const next = head({
+          kicker: 'Profile',
+          title: 'Private profile',
+          lede: 'This person has limited who can see their page.',
+        });
+        host.replaceChild(next, headNode);
+        headNode = next;
+        replaceChildren(identity, fold([
+          blank({
+            glyph: 'lock',
+            title: 'This profile is private',
+            text: 'You can still meet them in a community you share, or through somebody you both know.',
+            action: el('a', { class: 'btn btn--default', href: path('/friends') }, 'Back to friends'),
+          }),
+        ]));
+        return;
+      }
       replaceChildren(identity, fold([
         blank({
           glyph: 'user',

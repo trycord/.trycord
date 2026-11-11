@@ -19,11 +19,23 @@ async function resolveServer(req, res, next) {
     // /api/servers/:slug/... work everywhere without touching each route.
     const srv = await slugs.resolveServer(serverIdOf(req));
     if (!srv) return fail(res, 'SERVER_NOT_FOUND', 'server not found');
-    // Trust & Safety: suspended servers are out of reach for everyone except
-    // the owner (still needs a maintenance access path) and platform admins
+    const platformAdmin = req.user ? await isPlatformAdmin(req.user.id) : false;
+    // Trust & Safety removals are soft deletions: the rows remain for the
+    // audit and a possible restoration, but the community is unreachable to
+    // its members. Only a platform administrator may inspect it.
+    if (srv.deleted_at || srv.enforcement_state === 'removed') {
+      if (!platformAdmin) {
+        return fail(res, 'SERVER_REMOVED', 'community removed by Trust & Safety', 403,
+          { removed: true, reason: srv.enforcement_reason || null });
+      }
+    }
+    // Suspended communities are out of reach for everyone except the owner
+    // (still needs a maintenance access path) and platform administrators
     // (who may need to inspect before lifting). Everything else gets 403.
-    if (srv.enforcement_state === 'suspended' && !(req.user && (req.user.id === srv.owner_id || (await isPlatformAdmin(req.user.id))))) {
-      return fail(res, 'SERVER_SUSPENDED', 'server is suspended', 403, { suspended: true });
+    if (srv.enforcement_state === 'suspended'
+      && !(req.user && (req.user.id === srv.owner_id || platformAdmin))) {
+      return fail(res, 'SERVER_SUSPENDED', 'server is suspended', 403,
+        { suspended: true, until: srv.enforcement_expires_at || null });
     }
     req.server = srv;
     next();

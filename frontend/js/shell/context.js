@@ -16,7 +16,7 @@ import { path, currentRoute, navigate } from '../../packages/nav.js';
 import { openMenu, attachContextMenu, confirmDialog, toast, errorToast } from '../ui/overlays.js';
 import { globalPages } from '../../packages/registry.js';
 import { brandMark } from './frame.js';
-import { personContextMenu } from '../ui/person.js';
+import { personContextMenu, reportDialog } from '../ui/person.js';
 import Api from '../../packages/api.js';
 import { avatarUrlOf } from '../../packages/identity.js';
 import { federatedName } from '../../packages/places.js';
@@ -140,6 +140,10 @@ function youContext(kind) {
 
 export function serverMenuItems(server) {
   const id = server.id;
+  // The report entry is for members, not for the people running the place:
+  // an owner or a manager reporting their own community to the platform is
+  // noise, and they have the settings to fix what they dislike.
+  const mine = State.user && server.ownerId === State.user.id;
   return [
     { header: server.name },
     { label: 'Open', icon: 'arrow-right', onSelect: () => navigate('/server/' + id) },
@@ -148,7 +152,18 @@ export function serverMenuItems(server) {
     { label: 'Invite people', icon: 'mail', onSelect: () => navigate('/server/' + id + '/settings/invites') },
     { label: 'Members', icon: 'users', onSelect: () => navigate('/server/' + id + '/members') },
     { label: 'Community settings', icon: 'settings', onSelect: () => navigate('/server/' + id + '/settings') },
-  ];
+    mine ? null : { separator: true },
+    mine ? null : {
+      label: 'Report community', icon: 'flag',
+      onSelect: () => reportDialog({
+        title: 'Report ' + (server.name || 'this community'),
+        who: server.name || '',
+        payload: (reason, description) => ({
+          targetType: 'server', targetId: id, serverId: id, reason, description,
+        }),
+      }),
+    },
+  ].filter(Boolean);
 }
 
 function communityIdentity(server) {

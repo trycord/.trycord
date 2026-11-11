@@ -20,7 +20,7 @@ const cors = require('cors');
 const db = require('./db');
 const createGateway = require('./ws');
 const serveClient = require('./serve-client');
-const { corsOptions, originCovers, DESKTOP_ORIGIN } = require('./origins');
+const { corsOptions, corsDelegate, originCovers, DESKTOP_ORIGIN } = require('./origins');
 const inviteRoutes = require('./routes/invites');
 const enforcement = require('./services/enforcement');
 const pages = require('./services/pages');
@@ -285,7 +285,12 @@ async function boot(options = {}) {
     app.set('trust proxy', 'loopback');
     console.log('[info] TRUST_PROXY=1: trusting X-Forwarded-* from loopback only');
   }
-  app.use(cors(corsOptions(inst.clientOrigins, inst.ownOrigins)));
+  // The delegate answers the same-origin question per request - "is this
+  // origin the address the request arrived at?" - before falling back to the
+  // configured policy. The instance listens on every interface, so a reader
+  // on the same network reaches it by its LAN address, and refusing that
+  // origin broke every write from that browser while the page itself loaded.
+  app.use(cors(corsDelegate(corsOptions(inst.clientOrigins, inst.ownOrigins))));
   if (inst.ownOrigins.length) {
     console.log('[info] the instance answers its own origin: ' + inst.ownOrigins.join(', '));
   }
@@ -420,6 +425,9 @@ async function boot(options = {}) {
   app.use('/api/servers/:serverId/communityMemory', require('./routes/communityMemory'));
   // The notes a community's moderators keep about the people in it.
   app.use('/api/servers/:serverId/notes', require('./routes/memberNotes'));
+  // Reports, cases, warnings, appeals and moderation history for one
+  // community. Mounted separately so every read carries its server scope.
+  app.use('/api/servers/:serverId/moderation', require('./routes/serverModeration'));
   // Community onboarding: the welcome, the rules, the questions, and the
   // answers a member gives.
   app.use('/api/servers/:serverId/onboarding', require('./routes/communityOnboarding'));
@@ -533,8 +541,17 @@ async function boot(options = {}) {
       cspOriginOf,
     });
 
+  // Mount the developer portal SPA at /applications/
+  if (options.client !== false && deploymentRole !== 'backend') {
+    serveClient.mountPortal(app, {
+      serverDir: __dirname,
+      originOf,
+      cspOriginOf,
+    });
+  }
 
-  const { broadcast, broadcastDm, sendToUser, isOnline, getPresence, issueTicket, disconnectUser, broadcastServer, evictUserFromServer } = createGateway(server);
+
+  const { broadcast, broadcastDm, sendToUser, isOnline, getPresence, announcePresence, refreshPresence, issueTicket, disconnectUser, broadcastServer, evictUserFromServer, invalidateMembers } = createGateway(server);
   require('./routes/auth').setTicketIssuer(issueTicket);
   require('./routes/auth').setGateway({ disconnectUser });
   // Voice mesh (in-house, peer-to-peer real-time) uses the realtime gateway to
@@ -574,13 +591,18 @@ async function boot(options = {}) {
   app.use('/api/voice-local-ticket', require('./routes/voiceLocalTicket'));
   // Instance-wide announcement banners (per-deployment, not global).
   app.use('/api/announcements', require('./routes/announcements'));
-  require('./routes/dms').setGateway({ broadcastDm, sendToUser, isOnline });
-  require('./routes/friends').setGateway({ sendToUser });
-  require('./routes/users').setGateway({ getPresence });
+  require('./routes/dms').setGateway({ broadcastDm, sendToUser, isOnline, getPresence });
+  require('./routes/friends').setGateway({ sendToUser, getPresence });
+  require('./routes/users').setGateway({ getPresence, announcePresence });
+  require('./routes/privacy').setGateway({ refreshPresence });
   require('./routes/admin').setGateway({ disconnectUser });
   require('./services/events').setGateway({
     broadcast: broadcastServer, broadcastChannel: broadcast,
     sendToUser, evict: evictUserFromServer,
+    // The membership cache behind the server room has to drop on member
+    // writes, or a just-kicked member keeps receiving that community's
+    // events until the cache expires.
+    invalidate: invalidateMembers,
   });
 
   // Trust & Safety: bootstrap platform admins from ADMIN_USERNAMES before
@@ -767,6 +789,19 @@ async function boot(options = {}) {
   };
   await purge();
   setInterval(purge, 60 * 60 * 1000).unref();
+
+  // Moderation expiry: suspensions, community bans, timeouts, warnings and
+  // restrictions have end times. The enforcement checks treat an expired row
+  // as inactive immediately; this pass moves the durable record and tells the
+  // member. It runs on boot and every five minutes.
+  if (options.jobs !== false) {
+    const expiry = require('./services/moderationExpiry');
+    const sweepExpired = () => expiry.sweep().catch((e) => {
+      console.error('[moderation-expiry]', e && e.message ? e.message : e);
+    });
+    await sweepExpired();
+    setInterval(sweepExpired, 5 * 60 * 1000).unref();
+  }
 
   // Durable background jobs: bounded workers claim due jobs from the database,
   // retry with backoff, and never lose work on restart or crash.

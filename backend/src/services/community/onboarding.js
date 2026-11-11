@@ -303,19 +303,22 @@ async function save(serverId, actorId, input) {
 
   const ts = now();
   await db.transaction(async (t) => {
-    await t.run(
-      'INSERT INTO community_onboarding'
-      + ' (id, server_id, enabled, welcome_title, welcome_body, rules, default_channels, required,'
-      + ' created_at, updated_at)'
-      + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      + ' ON CONFLICT (server_id) DO UPDATE SET enabled = ?, welcome_title = ?, welcome_body = ?,'
-      + ' rules = ?, default_channels = ?, required = ?, updated_at = ?',
-      [
-        uuid(), serverId, enabled ? 1 : 0, welcomeTitle, welcomeBody,
-        JSON.stringify(rules), JSON.stringify(defaultChannels), required_ ? 1 : 0, ts, ts,
-        enabled ? 1 : 0, welcomeTitle, welcomeBody,
-        JSON.stringify(rules), JSON.stringify(defaultChannels), required_ ? 1 : 0, ts,
-      ],
+    // The configuration row is one per community, keyed by the community
+    // itself, so it upserts on the community and nothing else.
+    await db.upsert(
+      'community_onboarding',
+      ['id', 'server_id', 'enabled', 'welcome_title', 'welcome_body', 'rules', 'default_channels', 'required', 'created_at', 'updated_at'],
+      [uuid(), serverId, enabled ? 1 : 0, welcomeTitle, welcomeBody, JSON.stringify(rules), JSON.stringify(defaultChannels), required_ ? 1 : 0, ts, ts],
+      ['server_id'],
+      {
+        enabled: db.newRef('enabled'),
+        welcome_title: db.newRef('welcome_title'),
+        welcome_body: db.newRef('welcome_body'),
+        rules: db.newRef('rules'),
+        default_channels: db.newRef('default_channels'),
+        required: db.newRef('required'),
+        updated_at: db.newRef('updated_at'),
+      },
     );
     // The questions are replaced, because an answer recorded against an
     // option that no longer exists would be an answer to nothing.
@@ -455,16 +458,15 @@ async function answer(serverId, userId, input) {
 
   await db.transaction(async (t) => {
     for (const record of records) {
-      await t.run(
-        'INSERT INTO community_onboarding_answers'
-        + ' (id, server_id, user_id, question_id, option_ids, answered_at)'
-        + ' VALUES (?, ?, ?, ?, ?, ?)'
-        + ' ON CONFLICT (user_id, question_id) DO UPDATE SET option_ids = ?, answered_at = ?',
-        [
-          uuid(), serverId, userId, record.questionId,
-          JSON.stringify(record.optionIds), ts,
-          JSON.stringify(record.optionIds), ts,
-        ],
+      await db.upsert(
+        'community_onboarding_answers',
+        ['id', 'server_id', 'user_id', 'question_id', 'option_ids', 'answered_at'],
+        [uuid(), serverId, userId, record.questionId, JSON.stringify(record.optionIds), ts],
+        ['user_id', 'question_id'],
+        {
+          option_ids: db.newRef('option_ids'),
+          answered_at: db.newRef('answered_at'),
+        },
       );
     }
   });

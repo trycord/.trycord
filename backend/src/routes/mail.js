@@ -111,10 +111,8 @@ router.delete('/secrets/:key', rateLimit({ windowMs: 60000, max: 30 }), wrap(asy
   }
 
   await db.run('DELETE FROM instance_settings WHERE `key` = ?', [key]);
-  await db.run(
-    `INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, reason, created_at)
-     VALUES (?, ?, 'clear_secret', 'instance', ?, NULL, ?)`,
-    [uuid(), req.user.id, key, now()]
+  await require('../services/audit').record(
+    req.user.id, 'clear_secret', 'instance', key, null
   );
   await settings.load(true);
 

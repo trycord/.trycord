@@ -12,7 +12,7 @@ import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { EVENTS, on, joinChannel, leaveChannel } from '../../packages/realtime.js';
 import {
-  State, refreshServerTree, refreshServerRoles, can, isOwner, serverById, channelById,
+  State, on as onStore, refreshServerTree, refreshServerRoles, can, isOwner, serverById, channelById,
 } from '../../packages/store.js';
 import { path, navigate } from '../../packages/nav.js';
 import { head, card, row, blank, fault, fold, hold } from '../ui/page.js';
@@ -418,6 +418,13 @@ export function renderRoles(ctx) {
     })));
   };
 
+  // A role that changed elsewhere - another admin's editor, a reorder -
+  // repaints here instead of waiting for a navigation.
+  const offRoles = onStore('roles', (event) => {
+    if (event && event.serverId !== undefined && String(event.serverId) !== String(serverId)) return;
+    paint();
+  });
+
   paint();
 
   return {
@@ -442,7 +449,7 @@ export function renderRoles(ctx) {
         body.replaceChildren(fold([fault(e, null)]));
       }
     },
-    cleanup() {},
+    cleanup() { offRoles(); },
   };
 }
 
@@ -491,6 +498,37 @@ export function renderInvites(ctx) {
     }));
   };
 
+  const newInvite = () => {
+    const code = el('input', {
+      class: 'input', type: 'text', 'aria-label': 'Invite code',
+      placeholder: 'Left empty, one is rolled for you', maxlength: '24',
+      autocomplete: 'off', spellcheck: 'false',
+    });
+    const uses = el('input', { class: 'input', type: 'number', min: '1', max: '100', 'aria-label': 'Maximum uses' });
+    const hours = el('input', { class: 'input', type: 'number', min: '1', max: '720', 'aria-label': 'Hours before expiry' });
+    const dialog = openDialog({
+      title: 'New invite',
+      body: el('form', { class: 'fold', onSubmit: async (event) => {
+        event.preventDefault();
+        try {
+          const out = await Api.createInvite(serverId, {
+            code: code.value || null,
+            maxUses: uses.value ? Number(uses.value) : null,
+            expiresInHours: hours.value ? Number(hours.value) : null,
+          });
+          dialog.close();
+          if (out && out.code) copyText(out.code);
+          paint(await Api.invites(serverId));
+        } catch (e) { errorToast(e); }
+      } },
+        code,
+        el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'Uses at most'), uses),
+        el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'Gone after (hours)'), hours),
+        el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Create invite')),
+    });
+    code.focus();
+  };
+
   return {
     node: fold([
       head({
@@ -499,12 +537,7 @@ export function renderInvites(ctx) {
         lede: 'Codes that let someone in.',
         actions: canManage ? el('button', {
           class: 'btn btn--default btn--sm', type: 'button',
-          onClick: async () => {
-            try {
-              await Api.createInvite(serverId, {});
-              paint(await Api.invites(serverId));
-            } catch (e) { errorToast(e); }
-          },
+          onClick: newInvite,
         }, icon('plus', { size: 14 }), 'New invite') : null,
       }),
       card({ label: 'Open invites', glyph: 'mail', body, flush: true }),

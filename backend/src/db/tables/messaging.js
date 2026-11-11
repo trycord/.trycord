@@ -77,19 +77,36 @@ module.exports = (engine) => [
       id         VARCHAR(64) PRIMARY KEY,
       pair_key   VARCHAR(129) UNIQUE,
       name       VARCHAR(255),
+      -- A group has an owner: the person who created it. The owner may
+      -- rename it, change its picture, add and remove people, and hand the
+      -- group on. A one-to-one conversation has no owner, because neither
+      -- person owns it.
+      owner_id   VARCHAR(64),
+      avatar_url VARCHAR(512),
       created_at VARCHAR(64) NOT NULL,
-      updated_at VARCHAR(64) NOT NULL
+      updated_at VARCHAR(64) NOT NULL,
+      FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE SET NULL
     )${engine}`,
 
   `CREATE TABLE IF NOT EXISTS dm_members (
       conversation_id VARCHAR(64) NOT NULL,
       user_id         VARCHAR(64) NOT NULL,
+      -- 'owner', 'admin' or 'member'. A one-to-one conversation has no
+      -- meaningful role; both sides are 'member' and either may leave.
+      role            VARCHAR(16) NOT NULL DEFAULT 'member',
       joined_at       VARCHAR(64) NOT NULL,
       last_read_at    VARCHAR(64),
       PRIMARY KEY (conversation_id, user_id),
       FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,
+
+  // A pinned message in a direct conversation. A channel's pins live in
+  // pinned_messages, which is keyed by channel; a conversation is not a
+  // channel, so it has its own table rather than a row that pretends the
+  // conversation has one.
+  // (Declared after dm_messages: MySQL checks the referenced table when the
+  // referencing one is created.)
 
   `CREATE TABLE IF NOT EXISTS dm_messages (
          id              VARCHAR(64) PRIMARY KEY,
@@ -104,6 +121,50 @@ module.exports = (engine) => [
          FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
          FOREIGN KEY (author_id) REFERENCES users(id)
        )${engine}`,
+
+  `CREATE TABLE IF NOT EXISTS dm_pins (
+      conversation_id VARCHAR(64) NOT NULL,
+      message_id      VARCHAR(64) NOT NULL,
+      pinned_by       VARCHAR(64) NOT NULL,
+      pinned_at       VARCHAR(64) NOT NULL,
+      PRIMARY KEY (conversation_id, message_id),
+      FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (message_id) REFERENCES dm_messages(id) ON DELETE CASCADE,
+      FOREIGN KEY (pinned_by) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+
+  // An invitation to a group conversation. Distinct from membership: being
+  // added is a fact, being invited is a question the recipient answers.
+  // UNIQUE(conversation_id, invitee_id) means one outstanding question per
+  // person per group; re-inviting after a decline reuses the row.
+  `CREATE TABLE IF NOT EXISTS dm_invites (
+      id              VARCHAR(64) PRIMARY KEY,
+      conversation_id VARCHAR(64) NOT NULL,
+      inviter_id      VARCHAR(64) NOT NULL,
+      invitee_id      VARCHAR(64) NOT NULL,
+      status          VARCHAR(16) NOT NULL DEFAULT 'pending',
+      created_at      VARCHAR(64) NOT NULL,
+      updated_at      VARCHAR(64) NOT NULL,
+      UNIQUE (conversation_id, invitee_id),
+      FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE,
+      FOREIGN KEY (inviter_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (invitee_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+
+  // A group's picture, kept beside the message attachments and the community
+  // icons rather than inside one of their tables. The key in the object store
+  // carries the owner kind, so an id from here can never resolve to a profile
+  // picture or a message file.
+  `CREATE TABLE IF NOT EXISTS conversation_media (
+      id              VARCHAR(64) PRIMARY KEY,
+      conversation_id VARCHAR(64) NOT NULL,
+      kind            VARCHAR(16) NOT NULL,
+      filename        VARCHAR(255) NOT NULL,
+      mime            VARCHAR(128) NOT NULL,
+      size            INTEGER NOT NULL,
+      created_at      VARCHAR(64) NOT NULL,
+      FOREIGN KEY (conversation_id) REFERENCES dm_conversations(id) ON DELETE CASCADE
+    )${engine}`,
 
   `CREATE TABLE IF NOT EXISTS message_embeds (
       id          VARCHAR(64) PRIMARY KEY,

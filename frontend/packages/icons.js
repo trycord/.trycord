@@ -135,6 +135,16 @@ const I = {
   edit3: ['M12 20h9', 'M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z'],
   slash: ['M4 20 20 4'],
   'circle-dot': [{ c: [12, 12, 9] }, { c: [12, 12, 3] }],
+  // The five drawings the consoles already asked for before they existed:
+  // their absence rendered the neutral placeholder on real screens (the
+  // configuration console's appearance row, the infrastructure console's
+  // storage and power cells). The names are kept so the call sites read as
+  // they always did.
+  'hard-drive': [{ r: [2, 9, 20, 12, 2] }, 'M2 13h20', 'M6 17h.01', 'M10 17h.01'],
+  power: ['M18.36 6.64a9 9 0 1 1-12.73 0', 'M12 2v10'],
+  palette: [{ c: [12, 12, 9] }, 'M12 3a9 9 0 1 0 0 18h1.5a2.5 2.5 0 0 0 0-5H12a7 7 0 1 1 7-7', { c: [7.5, 11.5, 1] }, { c: [12, 8, 1] }, { c: [16.5, 11.5, 1] }],
+  equal: ['M5 9h14', 'M5 15h14'],
+  wind: ['M9.59 4.59A2 2 0 1 1 11 8H2', 'M17.73 7.73A2.5 2.5 0 1 1 19.5 12H2', 'M12.59 19.41A2 2 0 1 0 14 16H2'],
 };
 
 // Names that are aliases of another icon, so a view can ask for the word that

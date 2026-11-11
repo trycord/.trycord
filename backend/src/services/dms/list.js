@@ -21,6 +21,7 @@ const groups = require('./groups');
 async function listMine(userId) {
   const memberships = await db.all(
     `SELECT m.*, c.updated_at, c.created_at AS conv_created, c.name AS conv_name,
+       c.avatar_url AS conv_avatar, c.owner_id AS conv_owner,
        (SELECT COUNT(*) FROM dm_members cm WHERE cm.conversation_id = m.conversation_id) AS member_count,
        (SELECT om.user_id FROM dm_members om
          WHERE om.conversation_id = m.conversation_id AND om.user_id != ? LIMIT 1) AS peer_id,
@@ -98,6 +99,9 @@ async function listMine(userId) {
         name: m.conv_name || null,
         isGroup: group,
         memberCount: Number(m.member_count || 0),
+        avatarUrl: m.conv_avatar || null,
+        ownerId: m.conv_owner || null,
+        role: m.role || 'member',
       }
     );
   });
@@ -130,6 +134,8 @@ async function detail(userId, conversationId, opts) {
   // client has to ask for separately.
   const people = await groups.members(conversationId);
   const group = groups.isGroup(seen.conv, people);
+  const mine = people.find((person) => String(person.id) === String(userId));
+  const myRole = mine ? mine.role : null;
   return {
     id: seen.conv.id,
     createdAt: seen.conv.created_at,
@@ -138,11 +144,16 @@ async function detail(userId, conversationId, opts) {
     // you are talking to" would be a lie about a group of five.
     peer: group ? null : publicPeer(peerRow),
     name: seen.conv.name || null,
+    avatarUrl: seen.conv.avatar_url || null,
+    ownerId: seen.conv.owner_id || null,
     isGroup: group,
     displayName: groups.displayName(seen.conv, people),
     memberCount: people.length,
+    myRole,
+    permissions: groups.permissions(myRole, group),
     people: people.map((person) => ({
       id: person.id, username: person.username, displayName: person.displayName,
+      avatarUrl: person.avatarUrl || null, role: person.role,
     })),
     members: members.map((m) => ({ userId: m.user_id, lastReadAt: m.last_read_at })),
     messages,

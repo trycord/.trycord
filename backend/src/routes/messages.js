@@ -95,6 +95,12 @@ async function mayAct(req, res, ch, permission, refused) {
     fail(res, 'TIMED_OUT', 'you are timed out in this community');
     return false;
   }
+  if (permission === 'SEND_MESSAGES'
+    && await require('../services/enforcement').isRestricted(req.user.id, 'SEND_MESSAGES')) {
+    fail(res, 'FEATURE_RESTRICTED', 'messaging is restricted on your account', 403,
+      { feature: 'SEND_MESSAGES' });
+    return false;
+  }
   return true;
 }
 
@@ -365,6 +371,18 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
     msg.attachments = ids.length
       ? await uploads.attachToMessage(ids, msg.id, req.user.id, { channelId: ch.id })
       : [];
+    // The live event has to describe its author the way the history read
+    // does - the SELECT at the top of this file aliases the same columns -
+    // because a row drawn as it arrives gets no second fetch. An event
+    // without the author's profile rendered initials instead of a face
+    // until the next reload.
+    const author = await db.get(
+      'SELECT username AS author_name, display_name AS author_display,' +
+      ' avatar_url AS author_avatar, banner_url AS author_banner, is_bot AS author_is_bot' +
+      ' FROM users WHERE id = ?',
+      [req.user.id]
+    );
+    if (author) Object.assign(msg, author);
     await attachEngagement([msg], req.user.id);
     broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE, ...msg });
 
@@ -431,7 +449,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
           authorId: req.user.id, content,
         });
         for (const f of found) {
-          if (f.held) continue;
+          if (f.held || !f.notification) continue;
           try { sendToUser(f.userId, { type: EVENTS.NOTIFICATION, notification: f.notification }); } catch { /* ignore */ }
         }
       } catch { /* ignore */ }
@@ -443,7 +461,7 @@ router.post('/', auth.requireVerified, rateLimit({ windowMs: 60000, max: 60 }), 
         kind: 'channel', scopeId: ch.id, rootId: threadRootId,
         replyId: msg.id, authorId: req.user.id,
       });
-      if (r && !r.held) sendToUser(r.userId, { type: EVENTS.NOTIFICATION, notification: r.notification });
+      if (r && r.notification && !r.held) sendToUser(r.userId, { type: EVENTS.NOTIFICATION, notification: r.notification });
     } catch { /* a missing notification must not fail the post */ }
     res.json(msg);
   } catch (e) { next(e); }
@@ -532,7 +550,10 @@ router.patch('/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, m
         content, createdAt: msg.created_at, serverId: ch.server_id,
       }).catch(() => {});
     }
-    const author = await db.get('SELECT username, display_name FROM users WHERE id = ?', [msg.author_id]);
+    const author = await db.get(
+      'SELECT username, display_name, avatar_url, banner_url, is_bot FROM users WHERE id = ?',
+      [msg.author_id]
+    );
     const out = {
       id: msg.id, channel_id: ch.id, server_id: ch.server_id,
       author_id: msg.author_id, user: req.user.username,
@@ -541,8 +562,13 @@ router.patch('/:messageId', auth.requireVerified, rateLimit({ windowMs: 60000, m
       envelopes: accepted.envelopes,
       created_at: msg.created_at, edited_at: editedAt,
       encryption: accepted.encryption,
+      // The same author block the create event and the history read carry:
+      // an edit that arrived without the profile would blank the row's face.
       author_name: (author && author.username) || req.user.username,
       author_display: (author && author.display_name) || req.user.username,
+      author_avatar: (author && author.avatar_url) || null,
+      author_banner: (author && author.banner_url) || null,
+      author_is_bot: !!(author && author.is_bot),
     };
     await attachEngagement([out], req.user.id);
     broadcast(ch.server_id, ch.id, { type: EVENTS.MESSAGE_UPDATED, ...out });

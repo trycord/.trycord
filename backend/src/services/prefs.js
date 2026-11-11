@@ -11,10 +11,11 @@ const { now } = require('../util');
 const boolInt = (v) => (v ? 1 : 0);
 const intBool = (v) => !!v;
 
-const NOTIFICATION_CATEGORIES = ['dm', 'mention', 'friend', 'moderation', 'announcement'];
+const NOTIFICATION_CATEGORIES = ['dm', 'mention', 'friend', 'group', 'community', 'moderation', 'announcement'];
 
 const DEFAULT_NOTIFICATION_PREFS = {
-  dm: true, mention: true, friend: true, moderation: true, announcement: true,
+  dm: true, mention: true, friend: true, group: true, community: true,
+  moderation: true, announcement: true,
 };
 
 function parseCategories(raw) {
@@ -37,13 +38,17 @@ function parseCategories(raw) {
 async function getNotificationPrefs(userId, serverId = null, conn = db) {
   if (serverId) {
     const scoped = await conn.get(
-      'SELECT categories FROM notification_prefs WHERE user_id = ? AND server_id = ?',
+      'SELECT categories FROM notification_prefs WHERE user_id = ? AND server_id = ? ORDER BY updated_at DESC',
       [userId, serverId]
     );
     if (scoped) return parseCategories(scoped.categories);
   }
+  // The global row is spelled with server_id IS NULL. A composite primary key
+  // containing a nullable column does not make NULLs unique in either SQLite
+  // or MySQL, so old writes could leave more than one global row. Reading the
+  // newest is the honest answer for a database that already has them.
   const global = await conn.get(
-    'SELECT categories FROM notification_prefs WHERE user_id = ? AND server_id IS NULL',
+    'SELECT categories FROM notification_prefs WHERE user_id = ? AND server_id IS NULL ORDER BY updated_at DESC',
     [userId]
   );
   return parseCategories(global && global.categories);
@@ -56,19 +61,35 @@ async function setNotificationPrefs(userId, patch, serverId = null) {
     if (typeof patch[k] === 'boolean') next[k] = patch[k];
   }
   const ts = now();
-  // A NULL server_id is the global row. SQLite and MySQL both need the NULL
-  // spelled out for the unique key to match, which is why this is two statements
-  // rather than one upsert.
-  // The global row stores NULL for server_id rather than an empty string, and
-  // both databases need the NULL spelled out for the unique key to match it.
-  // That is why this is two calls and not one with a conditional column list.
-  await db.upsert(
-    'notification_prefs',
-    ['user_id', 'server_id', 'categories', 'updated_at'],
-    [userId, serverId || null, JSON.stringify(next), ts],
-    ['user_id', 'server_id'],
-    { categories: db.newRef('categories'), updated_at: db.newRef('updated_at') }
-  );
+  const categories = JSON.stringify(next);
+  // A select-then-write inside a transaction, rather than an upsert keyed on
+  // (user_id, server_id). The global row carries NULL for server_id, and a
+  // unique key with a NULL component does not conflict in SQLite or MySQL:
+  // every global save inserted another row and the read kept finding the
+  // oldest one, so a preference could be "saved" and never apply. The
+  // transaction is the single-writer boundary the null-safe key cannot give
+  // us, and updating every legacy duplicate keeps the next read truthful.
+  await db.transaction(async (t) => {
+    const where = serverId
+      ? 'user_id = ? AND server_id = ?'
+      : 'user_id = ? AND server_id IS NULL';
+    const params = serverId ? [userId, serverId] : [userId];
+    const existing = await t.get(
+      'SELECT 1 FROM notification_prefs WHERE ' + where + ' LIMIT 1',
+      params
+    );
+    if (existing) {
+      await t.run(
+        'UPDATE notification_prefs SET categories = ?, updated_at = ? WHERE ' + where,
+        [categories, ts].concat(params)
+      );
+    } else {
+      await t.run(
+        'INSERT INTO notification_prefs (user_id, server_id, categories, updated_at) VALUES (?, ?, ?, ?)',
+        [userId, serverId || null, categories, ts]
+      );
+    }
+  });
   return next;
 }
 

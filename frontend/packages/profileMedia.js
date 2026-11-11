@@ -16,7 +16,9 @@
 //   - a failed upload leaves the old picture exactly where it was.
 
 import Api from './api.js';
-import { clearMediaCache } from './media.js';
+import { evictMedia } from './media.js';
+import { avatarUrlOf, bannerUrlOf, serverIconOf, serverBannerOf } from './identity.js';
+import { State, serverById } from './store.js';
 
 // The formats the server accepts. It sniffs the bytes rather than trusting
 // the name, so this is a first check and not the last one.
@@ -156,10 +158,9 @@ export async function prepareImage(file, options = {}) {
  * @returns {Promise<object>}
  */
 export async function uploadProfilePicture(kind, file) {
+  const before = State.user;
   const user = await Api.uploadProfileImage(kind, file);
-  // The face that was there is released, so nothing draws the old picture
-  // over the new one.
-  clearMediaCache();
+  evictMedia(kind === 'banner' ? bannerUrlOf(before) : avatarUrlOf(before));
   return user;
 }
 
@@ -170,8 +171,9 @@ export async function uploadProfilePicture(kind, file) {
  * @returns {Promise<object>}
  */
 export async function removeProfilePicture(kind) {
+  const before = State.user;
   const user = await Api.removeProfileImage(kind);
-  clearMediaCache();
+  evictMedia(kind === 'banner' ? bannerUrlOf(before) : avatarUrlOf(before));
   return user;
 }
 
@@ -184,8 +186,9 @@ export async function removeProfilePicture(kind) {
  * @returns {Promise<object>}
  */
 export async function uploadCommunityPicture(serverId, kind, file) {
+  const before = serverById(serverId);
   const out = await Api.setServerImage(serverId, kind, file);
-  clearMediaCache();
+  evictMedia(kind === 'banner' ? serverBannerOf(before) : serverIconOf(before));
   return out;
 }
 
@@ -197,8 +200,9 @@ export async function uploadCommunityPicture(serverId, kind, file) {
  * @returns {Promise<object>}
  */
 export async function removeCommunityPicture(serverId, kind) {
+  const before = serverById(serverId);
   const out = await Api.removeServerImage(serverId, kind);
-  clearMediaCache();
+  evictMedia(kind === 'banner' ? serverBannerOf(before) : serverIconOf(before));
   return out;
 }
 
