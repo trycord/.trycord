@@ -11,13 +11,26 @@ import { icon } from '../../packages/icons.js';
 import Api from '../../packages/api.js';
 import { SESSION_EVENTS, on } from '../../packages/realtime.js';
 import {
-  State, nameOf, refreshFriends, refreshPresence, presenceOf,
+  State, nameOf, refreshFriends, refreshPresence, presenceOf, on as onStore,
 } from '../../packages/store.js';
 import { path, navigate } from '../../packages/nav.js';
 import { avatar } from '../ui/primitives.js';
 import { card, row, blank, fault, fold, head } from '../ui/page.js';
 import { personSheetEntries, personContextMenu } from '../ui/person.js';
+import { presenceLabel } from '../ui/members.js';
+import { relativeTime } from '../../packages/format.js';
 import { errorToast, toast } from '../ui/overlays.js';
+
+// A presence is an answer about now; a last-active time is an answer about
+// then. Both are worth saying on a face, and saying which is which is what
+// keeps "Offline" from reading as "gone".
+function activityLine(person, presence) {
+  const state = presenceLabel(presence);
+  const active = person.lastActiveAt && presence === 'offline'
+    ? 'last active ' + relativeTime(person.lastActiveAt)
+    : null;
+  return [active || state, person.statusText].filter(Boolean).join(' · ');
+}
 
 function friendTile(person) {
   const presence = presenceOf(person.id);
@@ -47,10 +60,7 @@ function friendTile(person) {
   avatar(person, { size: 'md', rounded: true, presence }),
   el('span', { class: 'friendtile-main' },
     el('span', { class: 'friendtile-name' }, nameOf(person) || person.username),
-    el('span', { class: 'friendtile-sub' },
-      person.statusText
-        || (person.displayName && person.displayName !== person.username
-          ? '@' + person.username : 'Friend')),
+    el('span', { class: 'friendtile-sub' }, activityLine(person, presence)),
   ),
   actions,
   );
@@ -118,27 +128,14 @@ export function renderFriends() {
     body: fold([searchInput, searchResults]),
   });
 
-  const searchNow = async () => {
-    const q = searchInput.value.trim();
-    if (!q) {
-      searchResults.replaceChildren();
-      searchResults.hidden = true;
-      return;
-    }
-    searchResults.hidden = false;
-    let people = [];
-    try {
-      people = await Api.searchUsers(q);
-    } catch (e) {
-      searchResults.replaceChildren(fold([fault(e, () => searchNow())]));
-      return;
-    }
+  const paintSearch = (people) => {
     searchResults.replaceChildren(...(people || []).map((person) => {
-      const known = State.friends.some((f) => f.id === person.id);
+      const known = State.friends.some((f) => String(f.id) === String(person.id));
+      const presence = presenceOf(person.id);
       return row({
-        lead: avatar(person, { size: 'sm', rounded: true }),
+        lead: avatar(person, { size: 'sm', rounded: true, presence }),
         title: nameOf(person) || person.username,
-        sub: person.statusText || 'New to you',
+        sub: [presenceLabel(presence), person.statusText].filter(Boolean).join(' · '),
         href: path('/users/' + person.id),
         link: true,
         // A search result is a person: the row carries that person's menu.
@@ -167,7 +164,37 @@ export function renderFriends() {
       }));
     }
   };
-  searchInput.addEventListener('input', searchNow);
+
+  const searchNow = async () => {
+    const q = searchInput.value.trim();
+    if (!q) {
+      searchResults.replaceChildren();
+      searchResults.hidden = true;
+      return;
+    }
+    searchResults.hidden = false;
+    let people = [];
+    try {
+      people = await Api.searchUsers(q);
+    } catch (e) {
+      searchResults.replaceChildren(fold([fault(e, () => searchNow())]));
+      return;
+    }
+    paintSearch(people);
+    // The search answer carries no presence; the presence map does, once it
+    // has been asked for the people actually on screen.
+    const ids = (people || []).map((person) => person.id);
+    if (ids.length) {
+      refreshPresence(ids)
+        .then(() => paintSearch(people))
+        .catch(() => {});
+    }
+  };
+  let searchTimer = 0;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { searchNow(); }, 220);
+  });
   searchNow();
 
   // The roster and the request tray hold their breath until the first read has
@@ -198,7 +225,34 @@ export function renderFriends() {
         text: 'Add someone below; they will fill this wall.',
       }));
     } else {
-      rosterBody.replaceChildren(...friends.map((person) => friendTile(person)));
+      // Online first, then the people who were here recently, then the rest.
+      // The order is the answer to the question a friends page is actually
+      // asked: who can I talk to right now?
+      const online = [];
+      const recent = [];
+      const offline = [];
+      const recentFloor = Date.now() - (7 * 24 * 60 * 60 * 1000);
+      for (const person of friends) {
+        const presence = presenceOf(person.id);
+        if (presence && presence !== 'offline') {
+          online.push(person);
+        } else if (person.lastActiveAt && new Date(person.lastActiveAt).getTime() >= recentFloor) {
+          recent.push(person);
+        } else {
+          offline.push(person);
+        }
+      }
+      const sections = [
+        ['Online', online],
+        ['Recently active', recent],
+        ['Offline', offline],
+      ].filter(([, list]) => list.length);
+      rosterBody.replaceChildren(...sections.flatMap(([label, list]) => [
+        el('div', { class: 'peoplegrid-label' },
+          el('span', {}, label),
+          el('span', { class: 'peoplegrid-count' }, String(list.length))),
+        ...list.map((person) => friendTile(person)),
+      ]));
       refreshPresence(friends.slice(0, 40).map((p) => p.id)).catch(() => {});
     }
     if (!ready) {
@@ -219,6 +273,13 @@ export function renderFriends() {
   // The account-scoped push arrives when a request or an acceptance happens
   // elsewhere; the roster then reads fresh rather than staying stale silently.
   const unloadFriends = on(SESSION_EVENTS.FRIEND, () => {
+    refreshFriends().then(() => paint()).catch(() => {});
+  });
+  // Presence arrives over the socket and through refreshPresence(), so the
+  // faces are repainted from the store rather than from the copy they were
+  // built with.
+  const unloadPresence = onStore('presence', paint);
+  const unloadResync = onStore('resync', () => {
     refreshFriends().then(() => paint()).catch(() => {});
   });
 
@@ -255,6 +316,9 @@ export function renderFriends() {
     },
     cleanup() {
       unloadFriends();
+      unloadPresence();
+      unloadResync();
+      clearTimeout(searchTimer);
     },
   };
 }

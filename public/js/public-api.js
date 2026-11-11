@@ -1,6 +1,6 @@
 // A small read path for the public pages.
 //
-// The marketing pages, the demo and the directory read one deliberate surface:
+// The marketing pages and the directory read one deliberate surface:
 // the public discovery index, one community's preview, and the join endpoint the
 // application's own discovery screen already calls. None of it needs the
 // application's transport layer, and pulling the client bundle into three static
@@ -36,8 +36,9 @@
 //
 // A reader who is already signed in keeps their session: the token is read
 // from the same place the application writes it, under the origin of the
-// instance that issued it. It never writes the token, and a signed-out reader
-// is simply offered the app.
+// instance that issued it. This file does not mint one by itself; the site's
+// sign-in page uses the two calls below, and files the token the application
+// will read. A signed-out reader is simply offered the app.
 (function () {
   'use strict';
 
@@ -225,6 +226,17 @@
     return e;
   }
 
+  // A fetch rejection is not a sentence a reader can act on. Safari says
+  // "Load failed"; Chrome says "Failed to fetch"; both describe the transport,
+  // not the instance. The application's transport already turns these into
+  // "Could not reach the server" and the public site says the same thing.
+  function networkFailure(error) {
+    if (error && error.name === 'AbortError') {
+      return apiError(0, 'TIMEOUT', 'The instance took too long to answer. Try again.');
+    }
+    return apiError(0, 'NETWORK', 'Could not reach this instance. Check your connection and try again.');
+  }
+
   async function request(path, opts) {
     opts = opts || {};
     var base = await apiBase();
@@ -233,12 +245,22 @@
     var t = storedToken(originOf(base));
     if (t && opts.auth !== false) headers.Authorization = 'Bearer ' + t;
 
-    var res = await fetch(base + path, {
-      method: opts.method || 'GET',
-      headers: headers,
-      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
-      credentials: 'omit',
-    });
+    var controller = typeof AbortController === 'function' ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, 25000) : null;
+    var res;
+    try {
+      res = await fetch(base + path, {
+        method: opts.method || 'GET',
+        headers: headers,
+        body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+        credentials: 'omit',
+        signal: controller && controller.signal,
+      });
+    } catch (error) {
+      throw networkFailure(error);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
 
     var text = await res.text();
     var data = null;
@@ -251,17 +273,90 @@
     return data;
   }
 
+  /* ---- signing in ---------------------------------------------------------
+     The site owns the door, the instance owns the account. The two calls are
+     the same ones the application's gate makes, so an account with a second
+     factor meets the same challenge here. The token is filed under the API's
+     origin - the key the application reads - and is never put in a URL. */
+  function signIn(credentials) {
+    return request('/api/auth/login', { method: 'POST', body: credentials, auth: false });
+  }
+
+  function verifySecondFactor(body) {
+    return request('/api/auth/2fa/verify', { method: 'POST', body: body, auth: false });
+  }
+
+  function rememberSession(value) {
+    return apiBase().then(function (base) {
+      try {
+        localStorage.setItem(TOKEN_PREFIX + originOf(base), value);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    });
+  }
+
+  function clearSession() {
+    return apiBase().then(function (base) {
+      try {
+        localStorage.removeItem(TOKEN_PREFIX + originOf(base));
+        localStorage.removeItem(LEGACY_TOKEN_KEY);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    });
+  }
+
+  /* ---- creating and recovering an account --------------------------------
+     The public site owns the whole gate, not only its sign-in half. These are
+     the same endpoints the application's own gate calls, so an account made
+     here is an account made there, and a reset link opens the same single-use
+     token. Callers pass the current legal versions from /api/legal; they are
+     never written into this file. */
+  function register(body) {
+    return request('/api/auth/register', { method: 'POST', body: body, auth: false });
+  }
+
+  function forgotPassword(body) {
+    return request('/api/auth/forgot-password', { method: 'POST', body: body, auth: false });
+  }
+
+  function resetPassword(body) {
+    return request('/api/auth/reset-password', { method: 'POST', body: body, auth: false });
+  }
+
+  function verifyEmail(body) {
+    return request('/api/auth/verify-email', { method: 'POST', body: body, auth: false });
+  }
+
+  function verifyEmailResend(body) {
+    return request('/api/auth/verify-email/resend', { method: 'POST', body: body });
+  }
+
   window.TrycordApi = {
     token: function () { return apiBase().then(function (base) { return storedToken(originOf(base)); }); },
     // The session belongs to the instance that issued it, so it is filed under
     // the API's origin and nowhere else. Reading it against the page's origin
     // reported a signed-out reader on a split deployment.
     signedIn: function () { return apiBase().then(function (base) { return !!storedToken(originOf(base)); }); },
+    signIn: signIn,
+    verifySecondFactor: verifySecondFactor,
+    rememberSession: rememberSession,
+    clearSession: clearSession,
+    register: register,
+    forgotPassword: forgotPassword,
+    resetPassword: resetPassword,
+    verifyEmail: verifyEmail,
+    verifyEmailResend: verifyEmailResend,
     apiBase: apiBase,
     appBase: appBase,
     appHref: appHref,
     assetUrl: assetUrl,
     instance: function () { return request('/api/instance', { auth: false }); },
+    legal: function () { return request('/api/legal', { auth: false }); },
+    me: function () { return request('/api/users/me'); },
     servers: function (params) {
       var qs = new URLSearchParams();
       Object.keys(params || {}).forEach(function (k) {

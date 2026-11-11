@@ -114,6 +114,25 @@ export const PAGES = [
   p('developer.documentation', '/developer/documentation', {
     layout: 'plain', sidebar: 'profile', hidden: true,
   }),
+  p('applications', '/applications', {
+    layout: 'plain', sidebar: 'profile',
+    label: 'Developer Portal', icon: 'code',
+    blurb: 'Manage applications, keys and bots in Trycord',
+    access: 'session',
+    hidden: true,
+  }),
+  p('applications.keys', '/applications/keys', {
+    layout: 'plain', sidebar: 'profile', hidden: true,
+  }),
+  p('applications.applications', '/applications/applications', {
+    layout: 'plain', sidebar: 'profile', hidden: true,
+  }),
+  p('applications.dashboard', '/applications/dashboard', {
+    layout: 'plain', sidebar: 'profile', hidden: true,
+  }),
+  p('applications.documentation', '/applications/documentation', {
+    layout: 'plain', sidebar: 'profile', hidden: true,
+  }),
   p('federation', '/federation', {
     layout: 'plain',
     nav: { label: 'Federation reports', short: 'Federation', icon: 'share' },
@@ -189,6 +208,12 @@ export const PAGES = [
     layout: 'channel', sidebar: 'community', hidden: true,
   }),
   p('community.workspace.poll', '/server/:id/workspace/poll/:poll', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.files', '/server/:id/workspace/files', {
+    layout: 'channel', sidebar: 'community', hidden: true,
+  }),
+  p('community.workspace.file', '/server/:id/workspace/file/:file', {
     layout: 'channel', sidebar: 'community', hidden: true,
   }),
 

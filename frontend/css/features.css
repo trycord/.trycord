@@ -443,6 +443,23 @@
   outline-offset: 2px;
 }
 
+/* A file dragged over the conversation itself: the whole surface answers. */
+.convo.is-dropping {
+  outline: 2px dashed var(--brand-line);
+  outline-offset: -6px;
+  border-radius: var(--radius-md);
+}
+
+/* A file dragged over a card - the workspace's file list answers a drop. */
+.card.is-dropping {
+  outline: 2px dashed var(--brand-line);
+  outline-offset: 2px;
+}
+
+/* An upload still in flight, riding in its own row. */
+.msg-file--pending { opacity: 0.72; }
+.msg-file--pending .msg-file-glyph { color: var(--text-3); }
+
 /* Discover's public communities land on a grid of cards. */
 .cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-4); }
 
@@ -1798,3 +1815,62 @@
 .template-item-shortcut { font-family: var(--mono); font-size: var(--fs-xs); color: var(--brand); }
 .template-item-body { font-size: var(--fs-xs); color: var(--text-3); overflow-wrap: anywhere; }
 .template-item-actions { display: flex; gap: var(--space-2); flex: none; }
+
+/* -- the conversation lists and the presence states ---------------------------- */
+
+/* The messages browser: a quiet column of conversations. The header carries
+   the title and the quiet actions; the list holds the rows; the empty state is
+   the honest empty rather than a fault. */
+.conversation-browser { display: flex; flex-direction: column; min-height: 0; }
+.conversation-header { display: flex; align-items: center; gap: var(--space-3); }
+.conversation-browser > .conversation-header { justify-content: space-between; }
+.conversation-title { margin: 0; font-size: var(--fs-h2); font-weight: var(--weight-bold); }
+.conversation-actions { display: flex; align-items: center; gap: var(--space-2); }
+.conversation-list { display: flex; flex-direction: column; }
+.conversation-item { border-bottom: 1px solid var(--line); }
+.conversation-item-button {
+  display: flex; align-items: center; gap: var(--space-3);
+  width: 100%; padding: var(--space-3) var(--space-4);
+  background: transparent; border: 0; text-align: left; font: inherit; color: inherit;
+}
+.conversation-item-button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.conversation-avatar { flex: none; }
+.conversation-content { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.conversation-name { font-size: var(--fs-body); font-weight: var(--weight-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-time { font-size: var(--fs-sm); color: var(--text-3); flex: none; }
+.conversation-badge {
+  flex: none; display: inline-grid; place-items: center;
+  min-width: 18px; height: 18px; padding: 0 var(--space-1);
+  border-radius: var(--radius-pill); background: var(--brand); color: var(--text-on-brand);
+  font-size: var(--fs-micro); font-weight: var(--weight-bold);
+}
+.conversation-preview { font-size: var(--fs-sm); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-system { font-size: var(--fs-sm); color: var(--text-3); font-style: italic; }
+.conversation-empty {
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  padding: var(--space-8) var(--space-4); text-align: center;
+}
+.conversation-empty-icon {
+  display: grid; place-items: center; width: 40px; height: 40px;
+  border-radius: var(--radius-pill); background: var(--panel-2); color: var(--text-3);
+}
+.conversation-empty-text { margin: 0; font-size: var(--fs-body); font-weight: var(--weight-strong); }
+.conversation-empty-subtext { margin: 0; font-size: var(--fs-sm); color: var(--text-3); }
+
+/* The feed's dismiss action: it leaves the notification without leaving the
+   row that carries it. */
+.feed-dismiss { justify-self: end; }
+
+/* The people grid's section label and its count. */
+.peoplegrid-label {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  font-size: var(--fs-meta); font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-label); text-transform: uppercase; color: var(--text-3);
+}
+.peoplegrid-count { color: var(--text-3); font-size: var(--fs-sm); font-weight: var(--weight-medium); }
+
+/* The profile's presence line. The colour of the state itself is owned by
+   .member-presence; this is the line that carries it. */
+.profile-presence { display: inline-flex; align-items: center; gap: var(--space-2); }
+.profile-presence-line { margin: 0; font-size: var(--fs-sm); color: var(--text-2); }
+.profile-presence-note { font-size: var(--fs-sm); color: var(--text-3); }

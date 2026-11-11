@@ -42,6 +42,15 @@
   --fs-sm: 0.875rem;
   --fs-meta: 0.8125rem;
   --fs-micro: 0.75rem;
+  /* The smaller size steps the components spend: extra small below the micro,
+     medium between body and small, large above the heading, extra large above
+     the display. They are the step ladder the type scale walks, so a component
+     that needs a size between two known steps asks for one rather than for a
+     value no token holds. */
+  --fs-xs: 0.6875rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.45rem;
+  --fs-xl: 1.9rem;
   --weight-body: 450;
   --weight-medium: 550;
   --weight-strong: 650;
@@ -61,6 +70,10 @@
   --space-8: 40px;
   --space-9: 56px;
 
+  /* The spacing steps between items, as the layouts ask for them. */
+  --gap-sm: var(--space-2);
+  --gap-md: var(--space-4);
+
   /* -- radii and motion ---------------------------------------------------- */
   --radius-xs: 4px;
   --radius-sm: 6px;
@@ -68,6 +81,7 @@
   --radius-lg: 14px;
   --radius-xl: 20px;
   --radius-pill: var(--tc-radius-pill);
+  --line-3: rgba(246, 245, 243, 0.20);
   --dur-1: var(--tc-motion-fast);
   --dur-2: var(--tc-motion-normal);
   --dur-3: 300ms;
@@ -111,6 +125,10 @@
   --brand-fill: var(--tc-brand-strong);
   --brand-fill-hover: var(--tc-brand);
   --brand-ink: #FFFFFF;
+  --role-colour: var(--brand);
+  --text-on-brand: var(--tc-text-on-brand);
+  --warn-soft: color-mix(in srgb, var(--warning) 12%, transparent);
+  --weight-semibold: var(--weight-strong);
 }
 
 /* Density. The attribute lives on <html> and is written by js/prefs.js; the
@@ -146,32 +164,34 @@
   --rail-w: 82px;
 }
 
-/* Ember - the default dark palette. Charcoal from the canonical library, the
- * ember accent, and nothing else. */
+/* Ember - the default dark palette. A deep, warm charcoal so the panels
+ * read as steps of one material, and the ember is the only colour on
+ * screen that asks for the eye. */
 :root,
 [data-theme="trycord"],
 [data-theme="dark"] {
   color-scheme: dark;
-  --app-bg: var(--c-pg, var(--tc-bg-deep));
-  --panel: var(--c-base, var(--tc-bg));
-  --panel-2: #1D1F24;
-  --panel-3: var(--tc-surface);
-  --raised: var(--tc-surface);
-  --rail-bg: #0E0F12;
+  --app-bg: var(--c-pg, #101114);
+  --panel: var(--c-base, #17181C);
+  --panel-2: #1E2025;
+  --panel-3: #26282F;
+  --panel-1: var(--panel);
+  --raised: #2B2E36;
+  --rail-bg: #0B0C0E;
 
-  --line: var(--tc-border);
-  --line-2: #3A3D46;
+  --line: rgba(246, 245, 243, .07);
+  --line-2: rgba(246, 245, 243, .13);
 
-  --text-1: var(--c-txt, var(--tc-text));
-  --text-2: #B9BDC7;
-  --text-3: #8F949F;
+  --text-1: var(--c-txt, #F2F1EF);
+  --text-2: #A8ACB6;
+  --text-3: #7E828D;
 
-  --hover: rgba(244, 245, 247, .06);
-  --active: rgba(244, 245, 247, .10);
-  --selected: color-mix(in srgb, var(--brand) 16%, transparent);
+  --hover: rgba(242, 241, 239, .055);
+  --active: rgba(242, 241, 239, .095);
+  --selected: color-mix(in srgb, var(--brand) 18%, transparent);
 
-  --brand-soft: color-mix(in srgb, var(--brand) 13%, transparent);
-  --brand-line: color-mix(in srgb, var(--brand) 42%, transparent);
+  --brand-soft: color-mix(in srgb, var(--brand) 14%, transparent);
+  --brand-line: color-mix(in srgb, var(--brand) 45%, transparent);
   --focus: var(--tc-brand-focus);
 
   --danger: var(--tc-danger);
@@ -179,14 +199,14 @@
   --warning: var(--tc-warning);
   --info: var(--tc-info);
 
-  --shadow-1: 0 1px 3px rgba(0, 0, 0, .4);
-  --shadow-2: 0 10px 30px -10px rgba(0, 0, 0, .65);
-  --shadow-3: 0 26px 70px -18px rgba(0, 0, 0, .78);
+  --shadow-1: 0 1px 2px rgba(8, 9, 11, .5);
+  --shadow-2: 0 12px 32px -12px rgba(8, 9, 11, .7);
+  --shadow-3: 0 30px 80px -20px rgba(8, 9, 11, .85);
 
-  --ember-wash: radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 70%);
+  --ember-wash: radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--brand) 18%, transparent), transparent 70%);
 
-  --scrollbar: rgba(255, 255, 255, .12);
-  --scrollbar-hover: rgba(255, 255, 255, .20);
+  --scrollbar: rgba(242, 241, 239, .12);
+  --scrollbar-hover: rgba(242, 241, 239, .22);
 }
 
 /* Daylight */
@@ -195,20 +215,20 @@
   --app-bg: #F1F2F5;
   --panel: #F7F8FA;
   --panel-2: #FFFFFF;
-  --panel-3: #EDEFF3;
+  --panel-3: #ECEEF2;
   --raised: #FFFFFF;
-  --rail-bg: #E8EAEE;
+  --rail-bg: #E7E9ED;
 
-  --line: #E4E6EB;
-  --line-2: #D3D6DD;
+  --line: rgba(27, 28, 33, .08);
+  --line-2: rgba(27, 28, 33, .15);
 
-  --text-1: #1D1E23;
-  --text-2: #4B5058;
-  --text-3: #666B78;
+  --text-1: #1B1C21;
+  --text-2: #4E535C;
+  --text-3: #6A6F7A;
 
-  --hover: rgba(29, 30, 35, .05);
-  --active: rgba(29, 30, 35, .09);
-  --selected: rgba(201, 54, 24, .12);
+  --hover: rgba(27, 28, 33, .045);
+  --active: rgba(27, 28, 33, .085);
+  --selected: rgba(201, 54, 24, .13);
 
   --brand: var(--c-accent, #C93618);
   --brand-fill: #C93618;

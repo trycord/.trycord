@@ -448,6 +448,13 @@ export function writeMobileHarnessDocument() {
   ));
   fs.cpSync(path.join(CLIENT, 'mobile', 'css'), path.join(dir, 'css'), { recursive: true });
   fs.cpSync(path.join(CLIENT, 'mobile', 'js'), path.join(dir, 'js'), { recursive: true });
+  // The phone shares the desk's ui logic modules - the avatar primitive and
+  // the encryption surface are one implementation, and the module boundary
+  // permits the phone to read them. The harness copies the tree it reaches
+  // for, or the module graph fails to load and the phone pass measures a
+  // crash screen instead of the application.
+  fs.cpSync(path.join(CLIENT, 'js'), path.join(CLIENT, '.browser-harness', 'js'),
+    { recursive: true });
   fs.cpSync(path.join(CLIENT, 'assets'), path.join(CLIENT, '.browser-harness', 'assets'),
     { recursive: true });
   fs.cpSync(path.join(CLIENT, 'packages'), path.join(CLIENT, '.browser-harness', 'packages'),

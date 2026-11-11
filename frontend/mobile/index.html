@@ -14,7 +14,7 @@
        desktop module and nothing else - no desktop stylesheet is loaded here. -->
   <base href="/app/mobile/">
 
-  <link rel="stylesheet" href="./css/app.css?v=2">
+  <link rel="stylesheet" href="./css/app.css?v=4">
   <link rel="manifest" href="../assets/trycord-assets/app/site.webmanifest">
   <link rel="icon" href="../assets/trycord-assets/app/favicon.svg">
   <link rel="apple-touch-icon" href="../assets/trycord-assets/app/trycord-app-icon.svg">
@@ -23,19 +23,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Trycord">
 
-  <script>
-    // The theme, applied before the first paint so the page never flashes the wrong
-    // one. Same key and same fallback as the desktop entry: a reader who chose a
-    // theme in either module keeps it in both.
-    (function () {
-      var key = 'trycord.theme';
-      var stored = null;
-      try { stored = window.localStorage.getItem(key); } catch (e) { /* storage off */ }
-      var theme = stored || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
-        ? 'light' : 'trycord');
-      document.documentElement.setAttribute('data-theme', theme);
-    })();
-  </script>
+  <!-- The stored theme, applied before the first paint. Shared with the
+       desktop entry; the policy refuses inline script. -->
+  <script src="../js/theme-bootstrap.js"></script>
 </head>
 <body>
   <!-- One mount point. The whole interface is built by js/main.js. -->
@@ -44,6 +34,6 @@
   <!-- Loaded first, as a plain script: it has to be able to report a module graph
        that failed to load, so it cannot depend on that graph. -->
   <script src="../packages/crash.js"></script>
-  <script type="module" src="./js/main.js"></script>
+  <script type="module" src="./js/main.js?v=4"></script>
 </body>
 </html>

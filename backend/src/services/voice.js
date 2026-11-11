@@ -537,10 +537,8 @@ async function moderate(channelId, actorId, targetUserId, { mute, deafen, discon
     }
   }
 
-  await db.run(
-    `INSERT INTO audit_logs (id, actor_id, action, target_type, target_id, reason, created_at)
-     VALUES (?, ?, ?, 'user', ?, NULL, ?)`,
-    [uuid(), actorId, disconnect ? 'voice_disconnect' : 'voice_moderate', targetUserId, now()]
+  await require('./audit').record(
+    actorId, disconnect ? 'voice_disconnect' : 'voice_moderate', 'user', targetUserId, null
   );
 
   return { ok: true, disconnected: !!disconnect, sessionId };

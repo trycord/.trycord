@@ -20,6 +20,15 @@ router.get('/mine', auth, async (req, res, next) => {
   } catch (e) { serviceError(res, e); }
 });
 
+// Decisions this account can currently appeal, with any existing appeal.
+// Possession still gates anonymous submission; this endpoint is how a
+// signed-in member sees the same list without already knowing an action id.
+router.get('/eligible', auth, async (req, res, next) => {
+  try {
+    res.json(await ts.eligibleAppeals(req.user.id));
+  } catch (e) { serviceError(res, e); }
+});
+
 router.post('/', rateLimit({ windowMs: 60000, max: 10 }), async (req, res, next) => {
   try {
     res.status(201).json(await ts.submitAppeal(req.body || {}));

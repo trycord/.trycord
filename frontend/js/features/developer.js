@@ -1257,38 +1257,20 @@ function documentationSection() {
           + 'the SDK calls them for you.',
       }),
       card({
-        label: 'From token to working bot',
+        label: 'Trycord Bot Documentation',
         glyph: 'code',
-        note: 'the routes this console configures, called by a running application',
-        body: el('div', { class: 'fold fold--tight' },
-          el('p', { class: 'form-note' },
-            'Create an application above and keep the token it shows you once. Give these lines '
-            + 'to it, and it hears the community and answers. A self-hosted instance points the '
-            + 'client at its own address; the address below is only the default.'),
-          el('code', { class: 'keyblock' }, hoistExample())),
-      }),
-      card({
-        label: 'The documentation',
-        glyph: 'book',
-        note: 'the guide, the reference, and the client library',
-        flush: true,
+        note: 'the trycord-botjs SDK, API reference, and bot guides',
         body: el('div', { class: 'rowlist' }, [
           linkRow(
-            'The developer guide',
-            'Make an application, use its token, post a message, hold the gateway open.',
+            'Getting Started',
+            'Create an application, authenticate it, install it in a community.',
             publicPath('/developers'),
             false,
           ),
           linkRow(
-            'The API reference',
+            'API Reference',
             'Every route and every scope, as a machine-readable document.',
             publicPath('/api/v1/openapi.json'),
-            false,
-          ),
-          linkRow(
-            'The event vocabulary',
-            'Every event an application may be told about, by name and shape.',
-            '/api/v1/events',
             false,
           ),
           linkRow(
@@ -1296,6 +1278,12 @@ function documentationSection() {
             'The client library, with its types, its tests and its examples.',
             'https://github.com/trycord/.trycord/tree/main/sdk/trycord-botjs',
             true,
+          ),
+          linkRow(
+            'Events & Gateway',
+            'The event vocabulary the communities emit, and how to hear each one as it is delivered.',
+            publicPath('/api/v1/events'),
+            false,
           ),
           linkRow(
             'Running your own instance',
@@ -1319,11 +1307,250 @@ function documentationSection() {
   };
 }
 
+// -- developer portal ---------------------------------------------------------
+
+// Developer Portal with comprehensive navigation and features
+export function renderDeveloperPortal(ctx) {
+  const stage = el('div', { class: 'fold fold--tight' });
+
+  const paint = async () => {
+    if (!State.servers.length) {
+      try { await refreshServers(); } catch { /* note says what's missing */ }
+    }
+
+    const managed = State.servers.filter((server) => {
+      const perms = (server.permissions || []).includes('*') || (server.permissions || []).includes('MANAGE_SERVER');
+      return perms || server.is_owner;
+    });
+
+    stage.replaceChildren(
+      fold([
+        head({ label: 'Developer Portal' }),
+        el('div', { class: 'settings-item' },
+          el('div', { class: 'settings-item-main' },
+            el('p', { class: 'settings-item-label' }, 'Your API Keys'),
+            el('p', { class: 'settings-note' }, 'Manage keys that speak for your account.')),
+          el('div', { class: 'settings-item-control' },
+            el('button', {
+              class: 'btn btn--primary btn--sm', type: 'button',
+              onClick: () => replaceAddress('/developers/keys'),
+            }, 'Manage Keys'))),
+        el('div', { class: 'settings-item' },
+          el('div', { class: 'settings-item-main' },
+            el('p', { class: 'settings-item-label' }, 'Applications'),
+            el('p', { class: 'settings-note' }, 'Create and configure bot applications.')),
+          el('div', { class: 'settings-item-control' },
+            el('button', {
+              class: 'btn btn--primary btn--sm', type: 'button',
+              onClick: () => replaceAddress('/developers/applications'),
+            }, 'Manage Applications'))),
+        el('div', { class: 'settings-item' },
+          el('div', { class: 'settings-item-main' },
+            el('p', { class: 'settings-item-label' }, 'API Documentation'),
+            el('p', { class: 'settings-note' }, 'Complete API reference and guides.')),
+          el('div', { class: 'settings-item-control' },
+            el('button', {
+              class: 'btn btn--primary btn--sm', type: 'button',
+              onClick: () => replaceAddress('/developers/documentation'),
+            }, 'Read Docs'))),
+        managed.length
+          ? el('div', { class: 'settings-item' },
+              el('div', { class: 'settings-item-main' },
+                el('p', { class: 'settings-item-label' }, 'Community Integrations'),
+                el('p', { class: 'settings-note' }, 'Manage bots and integrations for your communities.')),
+              el('div', { class: 'settings-item-control' },
+                el('button', {
+                  class: 'btn btn--primary btn--sm', type: 'button',
+                  onClick: () => replaceAddress('/developers/applications'),
+                }, 'View Integrations')))
+          : null,
+      ])
+    );
+  };
+
+  return {
+    node: stage,
+    onMount: paint,
+    cleanup() {},
+  };
+}
+
+// -- applications dashboard ----------------------------------------------------
+
+// Comprehensive applications dashboard for the portal
+function applicationsDashboard() {
+  const stage = el('div', { class: 'fold fold--tight' });
+  const communityPicker = el('select', { class: 'input' });
+  const applicationsList = el('div', { class: 'rowlist' });
+  const summary = el('p', { class: 'form-note' });
+  let serverId = null;
+
+  function communities() {
+    return State.servers.filter((server) => {
+      const perms = (server.permissions || []).includes('*') || (server.permissions || []).includes('MANAGE_SERVER');
+      return perms || server.is_owner;
+    });
+  }
+
+  async function paint() {
+    const options = communities();
+    if (!options.length) {
+      communityPicker.replaceChildren(el('option', { value: '' }, 'No community to manage'));
+      communityPicker.disabled = true;
+      applicationsList.replaceChildren(blank({
+        glyph: 'bot',
+        title: 'No community available',
+        text: 'Create a community and manage it to access applications.',
+      }));
+      return;
+    }
+
+    communityPicker.disabled = false;
+    if (!serverId || !options.some((s) => s.id === serverId)) {
+      serverId = options[0].id;
+    }
+
+    communityPicker.replaceChildren(...options.map(s => el('option', { value: s.id }, s.name)));
+    communityPicker.value = serverId;
+
+    applicationsList.replaceChildren(hold('Loading applications...'));
+    summary.textContent = '';
+
+    try {
+      const answer = await readApplications(serverId);
+      const applications = (answer && answer.applications) || [];
+      const active = applications.filter(app => app.status === 'active').length;
+      const total = applications.length;
+
+      summary.textContent = total
+        ? `${total} application${total === 1 ? '' : 's'} · ${active} active`
+        : 'No applications yet';
+
+      applicationsList.replaceChildren(...(applications.length
+        ? applications.map(app => el('div', { class: 'settings-item' },
+            el('div', { class: 'settings-item-main' },
+              el('p', { class: 'settings-item-label' }, app.name),
+              el('p', { class: 'settings-note' },
+                (app.description || 'No description') + ' · ' +
+                (app.status === 'active' ? 'Active' : 'Disabled') + ' · ' +
+                (app.credential?.scopes?.length || 0) + ' scope' +
+                ((app.credential?.scopes?.length || 0) !== 1 ? 's' : ''))),
+            el('div', { class: 'settings-item-control' },
+              el('button', {
+                class: 'btn btn--default btn--sm', type: 'button',
+                onClick: () => openApplication(serverId, app, paint),
+              }, 'Manage'))))
+        : [blank({
+            glyph: 'bot',
+            title: 'No applications yet',
+            text: 'Create your first bot application to get started.',
+          })]));
+
+      communityPicker.replaceChildren(...options.map(s => el('option', { value: s.id }, s.name)));
+    } catch (error) {
+      applicationsList.replaceChildren(fault(error, paint));
+    }
+  }
+
+  communityPicker.addEventListener('change', () => {
+    serverId = communityPicker.value;
+    paint();
+  });
+
+  return {
+    node: fold([
+      head({ label: 'Applications Dashboard' }),
+      el('div', { class: 'form-stack' },
+        el('label', { class: 'field' },
+          el('span', { class: 'field-label' }, 'Select Community'),
+          communityPicker),
+        summary,
+        applicationsList),
+    ]),
+    onMount: async () => {
+      if (!State.servers.length) {
+        try { await refreshServers(); } catch { /* note below */ }
+      }
+      paint();
+    },
+    cleanup() {},
+  };
+}
+
+// -- applications portal -------------------------------------------------------
+
+// Developer Portal - authenticated workspace for managing applications, keys, and bots
+export function renderApplicationsPortal(ctx) {
+  const stage = el('div', { class: 'fold fold--tight' });
+
+  const paint = async () => {
+    if (!State.servers.length) {
+      try { await refreshServers(); } catch { /* note says what's missing */ }
+    }
+
+    const managed = State.servers.filter((server) => {
+      const perms = (server.permissions || []).includes('*') || (server.permissions || []).includes('MANAGE_SERVER');
+      return perms || server.is_owner;
+    });
+
+    stage.replaceChildren(
+      fold([
+        head({ label: 'Developer Portal' }),
+        el('div', { class: 'settings-item' },
+          el('div', { class: 'settings-item-main' },
+            el('p', { class: 'settings-item-label' }, 'Application Console'),
+            el('p', { class: 'settings-note' }, 'Create, configure and manage your applications and bots.')),
+          el('div', { class: 'settings-item-control' },
+            el('button', {
+              class: 'btn btn--primary btn--sm', type: 'button',
+              onClick: () => replaceAddress('/applications/applications'),
+            }, 'Applications'))),
+        el('div', { class: 'settings-item' },
+          el('div', { class: 'settings-item-main' },
+            el('p', { class: 'settings-item-label' }, 'API Keys'),
+            el('p', { class: 'settings-note' }, 'Manage your credentials and authorization tokens.')),
+          el('div', { class: 'settings-item-control' },
+            el('button', {
+              class: 'btn btn--primary btn--sm', type: 'button',
+              onClick: () => replaceAddress('/applications/keys'),
+            }, 'API Keys'))),
+        el('div', { class: 'settings-item' },
+          el('div', { class: 'settings-item-main' },
+            el('p', { class: 'settings-item-label' }, 'Documentation'),
+            el('p', { class: 'settings-note' }, 'Learn how to build with Trycord.')),
+          el('div', { class: 'settings-item-control' },
+            el('button', {
+              class: 'btn btn--primary btn--sm', type: 'button',
+              onClick: () => replaceAddress('/applications/documentation'),
+            }, 'Documentation'))),
+        managed.length
+          ? el('div', { class: 'settings-item' },
+              el('div', { class: 'settings-item-main' },
+                el('p', { class: 'settings-item-label' }, 'Communities'),
+                el('p', { class: 'settings-note' }, 'Your managed communities with integrations.')),
+              el('div', { class: 'settings-item-control' },
+                el('button', {
+                  class: 'btn btn--primary btn--sm', type: 'button',
+                  onClick: () => replaceAddress('/applications/applications'),
+                }, 'View Communities')))
+          : null,
+      ])
+    );
+  };
+
+  return {
+    node: stage,
+    onMount: paint,
+    cleanup() {},
+  };
+}
+
 // -- the page --------------------------------------------------------------------
 
 const SECTIONS = [
-  { id: 'keys', label: 'API keys', view: keysSection },
+  { id: 'keys', label: 'API Keys', view: keysSection },
   { id: 'applications', label: 'Applications', view: applicationsSection },
+  { id: 'dashboard', label: 'Dashboard', view: applicationsDashboard },
   { id: 'documentation', label: 'Documentation', view: documentationSection },
 ];
 

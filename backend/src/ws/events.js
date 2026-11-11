@@ -24,6 +24,13 @@ const EVENTS = {
   DM_MESSAGE_EMBEDS: 'dm:message_embeds',
   DM_READ: 'dm:read',
   DM_TYPING: 'dm:typing',
+  // A group's name, picture, ownership or membership changed. Every member's
+  // list has to change with it, not only the person who pressed the button.
+  DM_CONVERSATION_UPDATED: 'dm:conversation_updated',
+  DM_PINNED: 'dm:pinned',
+  DM_UNPINNED: 'dm:unpinned',
+  // An invitation was sent, accepted, declined or cancelled.
+  DM_INVITE: 'dm:invite',
 
   PRESENCE: 'presence',
   NOTIFICATION: 'notification',

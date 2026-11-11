@@ -268,6 +268,115 @@ const MIGRATIONS = [
     },
   },
   {
+    version: 8,
+    name: '6.0.0 moderation cases',
+    // Existing reports and actions predate the case record. Give each one a
+    // case rather than leaving the new timeline empty for history that
+    // genuinely happened, and carry the report's status across with the
+    // vocabulary the console now uses.
+    //
+    // Not transactional: MySQL commits DDL implicitly, and this migration is
+    // idempotent because it only touches rows whose case_id is still NULL.
+    transactional: false,
+    async up(conn) {
+      const tables = require('./tables');
+      const engine = conn.dialect === 'mysql' ? ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4' : '';
+      for (const statement of tables(engine)) {
+        if (/moderation_cases|case_events|case_notes|case_evidence|user_restrictions|admin_user_notes/.test(statement)) {
+          await conn.exec(statement);
+        }
+      }
+      const { uuid } = require('../util');
+      const reportStatus = {
+        OPEN: 'OPEN',
+        INVESTIGATING: 'UNDER_REVIEW',
+        RESOLVED: 'RESOLVED',
+        DISMISSED: 'DISMISSED',
+      };
+      const reports = await conn.all('SELECT * FROM reports WHERE case_id IS NULL');
+      for (const report of reports) {
+        const caseId = uuid();
+        const status = reportStatus[report.status] || 'OPEN';
+        const closed = status === 'RESOLVED' || status === 'DISMISSED'
+          ? (report.resolved_at || report.updated_at || report.created_at)
+          : null;
+        await conn.run(
+          `INSERT INTO moderation_cases
+             (id, scope, server_id, subject_type, subject_id, title, category,
+              severity, priority, status, reporter_id, report_id, summary,
+              resolution, created_at, updated_at, closed_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [caseId, report.server_id ? 'community' : 'platform', report.server_id || null,
+            report.target_type, report.target_id, String(report.reason || 'Report').slice(0, 255),
+            report.category || 'OTHER', report.severity || 'MEDIUM', report.priority || 'NORMAL',
+            status, report.reporter_id, report.id, report.description || null,
+            report.resolution || null, report.created_at, report.updated_at || report.created_at, closed]
+        );
+        await conn.run(
+          'UPDATE reports SET case_id = ?, last_activity_at = COALESCE(last_activity_at, updated_at, created_at) WHERE id = ?',
+          [caseId, report.id]
+        );
+      }
+      const actions = await conn.all('SELECT * FROM moderation_actions WHERE case_id IS NULL');
+      for (const action of actions) {
+        let caseId = null;
+        if (action.report_id) {
+          const report = await conn.get('SELECT case_id FROM reports WHERE id = ?', [action.report_id]);
+          caseId = report ? report.case_id : null;
+        }
+        if (!caseId) {
+          caseId = uuid();
+          const status = action.status === 'LIFTED' ? 'RESOLVED' : 'RESOLVED';
+          await conn.run(
+            `INSERT INTO moderation_cases
+               (id, scope, server_id, subject_type, subject_id, title, category,
+                severity, priority, status, reporter_id, action_id, summary,
+                created_at, updated_at, closed_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [caseId, action.server_id ? 'community' : 'platform', action.server_id || null,
+              action.target_type, action.target_id,
+              String(action.action_type || 'Moderation action').replace(/_/g, ' ').toLowerCase(),
+              'OTHER', 'MEDIUM', 'NORMAL', status, null, action.id,
+              action.reason || null, action.created_at, action.updated_at || action.created_at,
+              action.created_at]
+          );
+        }
+        await conn.run('UPDATE moderation_actions SET case_id = ?, updated_at = COALESCE(updated_at, created_at) WHERE id = ?',
+          [caseId, action.id]);
+      }
+    },
+    async verify(conn) {
+      for (const name of ['moderation_cases', 'case_events', 'case_notes', 'case_evidence', 'user_restrictions', 'admin_user_notes']) {
+        if (!(await tableExists(conn, name))) {
+          throw new Error('the moderation case table is missing: ' + name);
+        }
+      }
+      const orphan = await conn.get('SELECT COUNT(*) AS n FROM reports WHERE case_id IS NULL');
+      if (Number(orphan && orphan.n) > 0) {
+        throw new Error('some reports still have no moderation case');
+      }
+    },
+  },
+  {
+    version: 9,
+    name: '6.0.0 audit hash chain',
+    // The audit table predates the chain. Seal the entries that already
+    // exist so verification starts from a complete, contiguous history.
+    transactional: false,
+    async up(conn) {
+      await require('../services/audit').rechain(conn);
+    },
+    async verify(conn) {
+      const rows = await conn.all(
+        'SELECT COUNT(*) AS total, SUM(CASE WHEN entry_hash IS NULL THEN 1 ELSE 0 END) AS unsealed FROM audit_logs'
+      );
+      const row = rows[0] || {};
+      if (Number(row.unsealed || 0) > 0) {
+        throw new Error('some audit entries were not sealed');
+      }
+    },
+  },
+  {
     version: 7,
     name: '5.5.1 separate bot accounts',
     // Older applications posted as their creator. Give each one a bot

@@ -408,4 +408,25 @@ module.exports = (engine) => [
       recorded_by VARCHAR(64) NOT NULL,
       FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE
     )${engine}`,
+
+  // ---- files -----------------------------------------------------------
+  //
+  // The community's own file store: files the workspace keeps, rather than
+  // files a message carries. A row names the object; the bytes live under the
+  // community's storage prefix and reach a reader only through the download
+  // route, which answers to membership - the same bar as reading the
+  // community itself. There is no storage_key column on purpose: the key is
+  // rebuilt from the row, so an id can never be walked into another scope's
+  // objects.
+  `CREATE TABLE IF NOT EXISTS workspace_files (
+      id          VARCHAR(64) PRIMARY KEY,
+      server_id   VARCHAR(64) NOT NULL,
+      name        VARCHAR(255) NOT NULL,
+      mime        VARCHAR(128) NOT NULL,
+      size        BIGINT NOT NULL,
+      uploaded_by VARCHAR(64) NOT NULL,
+      created_at  VARCHAR(64) NOT NULL,
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
+      FOREIGN KEY (uploaded_by) REFERENCES users(id)
+    )${engine}`,
 ];

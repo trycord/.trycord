@@ -339,9 +339,9 @@ router.post('/:id/transfer', resolveServer, auth.requireVerified, requireOwner, 
 
 router.post('/:id/kick', resolveServer, auth.requireVerified, requirePerm('KICK_MEMBERS'), async (req, res, next) => {
   try {
-    const { userId } = req.body || {};
+    const { userId, reason } = req.body || {};
     if (!userId) return fail(res, 'VALIDATION_ERROR', 'userId required');
-    res.json(await memberships.kick(req.server.id, req.user.id, userId));
+    res.json(await memberships.kick(req.server.id, req.user.id, userId, { reason }));
   } catch (e) { serviceError(res, e); }
 });
 
@@ -349,9 +349,9 @@ router.post('/:id/kick', resolveServer, auth.requireVerified, requirePerm('KICK_
 // lifted/expired). Hierarchy is enforced in the service; BAN_MEMBERS gates.
 router.post('/:id/ban', resolveServer, auth.requireVerified, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
   try {
-    const { userId, reason, minutes } = req.body || {};
+    const { userId, reason, minutes, reportId } = req.body || {};
     if (!userId) return fail(res, 'VALIDATION_ERROR', 'userId required');
-    res.json(await memberships.ban(req.server.id, req.user.id, userId, { reason, minutes }));
+    res.json(await memberships.ban(req.server.id, req.user.id, userId, { reason, minutes, reportId }));
   } catch (e) { serviceError(res, e); }
 });
 
@@ -373,9 +373,9 @@ router.get('/:id/bans', resolveServer, requirePerm('BAN_MEMBERS'), async (req, r
 // clears. Enforced on every message send, server-side.
 router.post('/:id/timeout', resolveServer, auth.requireVerified, requirePerm('BAN_MEMBERS'), async (req, res, next) => {
   try {
-    const { userId, minutes } = req.body || {};
+    const { userId, minutes, reason, reportId } = req.body || {};
     if (!userId) return fail(res, 'VALIDATION_ERROR', 'userId required');
-    res.json(await memberships.timeout(req.server.id, req.user.id, userId, minutes));
+    res.json(await memberships.timeout(req.server.id, req.user.id, userId, minutes, { reason, reportId }));
   } catch (e) { serviceError(res, e); }
 });
 

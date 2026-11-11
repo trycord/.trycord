@@ -215,7 +215,7 @@ for (const [area, dir] of AREAS) {
         'title', 'sub', 'body', 'foot', 'actions', 'head', 'dismissable',
         'class', 'wide', 'overlayClass', 'onClose',
       ]),
-      sheet: new Set(['title', 'body', 'footer', 'onClose']),
+      sheet: new Set(['title', 'body', 'footer', 'onClose', 'note']),
       menu: new Set(['title', 'items', 'class']),
       confirm: new Set(['title', 'text', 'body', 'confirmLabel', 'cancelLabel', 'danger']),
     };

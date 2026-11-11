@@ -50,4 +50,8 @@ module.exports = {
   serverMedia: identity.serverMedia,
   removeServerFile: identity.removeServerFile,
   openServerMedia: identity.openServerMedia,
+  storeConversationMedia: identity.storeConversationMedia,
+  conversationMedia: identity.conversationMedia,
+  removeConversationFile: identity.removeConversationFile,
+  openConversationMedia: identity.openConversationMedia,
 };

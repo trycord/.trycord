@@ -83,7 +83,6 @@
   /* The brand's own backgrounds. They are pictures, so they are named here
      once and used by path everywhere else. */
   --bg-planes: url("/assets/backgrounds/app-default.jpg");
-  --bg-horizon: url("/assets/backgrounds/login.jpg");
   --bg-eclipse: url("/assets/backgrounds/ambient-eclipse.jpg");
   --bg-glyph: url("/assets/backgrounds/chat.jpg");
   --bg-curves: url("/assets/backgrounds/settings.jpg");
@@ -97,10 +96,6 @@
     var(--color-accent) 0%,
     color-mix(in srgb, var(--color-accent) 30%, transparent) 46%,
     transparent 100%);
-  /* The light that runs along an edge. It is the flame, thinned. */
-  --wave-ember: color-mix(in srgb, var(--color-accent) 34%, transparent);
-  --wave-warm: color-mix(in srgb, var(--color-accent) 16%, var(--color-surface-sunken));
-
   --cutout: var(--color-background);
 }
 
@@ -250,8 +245,8 @@ p { text-wrap: pretty; }
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
   background: color-mix(in srgb, var(--color-background) 80%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(4px) saturate(120%);
+  backdrop-filter: blur(4px) saturate(120%);
   box-shadow: inset 0 -1px 0 0 var(--hairline);
 }
 /* The seam under the masthead: the one place the signal runs the full width
@@ -444,6 +439,11 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
    Buttons and links
    ========================================================================== */
 
+/* ==========================================================================
+    Buttons and links - with ember glow effects
+    ========================================================================== */
+
+/* Buttons use Trycord's distinctive ember signal style */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -455,25 +455,37 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
   font-size: var(--text-md);
   background: var(--color-surface);
   color: var(--color-text-primary);
-  border: 1px solid var(--color-border-strong);
-  transition: background-color var(--duration-fast) var(--ease-out),
-              border-color var(--duration-fast) var(--ease-out),
-              transform var(--duration-fast) var(--ease-out);
+  border: 1px solid var(--color-border);
+  transition: all var(--duration-fast) var(--ease-out);
+  position: relative;
+  overflow: hidden;
 }
-.btn:hover { text-decoration: none; border-color: var(--color-accent); }
+.btn:hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-surface) 92%, var(--color-accent) 8%);
+}
 .btn:active { transform: translateY(1px); }
 .btn-primary {
   background: var(--color-accent);
   color: var(--color-on-accent);
-  border-color: transparent;
+  border: 1px solid var(--color-accent);
 }
-.btn-primary:hover { background: var(--color-accent-hover); color: var(--color-on-accent); border-color: transparent; }
-.btn-ghost { background: transparent; border-color: var(--color-border-strong); }
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+.btn-ghost { background: transparent; border-color: var(--color-border); }
 .btn-sm { padding: var(--space-2) var(--space-4); font-size: var(--text-sm); }
+.btn-lg { padding: var(--space-3) var(--space-7); font-size: var(--text-lg); min-height: 46px; }
 .btn .icon { width: 18px; height: 18px; flex: 0 0 auto; }
 .btn[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
 
-.cta { display: flex; gap: var(--space-3); flex-wrap: wrap; align-items: center; }
+.cta .btn-primary {
+  box-shadow: var(--shadow-md);
+}
+.cta .btn-primary:hover {
+  box-shadow: var(--shadow-lg);
+}
 
 .text-link {
   display: inline-flex;
@@ -484,10 +496,21 @@ html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
   color: var(--color-accent);
   padding-block: var(--space-1);
   margin-block: calc(-1 * var(--space-1));
+  position: relative;
 }
-.text-link:hover { text-decoration: underline; text-underline-offset: 4px; }
-
-
+.text-link::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  height: 2px;
+  background: var(--color-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+.text-link:hover::after { transform: scaleX(1); }
 /* ==========================================================================
    The home page: the hero
    ========================================================================== */
@@ -942,10 +965,48 @@ main { counter-reset: section; }
   background: var(--seam);
   opacity: 0.3;
 }
-.card .feature-icon { width: 48px; height: 48px; justify-self: start; margin-bottom: var(--space-4); }
-.card .feature-icon .icon { width: 22px; height: 22px; }
-.card h3 { margin: 0 0 var(--space-2); font-size: var(--text-lg); }
-.card p { margin: 0; color: var(--color-text-secondary); font-size: var(--text-sm); line-height: var(--leading-relaxed); }
+.card {
+  position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: var(--space-6);
+  overflow: hidden;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.card:hover {
+  border-color: var(--color-accent);
+  background: var(--color-surface-hover);
+}
+.card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: var(--seam);
+  opacity: 0.3;
+}
+.card .icon {
+  width: 24px;
+  height: 24px;
+  margin-bottom: var(--space-3);
+  color: var(--color-accent);
+}
+.card h3 {
+  margin: 0 0 var(--space-3);
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text-primary);
+}
+.card p {
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
 .card .tag {
   display: inline-block;
   margin-bottom: var(--space-3);
@@ -1021,9 +1082,8 @@ main { counter-reset: section; }
    The cinematic band
    ========================================================================== */
 
-/* A full-width band with the type set like a poster and the product floating
-   in front of it. The picture behind it is the brand's own horizon, darkened
-   so the type stays readable. */
+/* A full-width band on the sunken surface, with the three product cards laid
+   out flat on it. */
 .cinema {
   position: relative;
   isolation: isolate;
@@ -1033,26 +1093,6 @@ main { counter-reset: section; }
   border-bottom: 1px solid var(--hairline);
   padding: clamp(var(--space-10), 8vw, 7rem) 0;
 }
-.cinema::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  background: var(--bg-horizon) center center / cover no-repeat;
-}
-/* The darkening over the picture. It is heavy on the left, where the type
-   sits, and light on the right, where the cards float. */
-.cinema::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background:
-    linear-gradient(100deg, color-mix(in srgb, var(--color-background) 88%, transparent) 12%, color-mix(in srgb, var(--color-background) 62%, transparent) 52%, color-mix(in srgb, var(--color-background) 78%, transparent) 100%),
-    linear-gradient(180deg, color-mix(in srgb, var(--color-background) 45%, transparent), transparent 30%, color-mix(in srgb, var(--color-background) 70%, transparent));
-  pointer-events: none;
-}
-:root[data-theme="light"] .cinema::before { display: none; }
 
 .cinema__head {
   display: grid;
@@ -1077,13 +1117,12 @@ main { counter-reset: section; }
   line-height: var(--leading-relaxed);
 }
 
-/* The floating cards. Each one is a different height and a different depth,
-   and they lean on each other the way objects on a table do. */
+/* The three cards sit on the band as one flat row. */
 .floaters {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-5);
-  align-items: start;
+  align-items: stretch;
 }
 .floater {
   position: relative;
@@ -1091,10 +1130,8 @@ main { counter-reset: section; }
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   overflow: hidden;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
 }
-.floater:nth-child(2) { margin-top: var(--space-8); }
-.floater:nth-child(3) { margin-top: var(--space-4); }
 .floater__screen {
   padding: var(--space-4);
   background: var(--color-surface-sunken);
@@ -1178,23 +1215,32 @@ main { counter-reset: section; }
 .showcase__body { background: var(--color-surface-sunken); }
 .showcase__body pre { margin: 0; border: 0; border-radius: 0; background: transparent; }
 
+/* The hero preview: the desktop client as the main object, the phone beside it
+   in a single clean frame, not a tilted spread of overlapping cards. */
+.showcase--hero { overflow: hidden; box-shadow: none; }
+.showcase--hero .showcase__body { display: flex; justify-content: center; }
+.hero-preview {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: clamp(var(--space-4), 3vw, var(--space-8));
+  align-items: start;
+  justify-content: center;
+  max-width: 900px;
+  padding: var(--space-4) var(--space-5) var(--space-6);
+}
+.hero-preview .device--desktop { width: 100%; }
+.hero-preview .device--phone { width: 184px; }
+.hero-preview .app-window { box-shadow: none; }
+
+@media (max-width: 860px) {
+  .hero-preview { grid-template-columns: 1fr; }
+  .hero-preview .device--phone { width: 200px; justify-self: center; }
+}
+
 
 /* ==========================================================================
    Light that runs along the edge
    ========================================================================== */
-
-/* The flame, wrapped around a section's edge rather than laid across it. */
-.streak {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  filter: blur(42px);
-  opacity: 0.5;
-  z-index: -1;
-}
-.streak--ember { background: var(--wave-ember); }
-.streak--warm { background: var(--wave-warm); }
-
 
 /* ==========================================================================
    Editorial pages
@@ -1311,8 +1357,8 @@ main { counter-reset: section; }
   box-shadow:
     inset 0 1px 0 0 var(--glass-sheen, transparent),
     0 40px 90px -50px rgba(0, 0, 0, 0.85);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(4px) saturate(120%);
+  backdrop-filter: blur(4px) saturate(120%);
   overflow: hidden;
 }
 .app-window::before {
@@ -2401,4 +2447,291 @@ select.dir-control { width: auto; cursor: pointer; }
   border: 1px solid var(--glass-edge);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
+}
+
+
+/* ==========================================================================
+   The account gate: sign in, register, and the pages that recover them
+   The public site owns the whole door, so these pages are the site's own
+   composition: two planes on a wide screen - the promise on the left, the
+   form on the right - and one column on a narrow one.
+   ========================================================================== */
+
+.login-page { padding: var(--page-pad) 0 var(--section-pad); }
+
+.login-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr);
+  gap: var(--space-10);
+  align-items: start;
+}
+
+/* The promise plane. It holds its place while the form beside it is the part
+   that moves, so the two never trade places mid-read. */
+.login-brand { position: sticky; top: calc(var(--header-h) + var(--space-6)); }
+
+.login-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-7);
+}
+.login-brand-mark .mark { width: 34px; height: 34px; color: var(--color-accent); }
+
+.login-brand h1 { font-size: var(--display-lg); }
+
+.login-lede {
+  font-size: var(--text-lg);
+  color: var(--color-text-secondary);
+  max-width: 46ch;
+  margin-top: var(--space-4);
+}
+
+/* Three numbered facts, the way the marketing pages number theirs. */
+.login-points {
+  list-style: none;
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-5);
+}
+.login-points li { display: flex; gap: var(--space-4); align-items: baseline; }
+.login-points p { margin: 0; color: var(--color-text-secondary); }
+.login-points strong { color: var(--color-text-primary); }
+.login-point-mark {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
+  color: var(--color-accent);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  flex: none;
+}
+
+/* Which instance the door belongs to, with a live dot beside the name. */
+.login-instance-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-8);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.login-instance-line strong { color: var(--color-text-primary); }
+.login-dot {
+  width: 8px; height: 8px; flex: none;
+  border-radius: var(--radius-circle);
+  background: var(--color-success, var(--color-accent));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-success, var(--color-accent)) 22%, transparent);
+}
+
+/* The form plane: the elevated surface of the site's own composition. */
+.login-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-9) var(--space-8);
+}
+
+.login-card h2 { font-size: var(--display-sm); margin: var(--space-2) 0 0; }
+.login-card .kicker { margin: 0; }
+
+.login-signed-in p { color: var(--color-text-secondary); }
+.login-signed-in-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-top: var(--space-5);
+}
+
+.login-form { display: grid; gap: var(--space-5); margin-top: var(--space-6); }
+
+/* The refusal strip. It is quiet until it is needed, and when it is it says
+   what happened rather than glowing. */
+.login-alert {
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  padding: var(--space-3) var(--space-4);
+  margin: 0;
+}
+.login-alert:not([hidden]) { display: block; }
+.login-alert[data-tone="error"] {
+  border-left-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+.login-alert a { font-weight: var(--weight-semibold); }
+
+/* The controls. One shape for every field on the gate, because a door whose
+   fields differ from one another is a door nobody trusts. */
+.field { display: block; }
+.field-hint {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: var(--space-2);
+}
+
+.login-input {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: var(--text-md);
+  transition: border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+.login-input::placeholder { color: var(--color-text-muted); }
+.login-input:hover { border-color: var(--color-border-strong); }
+.login-input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  border-color: var(--color-accent);
+}
+
+/* The password's reveal button sits inside the field it answers. */
+.login-password { position: relative; display: flex; align-items: center; }
+.login-password .login-input { padding-right: calc(76px + var(--space-4)); }
+.login-password-toggle {
+  position: absolute;
+  right: var(--space-2);
+  border: 0;
+  background: none;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.login-password-toggle:hover { color: var(--color-accent); }
+.login-password-toggle:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+
+.login-forgot {
+  justify-self: end;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-accent);
+}
+.login-forgot:hover { color: var(--color-accent-hover); }
+
+.login-submit {
+  width: 100%;
+  min-height: 46px;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+}
+.login-submit:disabled,
+.login-submit[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
+
+.login-submit-note {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.login-alt {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+.login-alt a { font-weight: var(--weight-semibold); }
+
+.login-note {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.login-footnote {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin: var(--space-6) 0 0;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--hairline);
+}
+
+/* The legal block on register: the documents in force, and the box that
+   accepts them. A gate that cannot say which version it asked about is a
+   gate nobody can hold to anything. */
+.login-legal-block {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-hover) 60%, transparent);
+  padding: var(--space-5);
+  display: grid;
+  gap: var(--space-3);
+}
+.login-legal-heading {
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  margin: 0;
+}
+.login-legal-lede {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+.login-legal {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  cursor: pointer;
+}
+.login-legal input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 18px; height: 18px;
+  margin: 1px 0 0;
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-background);
+  cursor: pointer;
+  position: relative;
+  transition: background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+.login-legal input[type="checkbox"]:checked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.login-legal input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  inset: 3px 4px 5px 3px;
+  border: solid var(--color-on-accent);
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg);
+}
+.login-legal input[type="checkbox"]:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.login-legal-meta {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+.login-legal-retry { font-size: var(--text-xs); justify-self: start; }
+
+/* One column on a narrow screen: the promise first, the form under it. */
+@media (max-width: 980px) {
+  .login-grid { grid-template-columns: minmax(0, 1fr); }
+  .login-brand { position: static; }
+  .login-card { padding: var(--space-7) var(--space-5); }
 }

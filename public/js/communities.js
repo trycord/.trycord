@@ -5,9 +5,9 @@
 // is a field the API returns: name, description, member and channel counts, and
 // for the preview, the channel list. Nothing is invented - a community with no
 // description says so, and an instance with no public communities gets an
-// explanation rather than a gallery of made-up ones. Sample content is for the
-// demo, where being a demonstration is the point; a directory is where a reader
-// goes to find something real.
+// explanation rather than a gallery of made-up ones. The labelled samples are
+// a boundary the directory holds: it is where a reader goes to find something
+// real, so a sample never stands in for an answer that failed.
 (function () {
   'use strict';
 

@@ -58,6 +58,11 @@ export function pollRoute(serverId, pollId) {
   return surfaceRoute(serverId, 'poll') + '/' + encodeURIComponent(pollId);
 }
 
+export function filesRoute(serverId, fileId) {
+  return surfaceRoute(serverId, fileId ? 'file' : 'files')
+    + (fileId ? '/' + encodeURIComponent(fileId) : '');
+}
+
 // The id of the thing a page is showing.
 //
 // The registry names the parameter after the thing it names, so a document
@@ -102,6 +107,12 @@ export const SURFACES = [
     label: 'Polls',
     icon: 'chart',
     blurb: 'A question put to the community, and the answer it recorded.',
+  },
+  {
+    id: 'files',
+    label: 'Files',
+    icon: 'folder',
+    blurb: 'Storage the community keeps: uploaded files, held and served here.',
   },
 ];
 
@@ -487,6 +498,15 @@ export const Workspace = {
     root(serverId) + '/polls/' + encodeURIComponent(pollId), { body }),
   votePoll: (serverId, pollId, choices) =>
     request('POST', root(serverId) + '/polls/' + encodeURIComponent(pollId) + '/vote', { body: { choices } }),
+
+  // Files: the community's own store. The list and the removal are ordinary
+  // requests; the upload is a multipart body, so it takes the XHR path that
+  // can report how much of it has gone up.
+  files: (serverId) => request('GET', root(serverId) + '/files'),
+  file: (serverId, fileId) =>
+    request('GET', root(serverId) + '/files/' + encodeURIComponent(fileId)),
+  deleteFile: (serverId, fileId) =>
+    request('DELETE', root(serverId) + '/files/' + encodeURIComponent(fileId)),
   pollResults: (serverId, pollId, recount) =>
     request('GET', root(serverId) + '/polls/' + encodeURIComponent(pollId) + '/results'
       + (recount ? '?recount=1' : '')),
@@ -497,7 +517,7 @@ export const Workspace = {
 export default {
   Workspace, SURFACES, surfaceById, paramId,
   workspaceRoute, surfaceRoute, spaceRoute, documentRoute, boardRoute, cardRoute,
-  eventRoute, pollRoute,
+  eventRoute, pollRoute, filesRoute,
   mayManageStructure, mayWriteDocuments, mayPost, mayModerate, mayActOn,
   formatInstant, readerZone, toZoneInput, instantInZone,
   attendanceCounts, attendanceRows,

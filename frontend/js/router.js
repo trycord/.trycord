@@ -7,7 +7,7 @@
 // has somewhere to unsubscribe.
 
 import { matchRoute, renderPage } from '../packages/registry.js';
-import { currentRoute, currentQuery, navigate, path } from '../packages/nav.js';
+import { currentRoute, currentQuery, navigate, path, publicPath } from '../packages/nav.js';
 import { el } from '../packages/dom.js';
 import {
   State, serverById, channelById, refreshServer, refreshServers, refreshServerTree,
@@ -23,6 +23,26 @@ import { renderNotFound } from './features/documents.js';
 let activeCleanup = null;
 let rawNode = null;
 let generation = 0;
+
+// Where the sign-in door is.
+//
+// A served instance usually has the public site at the origin root, and that
+// site owns the door at /login. A session route reached without a session leaves
+// the application for it, with the route remembered. A document opened off disk
+// - the desktop shell - has no origin root to leave for, so the application's
+// own gate remains the answer. The gate at /app/login still exists for a
+// deployment that serves the client alone; this is the canonical way in.
+function leaveForSignIn(route) {
+  const target = route && route !== '/'
+    ? '/login?next=' + encodeURIComponent(route)
+    : '/login';
+  const protocol = window.location && window.location.protocol;
+  if (protocol === 'http:' || protocol === 'https:') {
+    window.location.assign(publicPath(target));
+    return;
+  }
+  navigate(target, { replace: true });
+}
 
 // The first paint is the document the reader asked for; the browser has already
 // put them there. Every paint after it is a move inside the client, and a move
@@ -235,7 +255,7 @@ export async function run() {
 
   // The enrolment screen is only meaningful with a token to enrol against.
   if (page.id === 'twoStep' && !signedIn()) {
-    navigate('/login', { replace: true });
+    leaveForSignIn('/');
     return;
   }
 
@@ -244,7 +264,7 @@ export async function run() {
     return;
   }
   if (page.access === 'session' && !signedIn()) {
-    navigate('/login?next=' + encodeURIComponent(route), { replace: true });
+    leaveForSignIn(route);
     return;
   }
 

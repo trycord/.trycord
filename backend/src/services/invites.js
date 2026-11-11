@@ -6,11 +6,23 @@ const { now, uuid } = require('../util');
 const memberships = require('./memberships');
 
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const CODE_LENGTH = 7;
 
 function newCode() {
-  const buf = crypto.randomBytes(8);
+  const buf = crypto.randomBytes(CODE_LENGTH);
   let out = '';
-  for (let i = 0; i < 8; i++) out += CODE_CHARS[buf[i] % CODE_CHARS.length];
+  for (let i = 0; i < CODE_LENGTH; i++) out += CODE_CHARS[buf[i] % CODE_CHARS.length];
+  return out;
+}
+
+// A code the creator chose, or null. Uppercased to match how codes are read
+// back, and bounded so a stored code is always typeable and short.
+function manualCode(code) {
+  if (code === undefined || code === null || code === '') return null;
+  const out = String(code).trim().toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9-]{1,22}[A-Z0-9]$/.test(out)) {
+    throw { code: 'VALIDATION_ERROR', message: 'A code is 3-24 letters, digits or dashes.' };
+  }
   return out;
 }
 
@@ -20,7 +32,7 @@ function parseRow(r) {
   return r;
 }
 
-async function create(serverId, creatorId, { maxUses, expiresInHours } = {}) {
+async function create(serverId, creatorId, { maxUses, expiresInHours, code } = {}) {
   if (maxUses !== undefined && maxUses !== null && maxUses !== '') {
     maxUses = Number(maxUses);
     if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 100) {
@@ -37,8 +49,11 @@ async function create(serverId, creatorId, { maxUses, expiresInHours } = {}) {
     }
     expiresAt = new Date(Date.now() + h * 3600 * 1000).toISOString();
   }
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const code = newCode();
+  // A code the creator chose is used as given; one that is already taken is
+  // a conflict, not a retry. A rolled code retries on the rare collision.
+  const chosen = manualCode(code);
+  for (let attempt = 0; attempt < (chosen ? 1 : 5); attempt++) {
+    const code = chosen || newCode();
     try {
       const id = uuid();
       await db.run(
@@ -51,6 +66,9 @@ async function create(serverId, creatorId, { maxUses, expiresInHours } = {}) {
     } catch (e) {
       const msg = String((e && e.message) || '');
       if (!/UNIQUE|unique|ER_DUP_ENTRY/i.test(msg) && e.code !== 'ER_DUP_ENTRY' && e.code !== 'SQLITE_CONSTRAINT_UNIQUE') throw e;
+      if (chosen) {
+        throw { code: 'CONFLICT', message: 'That code is already in use.' };
+      }
     }
   }
   throw { code: 'CONFLICT', message: 'Could not generate an invite code. Try again.' };

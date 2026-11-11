@@ -7,12 +7,13 @@ const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
 const enforcement = require('../services/enforcement');
 const privacy = require('../services/privacy');
+const presenceService = require('../services/presence');
 const uploads = require('../services/uploads');
 const events = require('../services/events');
 const { singleImage } = require('../middleware/upload');
 const { escapeLike } = require('../util');
 
-let gateway = { getPresence: null };
+let gateway = { getPresence: null, announcePresence: null };
 function setGateway(gw) {
   gateway = Object.assign(gateway, gw);
 }
@@ -36,13 +37,16 @@ function publicUser(row) {
   };
 }
 
-function presenceOf(id) {
-  try {
-    const p = gateway.getPresence ? gateway.getPresence([id]) : {};
-    return p[String(id)] || 'offline';
-  } catch {
-    return 'offline';
-  }
+// The account's own chosen state plus the registry's answer about sockets,
+// narrowed to what a reader may see. A hidden presence and a disconnected one
+// are the same answer to everybody except the account itself.
+async function presenceOf(id) {
+  const all = await presenceOfMany([String(id)]);
+  return all[String(id)] || 'offline';
+}
+
+async function presenceOfMany(ids) {
+  return presenceService.forGateway(ids, gateway);
 }
 
 router.get('/me', async (req, res, next) => {
@@ -61,7 +65,39 @@ router.get('/me', async (req, res, next) => {
       // locking messaging behind an action that is impossible here.
       verificationRequired: auth.verificationEnforceable(),
       isAdmin,
+      // The account's own answer about how it presents itself. Other people
+      // never receive 'invisible' as a distinct state; the owner does, because
+      // otherwise the choice they made would be invisible to them too.
+      presenceStatus: await presenceService.chosen(row.id),
+      presence: await presenceService.chosen(row.id),
     }));
+  } catch (e) { next(e); }
+});
+
+// PATCH /api/users/me/presence — choose how the account presents itself.
+//
+// The choice is stored on the account, not only in the socket, because it has
+// to survive a reconnect: a person who chose invisible does not become visible
+// again when their laptop reconnects.
+router.patch('/me/presence', async (req, res, next) => {
+  try {
+    const body = req.body || {};
+    const value = body.status !== undefined ? body.status : body.presence;
+    let out;
+    try {
+      out = await presenceService.setStatus(req.user.id, value);
+    } catch (e) {
+      if (e && e.code === 'VALIDATION_ERROR') return fail(res, e.code, e.message);
+      throw e;
+    }
+    // The account's own other tabs follow immediately, and everybody allowed
+    // to see this account is told the new state. Fire-and-forget: a presence
+    // push must not fail the write that succeeded.
+    if (gateway.announcePresence) {
+      events.emitTo(req.user.id, 'presence', { presence: out.status });
+      gateway.announcePresence(req.user.id);
+    }
+    res.json(out);
   } catch (e) { next(e); }
 });
 
@@ -162,7 +198,7 @@ router.get('/search', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, 
     for (const r of rows) {
       if (!(await privacy.canDiscover(req.user.id, r.id))) continue;
       const user = publicUser(r);
-      user.presence = (await privacy.canSeePresence(req.user.id, r.id)) ? presenceOf(r.id) : null;
+      user.presence = (await privacy.canSeePresence(req.user.id, r.id)) ? await presenceOf(r.id) : null;
       out.push(user);
     }
     res.json(out);
@@ -173,19 +209,15 @@ router.get('/search', rateLimit({ windowMs: 60000, max: 60 }), async (req, res, 
 router.get('/presence', async (req, res, next) => {
   try {
     const ids = String(req.query.ids || '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 100);
-    let out = {};
-    try {
-      out = gateway.getPresence ? gateway.getPresence(ids) : {};
-    } catch { /* presence is best-effort */ }
     // The same filter search already applies, applied here too: a hidden presence
     // that still arrives in the payload is not hidden, and bulk is the easiest
     // place to read one. null, not 'offline', so the caller cannot tell a
     // withheld answer apart from a genuinely offline account.
+    const states = await presenceOfMany(ids);
     const me = req.user.id;
     const filtered = {};
     for (const id of ids) {
-      const state = out[id] || 'offline';
-      filtered[id] = (await privacy.canSeePresence(me, id)) ? state : null;
+      filtered[id] = (await privacy.canSeePresence(me, id)) ? states[String(id)] || 'offline' : null;
     }
     res.json(filtered);
   } catch (e) { next(e); }
@@ -200,9 +232,20 @@ router.get('/:id', async (req, res, next) => {
     );
     if (!row) return fail(res, 'NOT_FOUND', 'user not found');
     const me = req.user.id;
-    const profile = Object.assign(publicUser(row), {
-      presence: (await privacy.canSeePresence(me, row.id)) ? presenceOf(row.id) : null,
-    });
+    const self = String(row.id) === String(me);
+    // The subject's profile_visibility (and a block in either direction) is
+    // enforced here, on the route that returns the profile, rather than only
+    // in the client that draws the page. A profile hidden in the interface
+    // but readable from the API is not hidden.
+    const view = await privacy.canViewProfile(me, row.id);
+    if (!view.allowed) return fail(res, 'PROFILE_PRIVATE', 'this profile is private');
+
+    // The owner sees the state they chose, including 'invisible'. Everybody
+    // else sees the presented state, and only when presence privacy allows it.
+    let presence = null;
+    if (self) presence = await presenceService.chosen(row.id);
+    else if (await privacy.canSeePresence(me, row.id)) presence = await presenceOf(row.id);
+    const profile = Object.assign(publicUser(row), { presence });
     if (String(row.id) === String(me)) {
       profile.relation = 'self';
     } else {
@@ -218,6 +261,52 @@ router.get('/:id', async (req, res, next) => {
       profile.relation = friend ? 'friend' : pending
         ? (String(pending.from_user_id) === String(me) ? 'pending-out' : 'pending-in')
         : 'none';
+
+      // The people both accounts know, and the communities both belong to.
+      // Both are facts about the viewer's own relationships as much as the
+      // subject's, which is why they are safe to show on a profile the viewer
+      // is already allowed to open.
+      const [mutual, mutualCount, shared] = await Promise.all([
+        db.all(
+          `SELECT u.id, u.username, u.display_name, u.avatar_url
+           FROM friendships mine
+           JOIN friendships theirs ON theirs.friend_id = mine.friend_id AND theirs.user_id = ?
+           JOIN users u ON u.id = mine.friend_id
+           WHERE mine.user_id = ?
+           ORDER BY u.username
+           LIMIT 12`,
+          [row.id, me]
+        ),
+        db.get(
+          `SELECT COUNT(*) AS n
+           FROM friendships mine
+           JOIN friendships theirs ON theirs.friend_id = mine.friend_id AND theirs.user_id = ?
+           WHERE mine.user_id = ?`,
+          [row.id, me]
+        ),
+        db.all(
+          `SELECT s.id, s.name, s.icon_url
+           FROM server_members mine
+           JOIN server_members theirs ON theirs.server_id = mine.server_id AND theirs.user_id = ?
+           JOIN servers s ON s.id = mine.server_id
+           WHERE mine.user_id = ?
+           ORDER BY s.name
+           LIMIT 12`,
+          [row.id, me]
+        ),
+      ]);
+      profile.mutualFriends = mutual.map((u) => ({
+        id: u.id,
+        username: u.username,
+        displayName: u.display_name,
+        avatarUrl: u.avatar_url || null,
+      }));
+      profile.mutualFriendCount = Number((mutualCount && mutualCount.n) || 0);
+      profile.sharedCommunities = shared.map((s) => ({
+        id: s.id,
+        name: s.name,
+        iconUrl: s.icon_url || null,
+      }));
     }
     // Whether the viewer has blocked them. The profile page needs this to label
     // the control honestly: without it the only way to find out is to press

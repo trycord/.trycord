@@ -12,7 +12,8 @@ import { TrycordConfig } from '../packages/config.js';
 import {
   State, on as onStore, loadInstance, loadLegal, loadSession, logout,
   refreshServers, refreshFederated, refreshDms, refreshFriends, refreshNotifications,
-  markConversationRead,
+  refreshDmInvites, markConversationRead, noteNotificationIncoming, emit as emitStore,
+  refreshServer, refreshServerTree, refreshServerMembers, refreshServerRoles,
 } from '../packages/store.js';
 import { installLinkHandler, installPopStateHandler, navigate, BASE } from '../packages/nav.js';
 import { loadLocale } from '../packages/locale.js';
@@ -66,7 +67,75 @@ function wireChrome() {
     else if (status === 'connecting') setConnection('connecting', 'Connecting');
     else setConnection('offline', 'Offline - reconnecting');
   });
+  // The first open follows the boot reads. A later one follows a dropped
+  // socket, and anything that changed while it was down - a new friend, a
+  // conversation, a notification, an invitation - is read again here rather
+  // than surviving as a stale screen until the reader navigates away.
+  let openedBefore = false;
+  onRealtime('open', () => {
+    if (!openedBefore) { openedBefore = true; return; }
+    if (!State.user) return;
+    Promise.allSettled([
+      refreshDms(), refreshFriends(), refreshNotifications(), refreshDmInvites(),
+    ]).then(() => refreshChrome());
+    // Ask each surface to repaint itself from the refreshed store.
+    emitStore('resync', {});
+  });
   onRealtime('presence-changed', () => { refreshChrome(); });
+  // The structure of a community - its channels, its roles, its membership,
+  // its name - changes from elsewhere: another member's button, a moderation
+  // action, a webhook. The server rooms carry those events; the client
+  // refetches the part of the store that changed, and every surface that
+  // draws from that store repaints with it. Without this, a sidebar quietly
+  // lied until the reader navigated or reloaded.
+  const STRUCTURAL = new Set([
+    'server_updated', 'community_settings_updated',
+    'channel_created', 'channel_updated', 'channel_deleted', 'channels_reordered',
+    'category_created', 'category_updated', 'category_deleted', 'categories_reordered',
+    'role_created', 'role_updated', 'role_deleted', 'roles_reordered',
+    'member_joined', 'member_left', 'member_kicked', 'member_banned',
+    'member_unbanned', 'member_updated', 'member_roles_updated',
+    'invite_created', 'invite_revoked',
+  ]);
+  let structuralTimer = 0;
+  const structuralDirty = new Set();
+  const onStructural = (event) => {
+    // The event names its community the way its route emits it - some on the
+    // top level, some nested in the row itself.
+    const id = event && (event.server_id || event.serverId || (event.server && event.server.id));
+    if (id) structuralDirty.add(String(id));
+    // An event without an id still refreshes whatever is open: the burst
+    // debounce keeps that cheap, and a stale screen is worse than a read.
+    clearTimeout(structuralTimer);
+    // A burst of events (an import, a reorder drag) is one refetch, not one
+    // per event: the reads cost a round trip each, and nothing on screen
+    // benefits from being right twice in the same second.
+    structuralTimer = setTimeout(() => {
+      // An event that names no community (or one the client cannot parse)
+      // refreshes every community on the list: a member has a handful, and
+      // a stale sidebar is worse than a small read.
+      const ids = structuralDirty.size
+        ? [...structuralDirty]
+        : (Array.isArray(State.servers) ? State.servers.map((s) => String(s.id)) : []);
+      structuralDirty.clear();
+      Promise.allSettled(ids.map((id) => Promise.allSettled([
+        refreshServer(id),
+        refreshServerTree(id, { force: true }),
+        refreshServerMembers(id),
+        refreshServerRoles(id),
+      ]))).then(() => refreshChrome());
+    }, 250);
+  };
+  for (const type of STRUCTURAL) onRealtime(type, onStructural);
+  // Live in every community's room: the room is how the events above arrive,
+  // and the list of communities is known the moment it is read. Rejoining a
+  // room the socket is already in costs one check, not a frame.
+  onStore('servers', () => {
+    const mine = Array.isArray(State.servers) ? State.servers : [];
+    for (const server of mine) {
+      if (server && server.id) realtime.joinServer(server.id);
+    }
+  });
   // The communities on other instances arrived, or changed. The rail has a
   // section of its own for them.
   onStore('federated', () => { refreshChrome(); });
@@ -74,8 +143,31 @@ function wireChrome() {
   // account button in the corner shows it, so it is redrawn rather than
   // waiting for the reader to go somewhere else and come back.
   onStore('user', () => { refreshChrome(); });
-  onRealtime(EVENTS.NOTIFICATION, () => {
-    refreshNotifications().catch(() => { /* the bell catches up on the next open */ });
+  // A notification row arrives once, over the socket, and is merged into the
+  // list the reader is looking at. Asking for the whole list again would
+  // replace a filtered page with the unfiltered one and move the scroll.
+  onRealtime(EVENTS.NOTIFICATION, (event) => {
+    if (event && event.notification) noteNotificationIncoming(event.notification);
+    else refreshNotifications().catch(() => { /* the bell catches up on the next open */ });
+    refreshChrome();
+  });
+  // A conversation was renamed, given a face, had its roles changed, or lost a
+  // member. The list and the open page both hold a copy; the open page can be
+  // asked to read again by its own listener, and the list is refreshed here.
+  onRealtime(EVENTS.DM_CONVERSATION_UPDATED, (event) => {
+    refreshDms().catch(() => {});
+    refreshChrome();
+    // Being removed from a group is not a rename: the page has to leave the
+    // conversation it can no longer read.
+    const me = State.user && String(State.user.id);
+    if (event && event.reason === 'removed' && me &&
+        String(event.userId || event.user_id) === me) {
+      const here = String(window.location.pathname || '');
+      if (here.indexOf('/dms/' + event.conversationId) !== -1) navigate('/dms');
+    }
+  });
+  onRealtime(EVENTS.DM_INVITE, () => {
+    refreshDmInvites().catch(() => {});
     refreshChrome();
   });
   onRealtime(SESSION_EVENTS.PROFILE, () => {
@@ -125,7 +217,15 @@ function wireSignOut() {
   // The attribute is how a document says whether it is signed in - the checks and
   // the crash screen read it. Signing in in place has to move it too, not only a
   // reload, or a signed-in document keeps claiming it is signed out.
-  onStore('user', () => { setSession('in'); });
+  onStore('user', () => {
+    setSession('in');
+    // A session that begins in place has to open the socket as well: boot()
+    // connects only for a session that already existed at page load, and
+    // without this the app sat on REST alone - nothing live arrived until the
+    // next reload, which is the "it only does stuff on a reload" defect.
+    // connect() is idempotent: an open or connecting socket is left alone.
+    realtime.connect();
+  });
 }
 
 async function boot() {

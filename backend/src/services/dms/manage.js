@@ -44,6 +44,13 @@ async function edit(userId, conversationId, messageId, body, username) {
 
   const editedAt = now();
   await db.run('UPDATE dm_messages SET content = ?, edited_at = ? WHERE id = ?', [accepted.stored, editedAt, msg.id]);
+  // The edit event has to carry the author's profile like every other row:
+  // the client merges the event into the row it has, and a merge without the
+  // face blanks it.
+  const author = await db.get(
+    'SELECT display_name, avatar_url, is_bot FROM users WHERE id = ?',
+    [userId]
+  );
   return {
     id: msg.id,
     conversationId,
@@ -54,7 +61,9 @@ async function edit(userId, conversationId, messageId, body, username) {
     createdAt: msg.created_at,
     editedAt,
     authorId: userId,
-    authorName: username,
+    authorName: (author && (author.display_name || author.username)) || username,
+    authorAvatar: (author && author.avatar_url) || null,
+    authorIsBot: !!(author && author.is_bot),
   };
 }
 

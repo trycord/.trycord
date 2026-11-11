@@ -1,114 +1,82 @@
-// The Mobile renderer table.
+// The screens the phone answers.
 //
-// One function per page id, kept apart from the registry so the registry can be
-// read by the shell without importing every view. The mobile router binds this
-// before it dispatches, and a page with no entry here is a page that cannot be
-// opened. Every screen here is the Mobile module's own; none of it is the
-// Desktop module at a smaller width.
+// Read by the router before any view is imported, so the address table does
+// not pull the whole app into the first paint. Every entry is lazy: the view
+// arrives when its address does.
 
-import { PAGES } from '../../../packages/registry.js';
-import { renderHome } from './home.js';
-import { renderDms, renderDm } from './dms.js';
-import { renderNotifications } from './notifications.js';
-import { renderDiscover } from './discover.js';
-import { renderFriends } from './friends.js';
-import { renderMenu } from './menu.js';
-import { renderCommunities } from './communities.js';
-import { renderYou } from './you.js';
-import { renderProfile } from './profile.js';
-import { renderAuth } from './auth.js';
-import { renderSettings } from './settings.js';
-import { onboardingScreen as renderOnboarding } from './onboarding.js';
-import {
-  renderChannel, renderChannelPins, renderMembersPage, renderRolesPage,
-  renderInvitesPage, renderCategoriesPage, renderCommunitySettings, renderCommunityHome,
-} from './community.js';
-import { renderFederatedCommunity } from './federatedCommunity.js';
-import {
-  renderWorkspace, renderSpaces, renderSpace, renderDocuments, renderDocument,
-  renderBoards, renderBoard, renderCard, renderEvents, renderEvent,
-  renderPolls, renderPoll,
-} from './workspace.js';
-import {
-  renderSupport, renderLegal, renderInvite, renderServerCreate, renderNotFound,
-} from './plain.js';
-
-// Pages a reader opens once in a long while are loaded on the visit, not with
-// the shell: the developer console, the instance admin and the reader's own
-// indexes stay out of the first paint. The router awaits a page's renderer,
-// so a thunk that resolves to the real function is the same contract with a
-// smaller graph - and a page nobody opens is never downloaded.
-const lazy = (spec, name) => (ctx) => import(spec).then((m) => m[name](ctx));
-
-const auth = (ctx) => renderAuth(ctx.page, ctx.params);
-
-export const RENDERERS = {
-  home: () => renderHome(),
-  dms: () => renderDms(),
-  'dms.conversation': (ctx) => renderDm(ctx),
-  notifications: () => renderNotifications(),
-  discover: () => renderDiscover(),
-  friends: (ctx) => renderFriends(ctx),
-  menu: () => renderMenu(),
-  communities: () => renderCommunities(),
-  you: () => renderYou(),
-  profile: (ctx) => renderProfile(ctx),
-  // What the reader keeps, and what happened to the instance.
-  search: lazy('./search.js', 'renderSearch'),
-  collections: lazy('./collections.js', 'renderCollections'),
-  federation: lazy('./federation.js', 'renderFederation'),
-  status: lazy('./status.js', 'renderStatus'),
-  community: (ctx) => renderCommunityHome(ctx),
-  'community.legacy': (ctx) => renderCommunityHome(ctx),
-  'community.channel': (ctx) => renderChannel(ctx),
-  'community.channelPins': (ctx) => renderChannelPins(ctx),
-  'community.members': (ctx) => renderMembersPage(ctx),
-  'federated.community': (ctx) => renderFederatedCommunity(ctx),
-  'community.roles': (ctx) => renderRolesPage(ctx),
-  'community.invites': (ctx) => renderInvitesPage(ctx),
-  'community.categories': (ctx) => renderCategoriesPage(ctx),
-  'community.settings': (ctx) => renderCommunitySettings(ctx),
-  'community.onboarding': (ctx) => renderOnboarding(ctx),
-  'community.workspace': (ctx) => renderWorkspace(ctx),
-  'community.workspace.spaces': (ctx) => renderSpaces(ctx),
-  'community.workspace.space': (ctx) => renderSpace(ctx),
-  'community.workspace.documents': (ctx) => renderDocuments(ctx),
-  'community.workspace.document': (ctx) => renderDocument(ctx),
-  'community.workspace.boards': (ctx) => renderBoards(ctx),
-  'community.workspace.board': (ctx) => renderBoard(ctx),
-  'community.workspace.card': (ctx) => renderCard(ctx),
-  'community.workspace.events': (ctx) => renderEvents(ctx),
-  'community.workspace.event': (ctx) => renderEvent(ctx),
-  'community.workspace.polls': (ctx) => renderPolls(ctx),
-  'community.workspace.poll': (ctx) => renderPoll(ctx),
-  'community.new': () => renderServerCreate(),
-  extensions: lazy('./extensions.js', 'renderExtensions'),
-  developer: lazy('./developer.js', 'renderDeveloper'),
-  'developer.keys': lazy('./developer.js', 'renderDeveloper'),
-  'developer.applications': lazy('./developer.js', 'renderDeveloper'),
-  'developer.documentation': lazy('./developer.js', 'renderDeveloper'),
-  support: () => renderSupport(),
-  legal: (ctx) => renderLegal(ctx),
-  invite: (ctx) => renderInvite(ctx),
-  login: auth,
-  register: auth,
-  instances: lazy('./instances.js', 'renderInstances'),
-  forgot: auth,
-  resetPassword: auth,
-  verifyEmail: auth,
-  twoStep: auth,
+const lazy = (module, name) => async (ctx) => {
+  const view = await import(module);
+  return view[name](ctx);
 };
 
-// The remaining pages all belong to a scope whose sections share one renderer,
-// so they are filled from the registry rather than repeated by hand. When a
-// section gains its own treatment it moves up into the literal above.
-for (const page of PAGES) {
-  if (RENDERERS[page.id]) continue;
-  if (page.id === 'settings' || page.id.startsWith('settings.')) RENDERERS[page.id] = (ctx) => renderSettings(ctx);
-  else if (page.id.startsWith('admin')) RENDERERS[page.id] = lazy('./admin.js', 'renderAdmin');
-  else if (page.id.startsWith('community.settings.')) RENDERERS[page.id] = (ctx) => renderCommunitySettings(ctx);
-}
+export const RENDERERS = {
+  // The doors.
+  dms: lazy('./chats.js', 'renderChats'),
+  'dms.conversation': lazy('./convo.js', 'renderConvo'),
+  communities: lazy('./places.js', 'renderPlaces'),
+  you: lazy('./you.js', 'renderYou'),
+  notifications: lazy('./alerts.js', 'renderAlerts'),
 
-export { renderNotFound };
+  // The profile page: one address that is always a person's.
+  profile: lazy('./person.js', 'renderPerson'),
 
-export default { RENDERERS, renderNotFound };
+  // A place, by slug or by id, and its channel.
+  community: lazy('./place.js', 'renderPlace'),
+  'community.legacy': lazy('./place.js', 'renderPlace'),
+  'community.channel': lazy('./convo.js', 'renderConvo'),
+
+  // The place's files. The desk's studio holds the rest of the workspace.
+  'community.workspace': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.files': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.spaces': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.space': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.documents': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.document': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.boards': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.board': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.card': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.events': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.event': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.polls': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.poll': lazy('./workspace.js', 'renderWorkspace'),
+  'community.workspace.file': lazy('./workspace.js', 'renderWorkspace'),
+  'community.members': lazy('./place.js', 'renderPlace'),
+
+  // Friends has its own address on the desk; on the phone the Chats door
+  // answers for it, so an address typed or carried over still lands.
+  friends: lazy('./chats.js', 'renderChats'),
+
+  // The desk's home is the phone's Chats.
+  home: lazy('./chats.js', 'renderChats'),
+
+  // The front door and its siblings, all gates, all raw.
+  invite: lazy('./places.js', 'renderInvite'),
+  login: lazy('./auth.js', 'renderAuth'),
+  register: lazy('./auth.js', 'renderAuth'),
+  twoStep: lazy('./auth.js', 'renderAuth'),
+  forgot: lazy('./auth.js', 'renderAuth'),
+  resetPassword: lazy('./auth.js', 'renderAuth'),
+  verifyEmail: lazy('./auth.js', 'renderAuth'),
+
+  // The instance console. Every section the desk offers is answered on the
+  // phone too; the server decides who may read it.
+  admin: lazy('./admin.js', 'renderAdmin'),
+  'admin.users': lazy('./admin.js', 'renderAdmin'),
+  'admin.approvals': lazy('./admin.js', 'renderAdmin'),
+  'admin.communities': lazy('./admin.js', 'renderAdmin'),
+  'admin.reports': lazy('./admin.js', 'renderAdmin'),
+  'admin.appeals': lazy('./admin.js', 'renderAdmin'),
+  'admin.audit': lazy('./admin.js', 'renderAdmin'),
+  'admin.gdpr': lazy('./admin.js', 'renderAdmin'),
+  'admin.announcements': lazy('./admin.js', 'renderAdmin'),
+  'admin.pages': lazy('./admin.js', 'renderAdmin'),
+  'admin.settings': lazy('./admin.js', 'renderAdmin'),
+  'admin.database': lazy('./admin.js', 'renderAdmin'),
+  'admin.continuum': lazy('./admin.js', 'renderAdmin'),
+  'admin.voice': lazy('./admin.js', 'renderAdmin'),
+  'admin.diagnostics': lazy('./admin.js', 'renderAdmin'),
+  'admin.incidents': lazy('./admin.js', 'renderAdmin'),
+  'admin.federation': lazy('./admin.js', 'renderAdmin'),
+};
+
+export default { RENDERERS };

@@ -61,20 +61,29 @@ module.exports = function createRooms({ registry }) {
     set.forEach((c) => registry.deliver(c, data));
   }
 
-  function leaveServerRoom(ws) {
-    if (ws.serverRoom === undefined) return;
-    const set = serverRooms.get(String(ws.serverRoom));
-    if (set) {
-      set.delete(ws);
-      if (!set.size) serverRooms.delete(String(ws.serverRoom));
+  function leaveServerRoom(ws, serverId) {
+    // One room or all of them: a client that opens several communities at
+    // once lives in several rooms, and signing out leaves every one.
+    const keys = serverId === undefined ? [...(ws.serverRooms || [])] : [String(serverId)];
+    for (const key of keys) {
+      const set = serverRooms.get(key);
+      if (set) {
+        set.delete(ws);
+        if (!set.size) serverRooms.delete(key);
+      }
+      if (ws.serverRooms) ws.serverRooms.delete(key);
     }
-    ws.serverRoom = undefined;
   }
 
   function joinServerRoom(ws, serverId) {
-    leaveServerRoom(ws);
     const key = String(serverId);
-    ws.serverRoom = key;
+    // A socket lives in every community it has open on screen, so a change
+    // to any of them reaches it without a reload. Membership on delivery is
+    // re-checked per send, so a socket that stayed in a room it no longer
+    // belongs to is told nothing.
+    if (!ws.serverRooms) ws.serverRooms = new Set();
+    if (ws.serverRooms.has(key)) return;
+    ws.serverRooms.add(key);
     if (!serverRooms.has(key)) serverRooms.set(key, new Set());
     serverRooms.get(key).add(ws);
   }
@@ -127,7 +136,7 @@ module.exports = function createRooms({ registry }) {
       for (const c of [...servers]) {
         if (!c.user || String(c.user.id) !== who) continue;
         servers.delete(c);
-        if (c.serverRoom !== undefined && String(c.serverRoom) === target) c.serverRoom = undefined;
+        if (c.serverRooms) c.serverRooms.delete(target);
       }
       if (!servers.size) serverRooms.delete(target);
     }

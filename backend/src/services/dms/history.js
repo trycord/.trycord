@@ -97,6 +97,10 @@ async function history(userId, conversationId, { before = null, after = null, li
       editedAt: m.edited_at || null,
       authorId: m.author_id,
       authorName: m.author_display || m.author_name,
+      // The face rides with the row: the SELECT fetches it, and a message
+      // that arrives without it renders initials until the next reload.
+      authorAvatar: m.author_avatar || null,
+      authorIsBot: !!(m.author_is_bot),
       threadRootId: m.thread_root_id || null,
       replyCount: counts[m.id] || 0,
       attachments: files[m.id] || [],

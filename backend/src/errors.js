@@ -22,6 +22,14 @@ const Codes = {
   ROLE_IN_USE: 409,
   CONFLICT: 409,
   NOT_A_MEMBER: 403,
+  // A platform feature restriction is separate from a role refusal. The code
+  // tells the client which feature is unavailable without implying the
+  // account has lost access altogether.
+  FEATURE_RESTRICTED: 403,
+  // The request was understood but does not apply to this object. Kept
+  // distinct from VALIDATION_ERROR so a client does not ask the reader to
+  // correct input that was already correct.
+  NOT_APPLICABLE: 400,
   PERMISSION_DENIED: 403,
   BANNED: 403,
   TIMED_OUT: 403,
@@ -31,6 +39,7 @@ const Codes = {
   QUOTA_EXCEEDED: 413,
   SERVER_PRIVATE: 403,
   SERVER_SUSPENDED: 403,
+  SERVER_REMOVED: 403,
   SERVER_NOT_FOUND: 404,
   INVITE_INVALID: 404,
   // A refused registration is a policy decision, not a validation failure: the
@@ -44,6 +53,11 @@ const Codes = {
   BLOCKED: 403,
   NOT_ACCEPTING_DMS: 403,
   NOT_ACCEPTING_REQUESTS: 403,
+  // The profile's owner has limited who may open it. 403 and a code of its
+  // own so the client can show "this profile is private" instead of the
+  // generic permission failure, which would imply the viewer did something
+  // wrong.
+  PROFILE_PRIVATE: 403,
   // Voice and video. A feature that is switched off at the instance level is a refusal the
   // client can act on - it can hide the join control - rather than an internal error,
   // which is what an unmapped code used to become and which left a member looking at

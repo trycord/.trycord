@@ -51,7 +51,7 @@ export function renderMenu() {
       entry('Places', 'Account settings', '/settings', icon('settings', { size: 17 })),
       entry('Places', 'New community', '/servers/new', icon('plus', { size: 17 })),
       entry('Places', 'Extensions', '/extensions', icon('grid', { size: 17 })),
-      entry('Places', 'Developer', '/developer', icon('code', { size: 17 })),
+      entry('Places', 'Developer Portal', '/developers', icon('code', { size: 17 })),
     );
 
     const communities = State.servers.map((server) =>

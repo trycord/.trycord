@@ -46,7 +46,6 @@
             <div class="nav-menu-grid">
               <a href="/features"><strong>Features</strong><span>Channels, roles, moderation and more.</span></a>
               <a href="/download"><strong>Download</strong><span>Get the desktop app for your computer.</span></a>
-              <a href="/demo"><strong>Demo</strong><span>Try Trycord without an account.</span></a>
               <a href="/status"><strong>Status</strong><span>Live health for this instance.</span></a>
             </div>
           </div>
@@ -110,6 +109,8 @@
 
         <div class="nav-mobile-actions">
           <a class="btn btn-ghost btn-sm" href="/app/" data-app-link>Open the app</a>
+          <a class="btn btn-ghost btn-sm" href="/register">Create account</a>
+          <a class="btn btn-primary btn-sm" href="/login" data-signin>Sign in</a>
         </div>
       </nav>
 
@@ -118,8 +119,8 @@
           <svg class="icon icon-sun" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></svg>
           <svg class="icon icon-moon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></g></svg>
         </button>
-        <a class="btn btn-ghost btn-sm" href="/app/register" data-app-link>Create account</a>
-        <a class="btn btn-primary btn-sm" href="/app/" data-app-link>Open the app</a>
+        <a class="btn btn-ghost btn-sm" href="/register">Create account</a>
+        <a class="btn btn-primary btn-sm" href="/login" data-signin>Sign in</a>
       </div>
     </div>
   </header>
@@ -175,7 +176,6 @@
             <li><strong>Your session token.</strong> When you sign in, the server issues a signed token and the browser keeps it under a key that includes the instance's own address, so a token from one instance is never handed to another. It is sent back on each request as an authorisation header. Clearing it signs you out; it is not a cookie and it is not readable by another site.</li>
             <li><strong>Your theme and your preferences.</strong> The light or dark choice, any custom palette, the motion setting, and the layout of your workspace are stored so they survive a reload.</li>
             <li><strong>The API address you are using.</strong> If you point the client at a different instance, that address is remembered, along with the token for that instance, under that instance's own key.</li>
-            <li><strong>The demo's state.</strong> The <a href="/demo">demo</a> keeps which community you were looking at and which sample you had joined in the tab's session storage, and forgets it when the tab closes.</li>
             <li><strong>This site's theme choice.</strong> The website keeps it under its own key, separately from the application's, so a theme picked here never changes how the app looks.</li>
           </ul>
 
@@ -198,9 +198,7 @@
             A page on this site can embed an image or a link from somewhere
             else, and a browser will tell that other place your address when
             it does. The website itself embeds nothing from another origin.
-            The application connects only to the instance it is talking to,
-            and the demo connects only to the instance whose public community
-            list it is reading.
+            The application connects only to the instance it is talking to.
           </p>
 
           <h2>5. Clearing it</h2>
@@ -254,13 +252,15 @@
           <span class="brand-word">Trycord</span>
         </a>
         <p>Private, self-hostable community messaging. One client, browser and desktop.</p>
-        <a class="btn btn-primary btn-sm" href="/app/register" data-app-link>Create account</a>
+        <div class="footer-actions">
+          <a class="btn btn-primary btn-sm" href="/register">Create account</a>
+          <a class="btn btn-ghost btn-sm" href="/login" data-signin>Sign in</a>
+        </div>
       </div>
       <nav class="footer-col" aria-label="Product">
         <h2 class="footer-heading">Product</h2>
         <a href="/features">Features</a>
         <a href="/download">Desktop app</a>
-        <a href="/demo">Demo</a>
         <a href="/status">Status</a>
       </nav>
       <nav class="footer-col" aria-label="Docs">

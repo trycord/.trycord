@@ -11,25 +11,34 @@ import { fetchObjectUrl } from './api.js';
 
 const cache = new Map();
 
-export function isServerPath(url) {
-  return typeof url === 'string' && url.charAt(0) === '/' && url.indexOf('//') !== 0;
+function remember(url, fetch) {
+  // A failed read is not remembered: the file may be there next time.
+  const guarded = fetch.then((objectUrl) => {
+    if (objectUrl === null || objectUrl === undefined) cache.delete(url);
+    return objectUrl;
+  }, () => {
+    cache.delete(url);
+    return null;
+  });
+  cache.set(url, guarded);
+  return guarded;
 }
 
 export function mediaUrl(url) {
   if (!url) return Promise.resolve(null);
   if (!isServerPath(url)) return Promise.resolve(url);
-  if (!cache.has(url)) {
-    cache.set(url, fetchObjectUrl(url).catch(() => null));
-  }
+  if (!cache.has(url)) remember(url, fetchObjectUrl(url));
   return cache.get(url);
 }
 
-// A tiny marker so a caller can tell a cached load from a fresh one, and avoid
-// a flash of the fallback on a face that is already in memory.
-export function isCached(url) {
-  return cache.has(url);
+// Forget one path after its file changed, without throwing away anybody
+// else's picture or revoking blobs that drawn images still show.
+export function evictMedia(url) {
+  if (!url || !cache.has(url)) return;
+  cache.delete(url);
 }
 
+// For signing out.
 export function clearMediaCache() {
   for (const promise of cache.values()) {
     promise.then((objectUrl) => { if (objectUrl) URL.revokeObjectURL(objectUrl); }).catch(() => {});
@@ -37,9 +46,14 @@ export function clearMediaCache() {
   cache.clear();
 }
 
+export function isCached(url) {
+  return cache.has(url);
+}
 
-// Set an <img> to a protected or public address, calling `fallback` when there
-// is nothing to show rather than leaving a broken image icon.
+export function isServerPath(url) {
+  return typeof url === 'string' && url.charAt(0) === '/' && url.indexOf('//') !== 0;
+}
+
 export function applyImage(img, url, fallback) {
   if (!url) {
     if (fallback) fallback();
@@ -51,4 +65,4 @@ export function applyImage(img, url, fallback) {
   }).catch(() => { if (fallback) fallback(); });
 }
 
-export default { mediaUrl, applyImage, isCached, clearMediaCache, isServerPath };
+export default { mediaUrl, applyImage, isCached, clearMediaCache, evictMedia, isServerPath };

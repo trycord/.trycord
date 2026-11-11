@@ -61,7 +61,20 @@ function isUniqueViolation(e) {
 async function create({ name, description, joinCode, isPublic, isDiscoverable }, owner) {
   const cleanName = String(name || '').trim().slice(0, 64);
   if (!cleanName) throw { code: 'VALIDATION_ERROR', message: 'Name required' };
-  const code = String(joinCode || crypto.randomBytes(4).toString('hex')).toLowerCase();
+  if (await require('./enforcement').isRestricted(owner.id, 'CREATE_COMMUNITIES')) {
+    throw {
+      code: 'FEATURE_RESTRICTED',
+      message: 'creating communities is restricted on your account',
+    };
+  }
+  // A short code in the shortener style when the creator did not choose one.
+  const GEN_CHARS = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let code = String(joinCode || '').trim().toLowerCase();
+  if (!code) {
+    const buf = crypto.randomBytes(7);
+    code = '';
+    for (let i = 0; i < 7; i++) code += GEN_CHARS[buf[i] % GEN_CHARS.length];
+  }
   if (!/^[a-z0-9-]{3,32}$/.test(code)) {
     throw { code: 'VALIDATION_ERROR', message: 'Join code must be 3-32 characters: a-z, 0-9, -' };
   }

@@ -31,6 +31,13 @@ module.exports = (engine) => [
       enforcement_state VARCHAR(16),
       enforcement_reason TEXT,
       enforcement_updated_at VARCHAR(64),
+      enforcement_expires_at VARCHAR(64),
+      -- Soft deletion. A removed community is unreachable and disappears
+      -- from discovery, but its rows remain so the decision can be audited
+      -- and, while retention allows it, restored.
+      deleted_at      VARCHAR(64),
+      deletion_reason TEXT,
+      moderation_settings TEXT,
       -- Community customization: welcome content, guidelines, and defaults
       welcome_content TEXT,
       welcome_enabled INTEGER NOT NULL DEFAULT 0,

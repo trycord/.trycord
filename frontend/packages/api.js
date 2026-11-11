@@ -298,6 +298,7 @@ const Api = {
 
   me: () => request('GET', '/api/users/me'),
   updateMe: (body) => request('PATCH', '/api/users/me', { body }),
+  setPresence: (status) => request('PATCH', '/api/users/me/presence', { body: { status } }),
   searchUsers: (q) => request('GET', '/api/users/search?q=' + encodeURIComponent(q)),
   user: (id, serverId) => request('GET', '/api/users/' + encodeURIComponent(id)
     + (serverId ? '?serverId=' + encodeURIComponent(serverId) : '')),
@@ -341,15 +342,68 @@ const Api = {
   updateCommunityMemory: (serverId, id, body) => request('PUT', '/api/servers/' + encodeURIComponent(serverId) + '/communityMemory/' + encodeURIComponent(id), { body }),
   deleteCommunityMemory: (serverId, id) => request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/communityMemory/' + encodeURIComponent(id)),
   communityMemoryRevisions: (serverId, id) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/communityMemory/' + encodeURIComponent(id) + '/revisions'),
-  kickMember: (id, userId) =>
-    request('POST', '/api/servers/' + encodeURIComponent(id) + '/kick', { body: { userId } }),
-  banMember: (id, userId, reason) =>
-    request('POST', '/api/servers/' + encodeURIComponent(id) + '/ban', { body: { userId, reason } }),
-  unbanMember: (id, userId) =>
-    request('POST', '/api/servers/' + encodeURIComponent(id) + '/unban', { body: { userId } }),
+  kickMember: (id, userId, reason) =>
+    request('POST', '/api/servers/' + encodeURIComponent(id) + '/kick', { body: { userId, reason } }),
+  banMember: (id, userId, reason, minutes) =>
+    request('POST', '/api/servers/' + encodeURIComponent(id) + '/ban', { body: { userId, reason, minutes } }),
+  unbanMember: (id, userId, reason) =>
+    request('POST', '/api/servers/' + encodeURIComponent(id) + '/unban', { body: { userId, reason } }),
   bans: (id) => request('GET', '/api/servers/' + encodeURIComponent(id) + '/bans'),
-  timeoutMember: (id, userId, minutes) =>
-    request('POST', '/api/servers/' + encodeURIComponent(id) + '/timeout', { body: { userId, minutes } }),
+  timeoutMember: (id, userId, minutes, reason) =>
+    request('POST', '/api/servers/' + encodeURIComponent(id) + '/timeout', { body: { userId, minutes, reason } }),
+
+  // Community moderation: reports, cases, warnings, appeals and history.
+  moderationOverview: (serverId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/overview'),
+  moderationSettings: (serverId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/settings'),
+  setModerationSettings: (serverId, body) =>
+    request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/settings', { body }),
+  moderationReports: (serverId, opts) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/reports?'
+      + new URLSearchParams(Object.assign({ limit: '50' }, opts || {})).toString()),
+  moderationReport: (serverId, id) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/reports/' + encodeURIComponent(id)),
+  updateModerationReport: (serverId, id, body) =>
+    request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/reports/' + encodeURIComponent(id), { body }),
+  addModerationReportNote: (serverId, id, body) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/reports/' + encodeURIComponent(id) + '/notes', { body: { body } }),
+  addModerationReportEvidence: (serverId, id, body) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/reports/' + encodeURIComponent(id) + '/evidence', { body }),
+  moderationCases: (serverId, opts) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/cases?'
+      + new URLSearchParams(opts || {}).toString()),
+  moderationCase: (serverId, id) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/cases/' + encodeURIComponent(id)),
+  updateModerationCase: (serverId, id, body) =>
+    request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/cases/' + encodeURIComponent(id), { body }),
+  addModerationCaseNote: (serverId, id, body) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/cases/' + encodeURIComponent(id) + '/notes', { body: { body } }),
+  addModerationCaseEvidence: (serverId, id, body) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/cases/' + encodeURIComponent(id) + '/evidence', { body }),
+  moderationWarnings: (serverId, opts) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/warnings?'
+      + new URLSearchParams(opts || {}).toString()),
+  warnMember: (serverId, body) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/warnings', { body }),
+  liftMemberWarning: (serverId, actionId, reason) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/warnings/' + encodeURIComponent(actionId) + '/lift', { body: { reason } }),
+  moderationAppeals: (serverId, opts) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/appeals?'
+      + new URLSearchParams(opts || {}).toString()),
+  moderationAppeal: (serverId, id) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/appeals/' + encodeURIComponent(id)),
+  updateModerationAppeal: (serverId, id, body) =>
+    request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/appeals/' + encodeURIComponent(id), { body }),
+  addModerationAppealNote: (serverId, id, body) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/appeals/' + encodeURIComponent(id) + '/notes', { body: { body } }),
+  moderationMember: (serverId, userId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/members/' + encodeURIComponent(userId)),
+  moderationHistory: (serverId) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/history'),
+  moderationAudit: (serverId, opts) =>
+    request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/moderation/audit?'
+      + new URLSearchParams(opts || {}).toString()),
 
   // What a member can actually do in a community.
   memberPermissions: (serverId, userId) =>
@@ -456,6 +510,11 @@ const Api = {
     fd.append('file', file);
     return xhrUpload('/api/dms/' + encodeURIComponent(conversationId) + '/attachments', fd, onProgress);
   },
+  uploadWorkspaceFile: (serverId, file, onProgress) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return xhrUpload('/api/servers/' + encodeURIComponent(serverId) + '/files', fd, onProgress);
+  },
 
   mutes: () => request('GET', '/api/mutes'),
   muteChannel: (channelId) => request('POST', '/api/mutes', { body: { channelId } }),
@@ -479,6 +538,8 @@ const Api = {
   createInvite: (serverId, body) => request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/invites', { body }),
   deleteInvite: (serverId, inviteId) =>
     request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/invites/' + encodeURIComponent(inviteId)),
+  notifyInvite: (serverId, inviteId, userId) =>
+    request('POST', '/api/servers/' + encodeURIComponent(serverId) + '/invites/' + encodeURIComponent(inviteId) + '/notify', { body: { userId } }),
   joinInvite: (code) => request('POST', '/api/invites/' + encodeURIComponent(code) + '/join'),
   invitePreview: (code) => request('GET', '/api/invites/' + encodeURIComponent(code) + '/preview'),
 
@@ -514,14 +575,46 @@ const Api = {
     request('POST', '/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(messageId) + '/reactions', { body: { emoji } }),
   unreactDm: (id, messageId, emoji) =>
     request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/messages/' + encodeURIComponent(messageId) + '/reactions/' + encodeURIComponent(emoji)),
+  dmSearch: (id, q, limit) => {
+    const p = new URLSearchParams({ q: String(q || '') });
+    if (limit) p.set('limit', String(limit));
+    return request('GET', '/api/dms/' + encodeURIComponent(id) + '/messages/search?' + p.toString());
+  },
+  dmPins: (id) => request('GET', '/api/dms/' + encodeURIComponent(id) + '/pins'),
+  pinDm: (id, messageId) =>
+    request('POST', '/api/dms/' + encodeURIComponent(id) + '/pins', { body: { messageId } }),
+  unpinDm: (id, messageId) =>
+    request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/pins/' + encodeURIComponent(messageId)),
+
   // The conversations of more than two people.
   createDmGroup: (body) => request('POST', '/api/dms/groups', { body }),
   renameDmGroup: (id, name) => request('PATCH', '/api/dms/' + encodeURIComponent(id), { body: { name } }),
+  uploadDmGroupAvatar: (id, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return request('POST', '/api/dms/' + encodeURIComponent(id) + '/avatar', { body: fd, form: true });
+  },
+  removeDmGroupAvatar: (id) =>
+    request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/avatar'),
   addDmGroupMember: (id, userId) =>
     request('POST', '/api/dms/' + encodeURIComponent(id) + '/members', { body: { userId } }),
   removeDmGroupMember: (id, userId) =>
     request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/members/' + encodeURIComponent(userId)),
   leaveDmGroup: (id) => request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/members'),
+  setDmGroupRole: (id, userId, role) =>
+    request('PATCH', '/api/dms/' + encodeURIComponent(id) + '/members/' + encodeURIComponent(userId), { body: { role } }),
+  transferDmGroup: (id, userId) =>
+    request('POST', '/api/dms/' + encodeURIComponent(id) + '/transfer', { body: { userId } }),
+
+  dmInvites: () => request('GET', '/api/dms/invites'),
+  inviteDmGroup: (id, userId) =>
+    request('POST', '/api/dms/' + encodeURIComponent(id) + '/invites', { body: { userId } }),
+  cancelDmInvite: (id, inviteId) =>
+    request('DELETE', '/api/dms/' + encodeURIComponent(id) + '/invites/' + encodeURIComponent(inviteId)),
+  acceptDmInvite: (inviteId) =>
+    request('POST', '/api/dms/invites/' + encodeURIComponent(inviteId) + '/accept'),
+  declineDmInvite: (inviteId) =>
+    request('POST', '/api/dms/invites/' + encodeURIComponent(inviteId) + '/decline'),
 
   dmRead: (id) => request('POST', '/api/dms/' + encodeURIComponent(id) + '/read'),
 
@@ -537,10 +630,14 @@ const Api = {
     const o = opts || {};
     const p = new URLSearchParams({ limit: String(o.limit || 30) });
     if (o.before) p.set('before', o.before);
+    if (o.category) p.set('category', o.category);
     return request('GET', '/api/notifications?' + p.toString());
   },
   readNotification: (id) => request('POST', '/api/notifications/' + encodeURIComponent(id) + '/read'),
   readAllNotifications: () => request('POST', '/api/notifications/read-all'),
+  deleteNotification: (id) => request('DELETE', '/api/notifications/' + encodeURIComponent(id)),
+  clearNotifications: (opts) => request('DELETE', '/api/notifications'
+    + (opts && opts.readOnly ? '?read=true' : '')),
 
   announcements: () => request('GET', '/api/announcements'),
   allAnnouncements: () => request('GET', '/api/announcements/all'),
@@ -565,23 +662,46 @@ const Api = {
   requestDeletion: (body) => request('POST', '/api/account/deletion', { body }),
   cancelDeletion: () => request('POST', '/api/account/deletion/cancel'),
 
+  adminMe: () => request('GET', '/api/admin/me'),
   adminOverview: () => request('GET', '/api/admin/overview'),
   adminUsers: (opts) => request('GET', '/api/admin/users?' + new URLSearchParams(Object.assign({ limit: '25' }, opts || {})).toString()),
+  adminUser: (userId) => request('GET', '/api/admin/users/' + encodeURIComponent(userId)),
   adminUserActions: (userId) => request('GET', '/api/admin/users/' + encodeURIComponent(userId) + '/actions'),
-  approveUser: (userId) => request('POST', '/api/users/' + encodeURIComponent(userId) + '/approve', { body: {} }),
+  adminAddUserNote: (userId, body) => request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/notes', { body: { body } }),
+  approveUser: (userId) => request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/approve', { body: {} }),
   adminEnforceUser: (userId, body) => request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/enforce', { body }),
+  adminWarnUser: (userId, body) => request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/warn', { body }),
+  adminRestrictUser: (userId, body) => request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/restrict', { body }),
   adminLiftUser: (userId, reason) => request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/lift', { body: { reason } }),
+  adminLiftRestriction: (userId, restrictionId, reason) =>
+    request('POST', '/api/admin/users/' + encodeURIComponent(userId) + '/restrictions/' + encodeURIComponent(restrictionId) + '/lift', { body: { reason } }),
   adminServers: (opts) => request('GET', '/api/admin/servers?' + new URLSearchParams(Object.assign({ limit: '25' }, opts || {})).toString()),
+  adminServer: (id) => request('GET', '/api/admin/servers/' + encodeURIComponent(id)),
   adminSuspendServer: (id, body) => request('POST', '/api/admin/servers/' + encodeURIComponent(id) + '/suspend', { body }),
   adminLiftServer: (id, reason) => request('POST', '/api/admin/servers/' + encodeURIComponent(id) + '/lift', { body: { reason } }),
+  adminRemoveServer: (id, body) => request('POST', '/api/admin/servers/' + encodeURIComponent(id) + '/remove', { body }),
+  adminRestoreServer: (id, reason) => request('POST', '/api/admin/servers/' + encodeURIComponent(id) + '/restore', { body: { reason } }),
   adminReports: (opts) => request('GET', '/api/admin/reports?' + new URLSearchParams(Object.assign({ limit: '50' }, opts || {})).toString()),
   adminApprovals: (opts) => request('GET', '/api/admin/approvals?' + new URLSearchParams(Object.assign({ limit: '50' }, opts || {})).toString()),
   adminReport: (id) => request('GET', '/api/admin/reports/' + encodeURIComponent(id)),
   adminUpdateReport: (id, body) => request('PATCH', '/api/admin/reports/' + encodeURIComponent(id), { body }),
+  adminAddReportNote: (id, body) => request('POST', '/api/admin/reports/' + encodeURIComponent(id) + '/notes', { body: { body } }),
+  adminAddReportEvidence: (id, body) => request('POST', '/api/admin/reports/' + encodeURIComponent(id) + '/evidence', { body }),
+  adminCases: (opts) => request('GET', '/api/admin/cases?' + new URLSearchParams(opts || {}).toString()),
+  adminCase: (id) => request('GET', '/api/admin/cases/' + encodeURIComponent(id)),
+  adminUpdateCase: (id, body) => request('PATCH', '/api/admin/cases/' + encodeURIComponent(id), { body }),
+  adminAddCaseNote: (id, body) => request('POST', '/api/admin/cases/' + encodeURIComponent(id) + '/notes', { body: { body } }),
+  adminAddCaseEvidence: (id, body) => request('POST', '/api/admin/cases/' + encodeURIComponent(id) + '/evidence', { body }),
   adminAppeals: (opts) => request('GET', '/api/admin/appeals?' + new URLSearchParams(Object.assign({ limit: '50' }, opts || {})).toString()),
   adminAppeal: (id) => request('GET', '/api/admin/appeals/' + encodeURIComponent(id)),
-  adminDecideAppeal: (id, decision, reason) => request('PATCH', '/api/admin/appeals/' + encodeURIComponent(id), { body: { decision, reason } }),
+  adminDecideAppeal: (id, decision, reason) => request('PATCH', '/api/admin/appeals/' + encodeURIComponent(id), { body: { decision, note: reason } }),
+  adminUpdateAppealStatus: (id, status) => request('PATCH', '/api/admin/appeals/' + encodeURIComponent(id), { body: { status } }),
+  adminAddAppealNote: (id, body) => request('POST', '/api/admin/appeals/' + encodeURIComponent(id) + '/notes', { body: { body } }),
   adminAudit: (opts) => request('GET', '/api/admin/audit?' + new URLSearchParams(Object.assign({ limit: '50' }, opts || {})).toString()),
+  adminVerifyAudit: () => request('GET', '/api/admin/audit/verify'),
+  adminRoles: () => request('GET', '/api/admin/roles'),
+  adminSetRole: (userId, role) => request('POST', '/api/admin/roles', { body: { userId, role } }),
+  adminRemoveRole: (userId) => request('DELETE', '/api/admin/roles/' + encodeURIComponent(userId)),
   adminGdprRequests: (opts) => request('GET', '/api/admin/gdpr/requests?' + new URLSearchParams(Object.assign({ limit: '50' }, opts || {})).toString()),
   adminReviewGdprRequest: (id, decision, note) =>
     request('POST', '/api/admin/gdpr/requests/' + encodeURIComponent(id) + '/review', { body: { decision, note } }),
@@ -644,8 +764,9 @@ const Api = {
 
   reports: (body) => request('POST', '/api/reports', { body }),
   myReports: () => request('GET', '/api/reports/mine'),
-  appeals: (body) => request('POST', '/api/appeals', { body, auth: false }),
+  appeals: (body) => request('POST', '/api/appeals', { body }),
   myAppeals: () => request('GET', '/api/appeals/mine'),
+  eligibleAppeals: () => request('GET', '/api/appeals/eligible'),
 
   // ---- the things a reader keeps --------------------------------------------
   // A template is a named piece of text the reader inserts; a collection is a

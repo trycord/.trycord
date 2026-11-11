@@ -14,6 +14,7 @@ import { icon } from '../../packages/icons.js';
 import { initials, hueOf } from '../../packages/format.js';
 import { mediaUrl, isServerPath } from '../../packages/media.js';
 import { avatarUrlOf, serverIconOf } from '../../packages/identity.js';
+import { State } from '../../packages/store.js';
 
 function identityGradient(hue) {
   const second = (hue + 38) % 360;
@@ -24,9 +25,18 @@ function identityGradient(hue) {
 // stores resolves through the media pack, a plain URL is used as given.
 function paintImage(node, url) {
   if (!url) return;
+  const fallbackChildren = [...node.childNodes];
+  const fallbackBackground = node.style.background;
   const apply = (src) => {
     node.textContent = '';
-    node.appendChild(el('img', { src, alt: '', loading: 'lazy' }));
+    const img = el('img', { src, alt: '', loading: 'lazy' });
+    // A picture that will not load puts the initials back, not a broken-image icon.
+    img.addEventListener('error', () => {
+      node.textContent = '';
+      node.style.background = fallbackBackground;
+      node.replaceChildren(...fallbackChildren);
+    });
+    node.appendChild(img);
     node.style.background = 'transparent';
   };
   if (isServerPath(url)) mediaUrl(url).then((resolved) => { if (resolved) apply(resolved); });
@@ -35,8 +45,12 @@ function paintImage(node, url) {
 
 export function avatar(user, options) {
   const opts = options || {};
-  const name = opts.name || (user && (user.nickname || user.displayName || user.username)) || '';
-  const hue = hueOf((user && user.id) || name);
+  // The reader's own face resolves from the session, so a new picture
+  // shows on the next repaint of rows already on the screen.
+  let who = user;
+  if (who && who.id && State.user && String(who.id) === String(State.user.id)) who = State.user;
+  const name = opts.name || (who && (who.nickname || who.displayName || who.username)) || '';
+  const hue = hueOf((who && who.id) || name);
 
   const node = el('span', {
     class: 'avatar avatar--' + (opts.size || 'md') + (opts.rounded ? ' avatar--rounded' : ''),
@@ -47,7 +61,7 @@ export function avatar(user, options) {
     style: { background: identityGradient(hue) },
   }, initials(name));
 
-  paintImage(node, avatarUrlOf(user));
+  paintImage(node, avatarUrlOf(who));
 
   if (opts.presence) {
     node.appendChild(el('span', {

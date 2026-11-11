@@ -169,6 +169,28 @@
     });
   }
 
+  /* ---- the sign-in door ---------------------------------------------------
+     A reader who is already signed in does not need a form: the header's
+     primary action becomes the way into the application, at the mount this
+     instance actually uses. A reader without a session keeps "Sign in", which
+     is the site's own page. The check is the same token the application reads,
+     filed under the API's origin, so the two surfaces cannot disagree. */
+  var signInLinks = Array.prototype.slice.call(document.querySelectorAll('[data-signin]'));
+  if (signInLinks.length && window.TrycordApi
+      && typeof window.TrycordApi.signedIn === 'function'
+      && typeof window.TrycordApi.appHref === 'function') {
+    window.TrycordApi.signedIn().then(function (signedIn) {
+      if (!signedIn) return;
+      return window.TrycordApi.appHref('').then(function (href) {
+        signInLinks.forEach(function (link) {
+          link.textContent = 'Open the app';
+          link.removeAttribute('data-signin');
+          if (href) link.setAttribute('href', href);
+        });
+      });
+    }).catch(function () { /* the sign-in page still answers */ });
+  }
+
   var reveals = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
   if (reveals.length && 'IntersectionObserver' in window) {
     document.documentElement.classList.add('js');

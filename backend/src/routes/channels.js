@@ -121,6 +121,7 @@ router.get('/:channelId/pins', requireMember, async (req, res, next) => {
     if (!ch) return fail(res, 'NOT_A_MEMBER', 'channel not found or not a member');
     const rows = await db.all(
       `SELECT m.*, u.username AS author_name, u.display_name AS author_display,
+              u.avatar_url AS author_avatar, u.banner_url AS author_banner, u.is_bot AS author_is_bot,
               p.pinned_by, p.pinned_at
        FROM pinned_messages p
        JOIN messages m ON m.id = p.message_id

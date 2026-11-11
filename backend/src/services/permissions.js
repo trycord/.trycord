@@ -9,6 +9,7 @@ const PERMISSIONS = {
   MANAGE_INVITES: 'Create and revoke invites.',
   KICK_MEMBERS: 'Remove members from the server.',
   BAN_MEMBERS: 'Ban or unban members and manage timeouts. Unbanning is not limited by rank.',
+  MANAGE_REPORTS: 'Review, assign and resolve community reports, and decide community appeals.',
   MANAGE_MESSAGES: 'Delete any message in the server.',
   SEND_MESSAGES: 'Post messages in channels.',
   MEMORIZE: 'Create and edit community memory entries.',

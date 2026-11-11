@@ -20,24 +20,11 @@
   <meta name="apple-mobile-web-app-title" content="Trycord">
   <meta name="theme-color" content="#141519">
 
-  <link rel="stylesheet" href="./css/app.css?v=2">
+  <link rel="stylesheet" href="./css/app.css?v=3">
 
-  <script>
-    // One fact the first paint depends on, decided here so the theme cannot flash:
-    // the stored theme. Which module this document is - Desktop - is not decided
-    // here; a phone reader gets the Mobile document instead, and this entry hands a
-    // phone over before it builds any chrome (see js/main.js).
-    (function () {
-      var root = document.documentElement;
-      var theme = null;
-      try { theme = localStorage.getItem('trycord.theme'); } catch (e) { theme = null; }
-      if (!theme) {
-        theme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches)
-          ? 'light' : 'trycord';
-      }
-      root.setAttribute('data-theme', theme);
-    })();
-  </script>
+  <!-- The stored theme, applied before the first paint. A file rather than an
+       inline script, because the served policy refuses inline script. -->
+  <script src="./js/theme-bootstrap.js"></script>
 </head>
 <body>
   <!-- One mount point. The whole interface is built by js/main.js, so there is

@@ -5,6 +5,7 @@
 const db = require('../db');
 const { now, uuid } = require('../util');
 const wellbeing = require('./wellbeing');
+const prefs = require('./prefs');
 
 // The kinds of notification this instance can raise.
 //
@@ -18,7 +19,77 @@ const wellbeing = require('./wellbeing');
 const TYPES = [
   'dm', 'friend_request', 'friend_accepted', 'mention', 'reply',
   'card_assigned', 'event_reminder',
+  // Direct conversations of more than two people. An invitation is distinct
+  // from membership: being added is a fact, being invited is a question.
+  'group_invite', 'group_member_added', 'group_member_removed',
+  'group_role_changed', 'group_ownership_transferred',
+  // Communities. The invite carries the invite code as its reference, so the
+  // recipient can join without the sender having to paste it elsewhere.
+  'community_invite', 'community_event',
+  // Trust & Safety. These are decision notifications, not a live feed of
+  // investigation detail: they name the action and point at the case/appeal,
+  // and never carry internal notes or evidence.
+  'moderation_action', 'moderation_warning', 'moderation_lift',
+  'report_update', 'appeal_update', 'community_moderation',
 ];
+
+// The category a type belongs to. Preferences are stored by category, and a
+// type with no category would be a notification the settings screen cannot
+// switch off - which is not a setting, it is an omission.
+const CATEGORY_OF = {
+  dm: 'dm',
+  mention: 'mention',
+  reply: 'mention',
+  friend_request: 'friend',
+  friend_accepted: 'friend',
+  group_invite: 'group',
+  group_member_added: 'group',
+  group_member_removed: 'group',
+  group_role_changed: 'group',
+  group_ownership_transferred: 'group',
+  community_invite: 'community',
+  community_event: 'community',
+  card_assigned: 'announcement',
+  event_reminder: 'announcement',
+  moderation_action: 'moderation',
+  moderation_warning: 'moderation',
+  moderation_lift: 'moderation',
+  report_update: 'moderation',
+  appeal_update: 'moderation',
+  community_moderation: 'moderation',
+};
+
+function categoryOf(type) {
+  return CATEGORY_OF[type] || 'announcement';
+}
+
+// Whether the account wants this category at all. An absent row is every
+// default on, so this changes nothing for an account that never opened the
+// settings. A category switched off suppresses the row as well as the push:
+// persisting it would still show it in the list and count it in the badge,
+// which is the opposite of what the setting says.
+async function wanted(userId, type) {
+  try {
+    const p = await prefs.getNotificationPrefs(userId);
+    const category = categoryOf(type);
+    return p[category] !== false;
+  } catch {
+    return true;
+  }
+}
+
+// 'dnd' is a presence state as well as a wellbeing setting. A person who has
+// told the instance "do not disturb" means it here too; the row is still
+// written, only the interruption is held.
+async function inDnd(userId) {
+  try {
+    const row = await db.get('SELECT presence_status FROM users WHERE id = ?', [userId]);
+    return !!row && row.presence_status === 'dnd';
+  } catch {
+    return false;
+  }
+}
+
 
 // `held` means this account's wellbeing settings say not to interrupt them right now.
 // The row is still written: a held notification is waiting next time they open the app,
@@ -26,24 +97,56 @@ const TYPES = [
 //
 // Without this the setting was stored, returned by the API and shown in Settings, and
 // nothing ever read it - a toggle that changes nothing.
-async function create(userId, type, actorId, referenceId) {
+async function create(userId, type, actorId, referenceId, options = {}) {
   if (TYPES.indexOf(type) === -1) throw { code: 'VALIDATION_ERROR', message: 'Unknown notification type.' };
+  if (!(await wanted(userId, type))) {
+    // The preference is about not being told, so there is nothing to hold for
+    // later and nothing to show in the list. Callers that send the realtime
+    // event must check `notification` before doing so.
+    return { notification: null, held: false, suppressed: true, duplicate: false };
+  }
+  const opts = options && typeof options === 'object' ? options : {};
   const row = {
     id: uuid(), user_id: userId, type,
     actor_id: actorId || null, reference_id: referenceId || null,
+    dedupe_key: opts.dedupeKey ? String(opts.dedupeKey).slice(0, 128) : null,
+    detail: opts.detail ? String(opts.detail).slice(0, 500) : null,
     created_at: now(), read_at: null,
   };
-  await db.run(
-    'INSERT INTO notifications (id, user_id, type, actor_id, reference_id, created_at, read_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [row.id, row.user_id, row.type, row.actor_id, row.reference_id, row.created_at, row.read_at]
-  );
-  return { notification: shape(row, null), held: await wellbeing.holds(userId, type) };
+  try {
+    await db.run(
+      `INSERT INTO notifications
+         (id, user_id, type, actor_id, reference_id, dedupe_key, detail, created_at, read_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [row.id, row.user_id, row.type, row.actor_id, row.reference_id,
+        row.dedupe_key, row.detail, row.created_at, row.read_at]
+    );
+  } catch (error) {
+    // The dedupe key is the idempotency contract. If this event has already
+    // been delivered, return the row that exists rather than creating a
+    // second, contradictory notification.
+    if (row.dedupe_key && db.isUniqueViolation(error)) {
+      const existing = await db.get('SELECT * FROM notifications WHERE dedupe_key = ?', [row.dedupe_key]);
+      if (existing) {
+        return { notification: shape(existing, null), held: false, duplicate: true };
+      }
+    }
+    throw error;
+  }
+  const quiet = await wellbeing.holds(userId, type);
+  return {
+    notification: shape(row, null),
+    held: quiet || await inDnd(userId),
+    suppressed: false,
+    duplicate: false,
+  };
 }
 
 function shape(n, actor) {
   return {
-    id: n.id, type: n.type, createdAt: n.created_at, readAt: n.read_at,
-    referenceId: n.reference_id,
+    id: n.id, type: n.type, category: categoryOf(n.type),
+    createdAt: n.created_at, readAt: n.read_at,
+    referenceId: n.reference_id, detail: n.detail || null,
     // The actor, with their picture. A notification that shows a name and no
     // face is a notification about somebody the reader cannot recognise.
     actor: actor ? {
@@ -80,28 +183,39 @@ function decodeCursor(raw) {
   return { createdAt, id };
 }
 
-async function list(userId, limit, cursor) {
+async function list(userId, limit, cursor, category) {
   const lim = Math.min(Math.max(parseInt(limit, 10) || 30, 1), 100);
   const anchor = decodeCursor(cursor);
 
-  // One extra row tells us whether another page exists without a second count
-  // query.
+  // A category narrows the list to the types that belong to it. The mapping
+  // lives beside the closed type list, so a new notification cannot be added
+  // without deciding which switch controls it.
+  const wantedCategory = category ? String(category) : null;
+  const categoryTypes = wantedCategory
+    ? TYPES.filter((t) => categoryOf(t) === wantedCategory)
+    : null;
+  if (wantedCategory && !categoryTypes.length) {
+    throw { code: 'VALIDATION_ERROR', message: 'Unknown notification category.' };
+  }
+  const typeClause = categoryTypes ? ` AND n.type IN (${categoryTypes.map(() => '?').join(',')})` : '';
+  const typeParams = categoryTypes || [];
+
   let rows;
   if (anchor) {
     rows = await db.all(
       `SELECT n.*, u.username AS actor_name, u.display_name AS actor_display, u.avatar_url AS actor_avatar
        FROM notifications n LEFT JOIN users u ON u.id = n.actor_id
        WHERE n.user_id = ?
-         AND (n.created_at < ? OR (n.created_at = ? AND n.id < ?))
+         AND (n.created_at < ? OR (n.created_at = ? AND n.id < ?))${typeClause}
        ORDER BY n.created_at DESC, n.id DESC LIMIT ${lim + 1}`,
-      [userId, anchor.createdAt, anchor.createdAt, anchor.id]
+      [userId, anchor.createdAt, anchor.createdAt, anchor.id].concat(typeParams)
     );
   } else {
     rows = await db.all(
       `SELECT n.*, u.username AS actor_name, u.display_name AS actor_display, u.avatar_url AS actor_avatar
        FROM notifications n LEFT JOIN users u ON u.id = n.actor_id
-       WHERE n.user_id = ? ORDER BY n.created_at DESC, n.id DESC LIMIT ${lim + 1}`,
-      [userId]
+       WHERE n.user_id = ?${typeClause} ORDER BY n.created_at DESC, n.id DESC LIMIT ${lim + 1}`,
+      [userId].concat(typeParams)
     );
   }
 
@@ -112,6 +226,16 @@ async function list(userId, limit, cursor) {
     'SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL',
     [userId]
   );
+  const unreadRows = await db.all(
+    `SELECT type, COUNT(*) AS n FROM notifications
+     WHERE user_id = ? AND read_at IS NULL GROUP BY type`,
+    [userId]
+  );
+  const unreadByCategory = {};
+  for (const r of unreadRows) {
+    const key = categoryOf(r.type);
+    unreadByCategory[key] = (unreadByCategory[key] || 0) + Number(r.n || 0);
+  }
   // Deep links: batch-resolve the referenced message so the client can jump
   // straight to it. Mentions and channel replies resolve to a channel, DM
   // replies to a conversation. Missing rows (deleted messages) simply carry no
@@ -142,10 +266,47 @@ async function list(userId, limit, cursor) {
       ctx[String(f.mid)] = { conversationId: String(f.conversation_id), messageId: String(f.mid) };
     }
   }
+  // Workspace reminders name the event, and assignments name the card. The
+  // client needs the community and board as well as the id, because neither
+  // has a route of its own outside its community. The title and time are not
+  // copied into the notification: they are read from the workspace, which
+  // stays the authority if the event was moved or the card renamed.
+  const eventIds = [...new Set(rows
+    .filter((r) => r.type === 'event_reminder' && r.reference_id)
+    .map((r) => String(r.reference_id)))];
+  if (eventIds.length) {
+    const placeholders = eventIds.map(() => '?').join(',');
+    const found = await db.all(
+      `SELECT id, server_id FROM events WHERE id IN (${placeholders})`,
+      eventIds
+    );
+    for (const f of found) {
+      ctx[String(f.id)] = { serverId: String(f.server_id), eventId: String(f.id) };
+    }
+  }
+  const cardIds = [...new Set(rows
+    .filter((r) => r.type === 'card_assigned' && r.reference_id)
+    .map((r) => String(r.reference_id)))];
+  if (cardIds.length) {
+    const placeholders = cardIds.map(() => '?').join(',');
+    const found = await db.all(
+      `SELECT id, server_id, board_id FROM cards WHERE id IN (${placeholders})`,
+      cardIds
+    );
+    for (const f of found) {
+      ctx[String(f.id)] = {
+        serverId: String(f.server_id),
+        boardId: String(f.board_id),
+        cardId: String(f.id),
+      };
+    }
+  }
   return {
     // Unread is a whole-account badge count, not a per-page count, so it must
     // not shrink just because the caller paged.
     unreadCount: unread ? unread.n : 0,
+    unreadByCategory,
+    category: wantedCategory,
     items: rows.map((r) => {
       const out = shape(r, r.actor_name ? {
         id: r.actor_id,
@@ -153,7 +314,7 @@ async function list(userId, limit, cursor) {
         display_name: r.actor_display,
         avatar_url: r.actor_avatar,
       } : null);
-      if ((r.type === 'mention' || r.type === 'reply') && ctx[String(r.reference_id)]) {
+      if (ctx[String(r.reference_id)]) {
         out.context = ctx[String(r.reference_id)];
       }
       return out;
@@ -176,4 +337,26 @@ async function markAllRead(userId) {
   return { ok: true };
 }
 
-module.exports = { TYPES, create, list, markRead, markAllRead };
+// Remove one notification. Scoped to the owner by the same condition as every
+// other query here; a caller who knows another account's id learns nothing.
+async function remove(userId, id) {
+  const n = await db.get('SELECT id FROM notifications WHERE id = ? AND user_id = ?', [id, userId]);
+  if (!n) throw { code: 'NOT_FOUND', message: 'Notification not found' };
+  await db.run('DELETE FROM notifications WHERE id = ? AND user_id = ?', [id, userId]);
+  return { id, deleted: true };
+}
+
+// Clear the list. `read` narrows it to the ones already read, which is the
+// common "clear the ones I have dealt with" action; omitting it clears all.
+async function clear(userId, { read } = {}) {
+  const onlyRead = read === true || read === 'true' || read === 1 || read === '1';
+  if (onlyRead) {
+    await db.run('DELETE FROM notifications WHERE user_id = ? AND read_at IS NOT NULL', [userId]);
+  } else {
+    await db.run('DELETE FROM notifications WHERE user_id = ?', [userId]);
+  }
+  const left = await db.get('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ?', [userId]);
+  return { ok: true, remaining: Number((left && left.n) || 0) };
+}
+
+module.exports = { TYPES, CATEGORY_OF, categoryOf, create, list, markRead, markAllRead, remove, clear };

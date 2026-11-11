@@ -28,17 +28,24 @@ const APP_ROUTE_PREFIXES = new Set([
 ]);
 
 // The clean URLs the public site mounts, one per file. A single list drives the
-// routes and the sitemap so the two cannot disagree, and the check in
-// scripts/check-public-site.js asserts them against each other. editable marks
-// the pages served through the page editor; everything else is served verbatim
-// from disk.
+// routes and the sitemap so the two cannot disagree, and the links check in
+// public/tests/links.test.js reads this list and the files on disk and fails
+// the build if a route, a file or a link is missing. editable marks the pages
+// served through the page editor; everything else is served verbatim from disk.
 const CLEAN_PAGES = [
-  { route: '/demo', file: 'demo.html' },
+  // The public site owns the whole account gate, not only its sign-in half.
+  // These pages are not listed in the sitemap: a page whose only purpose is
+  // to take a password or consume a one-time link is not a search result.
+  { route: '/login', file: 'login.html', listed: false },
+  { route: '/register', file: 'register.html', listed: false },
+  { route: '/forgot', file: 'forgot.html', listed: false },
+  { route: '/reset-password', file: 'reset-password.html', listed: false },
+  { route: '/verify-email', file: 'verify-email.html', listed: false },
   { route: '/communities', file: 'communities.html' },
   { route: '/instances', file: 'instances.html' },
   { route: '/features', file: 'features.html' },
   { route: '/docs', file: 'documentation.html' },
-  { route: '/developers', file: 'developers.html' },
+  { route: '/developers', file: 'developers.html', listed: false },
   { route: '/download', file: 'download.html' },
   { route: '/faq', file: 'faq.html' },
   { route: '/install', file: 'install.html' },
@@ -321,15 +328,44 @@ function mountClient(app, opts) {
     if (allowClientStaticBackend) allowClientStaticBackend(candidate);
     return candidate;
   }
+}
 
-  // The paths are listed because "no index.html found next to the server" tells an
-  // operator nothing about where the server actually looked, and the usual cause is a
-  // layout that is fine but different from the one this file assumes.
-  console.warn('[warn] web client NOT served: no index.html in any of these paths:');
-  for (const t of tried) console.warn('         ' + t);
-  console.warn('         Set TRYCORD_CLIENT_DIR to the directory holding index.html, '
-    + 'or ignore this if this instance is API-only.');
-  return null;
+// Mount the developer portal at /applications/
+function mountPortal(app, opts) {
+  const { serverDir, originOf, cspOriginOf } = opts;
+  // Portal is at .trycord/frontend/portal
+  const portalDir = path.join(__dirname, '../../frontend/portal');
+
+  if (!fs.existsSync(path.join(portalDir, 'index.html'))) {
+    console.warn('[warn] developer portal NOT served: no index.html in ' + portalDir);
+    return null;
+  }
+
+  const staticOptions = (extra) => Object.assign({
+    index: false,
+    setHeaders(res, filePath) {
+      if (/(^|[\\/])(index\.html|config\.js)$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'no-store');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=60');
+      }
+    },
+  }, extra);
+
+  // Serve portal static files (for /applications/* paths)
+  app.use('/applications', express.static(portalDir, staticOptions({ redirect: false })));
+
+  // Special handler for /applications root to inject base tag
+  app.get('/applications', (req, res) => {
+    fs.readFile(path.join(portalDir, 'index.html'), 'utf8', (err, html) => {
+      if (err) { res.status(500).send('Error loading portal'); return; }
+      res.setHeader('Cache-Control', 'no-store');
+      res.type('html').send(html.replace(/<base href="[^"]*">/i, `<base href="/applications/">`));
+    });
+  });
+
+  console.log('[info] serving developer portal from ' + portalDir + ' at /applications');
+  return portalDir;
 }
 
 // The optional public website: plain editable HTML under the same origin as the app,
@@ -368,10 +404,10 @@ function mountPublicSite(app, opts) {
   // The public site's own backend.json, rewritten to the origin that served
   // it.
   //
-  // The demo and the community directory read the instance's API. The site and
-  // the API are not always the same origin - the site is often a static
-  // deployment elsewhere - so a relative '/api/...' on the site reaches the
-  // site, which has no API, and the page answers 404. The file names the
+  // The community directory on the public site reads the instance's API. The
+  // site and the API are not always the same origin - the site is often a
+  // static deployment elsewhere - so a relative '/api/...' on the site reaches
+  // the site, which has no API, and the page answers 404. The file names the
   // address; here it is rewritten to whoever is serving, which is the same
   // rule the client's copy follows.
   //
@@ -502,19 +538,29 @@ function mountPublicSite(app, opts) {
 
   // Map one public HTML file to one clean URL. Missing files fall back to the site's
   // own 404 page instead of a bare Express "Cannot GET".
-  const publicPage = (name) => {
+  const publicPage = (name, canonicalRoute) => {
     return (req, res) => {
       const exists = fs.existsSync(path.join(publicDir, name));
-      sendPublic(res, exists ? name : '404.html', exists ? 200 : 404, req, req.path);
+      // A token route is served by the same document as its tokenless form.
+      // The canonical address is the tokenless one: a one-time credential
+      // does not belong in a canonical link or an Open Graph URL.
+      sendPublic(res, exists ? name : '404.html', exists ? 200 : 404, req,
+        canonicalRoute || req.path);
     };
   };
 
-  // One list drives the routes, the sitemap, and the check that keeps them in
-  // agreement, so a route cannot exist here and be missing from the sitemap, or
-  // the other way round.
+  // One list drives the routes and the sitemap, and the links check reads it
+  // against the files on disk, so a route cannot exist here and be missing
+  // from the sitemap or from the site, or the other way round.
   for (const p of CLEAN_PAGES) {
     app.get(p.route, p.editable ? editablePage(p.file, p.route.replace(/^\//, '')) : publicPage(p.file));
   }
+  // Email links carry the token as a path segment. The public site owns these
+  // addresses, so a reset or verification sent by this instance lands on the
+  // page that explains it rather than on the application shell. The tokenless
+  // route above remains the canonical address.
+  app.get('/reset-password/:token', publicPage('reset-password.html', '/reset-password'));
+  app.get('/verify-email/:token', publicPage('verify-email.html', '/verify-email'));
   // Contact was merged into Support: /contact redirects rather than 404ing, so
   // existing inbound links and bookmarks keep working.
   app.get('/contact', (req, res) => res.redirect(301, '/support'));
@@ -542,6 +588,13 @@ function mountPublicSite(app, opts) {
       'Allow: /',
       'Disallow: /api/',
       'Disallow: /app/',
+      // The account gate is for people, not crawlers: it holds no content
+      // and every useful answer behind it needs a session or a one-time link.
+      'Disallow: /login',
+      'Disallow: /register',
+      'Disallow: /forgot',
+      'Disallow: /reset-password',
+      'Disallow: /verify-email',
       'Disallow: /uploads',
       '',
       'Sitemap: ' + siteOrigin(req) + '/sitemap.xml',
@@ -553,7 +606,9 @@ function mountPublicSite(app, opts) {
     const esc = (s) => String(s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     const routes = ['/'].concat(
-      CLEAN_PAGES.filter((p) => fs.existsSync(path.join(publicDir, p.file))).map((p) => p.route)
+      CLEAN_PAGES
+        .filter((p) => p.listed !== false && fs.existsSync(path.join(publicDir, p.file)))
+        .map((p) => p.route)
     );
     const origin = siteOrigin(req);
     const urls = routes.map((r) => '  <url><loc>' + esc(origin + r) + '</loc></url>').join('\n');
@@ -698,6 +753,7 @@ function mountSpaFallback(app, opts) {
 
 module.exports = {
   mountClient,
+  mountPortal,
   mountPublicSite,
   mountSpaFallback,
   originOf,

@@ -199,7 +199,7 @@ module.exports = function createFrames({ rooms, registry }) {
           kind: 'channel', scopeId: ch.id, rootId: threadRootId,
           replyId: msg.id, authorId: user.id,
         });
-        if (r && !r.held) {
+        if (r && r.notification && !r.held) {
           registry.sendToUser(r.userId, { type: EVENTS.NOTIFICATION, notification: r.notification });
         }
       } catch { /* a missing notification must not fail the post */ }
@@ -224,7 +224,7 @@ module.exports = function createFrames({ rooms, registry }) {
         return;
       }
       case 'leave-server':
-        rooms.leaveServerRoom(ws);
+        rooms.leaveServerRoom(ws, data.serverId);
         return;
 
       case 'msg':

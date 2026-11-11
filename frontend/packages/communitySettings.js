@@ -183,6 +183,7 @@ export const COMMUNITY_ROUTES = [
   { id: 'invites.read', method: 'GET', path: '/api/servers/:serverId/invites', call: 'invites', surfaces: ['invites'] },
   { id: 'invites.create', method: 'POST', path: '/api/servers/:serverId/invites', call: 'createInvite', surfaces: ['invites'] },
   { id: 'invites.remove', method: 'DELETE', path: '/api/servers/:serverId/invites/:inviteId', call: 'deleteInvite', surfaces: ['invites'] },
+  { id: 'invites.notify', method: 'POST', path: '/api/servers/:serverId/invites/:inviteId/notify', call: 'notifyInvite', surfaces: ['invites'] },
 
   // The webhooks.
   { id: 'webhooks.read', method: 'GET', path: '/api/servers/:serverId/webhooks', call: 'webhooks', surfaces: ['integrations'] },

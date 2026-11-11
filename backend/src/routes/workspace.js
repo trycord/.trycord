@@ -27,6 +27,10 @@ const documents = require('../services/workspace/documents');
 const boards = require('../services/workspace/boards');
 const workspaceEvents = require('../services/workspace/events');
 const polls = require('../services/workspace/polls');
+const files = require('../services/workspace/files');
+const memberships = require('../services/memberships');
+const uploads = require('../services/uploads');
+const { singleFile } = require('../middleware/upload');
 
 const router = express.Router({ mergeParams: true });
 router.use(auth, resolveServer);
@@ -485,5 +489,62 @@ router.post('/polls/:pollId/close', requireMember,
     events.emit(req.server.id, 'workspace_poll_closed', { pollId: poll.id });
     res.json(out);
   }));
+
+// ---- files: the community's own store -----------------------------------
+//
+// A file the workspace keeps, not a file a message carries. Uploading is the
+// same member write posting a card is (SEND_MESSAGES, never while timed
+// out); listing and downloading are what being a member already means;
+// removing is the uploader's or a moderator's.
+
+router.get('/files', requireMember, wrap(async (req, res) => {
+  res.json(await files.list(req.server.id));
+}));
+
+router.post('/files', requirePerm('SEND_MESSAGES'),
+  rateLimit({ windowMs: 60000, max: 30, key: 'workspace:files' }),
+  singleFile,
+  wrap(async (req, res) => {
+    if (!require('../features').current.uploads) {
+      return fail(res, 'FEATURE_DISABLED', 'file uploads are off on this instance', 403);
+    }
+    if (await memberships.isTimedOut(req.server.id, req.user.id)) {
+      return fail(res, 'TIMED_OUT', 'you are timed out in this server');
+    }
+    const out = await files.store(req.server.id, req.user.id, req.file);
+    if (out.error) return fail(res, out.error, out.message);
+    events.emit(req.server.id, 'workspace_file_created', {
+      fileId: out.id, name: out.name, uploadedBy: req.user.id,
+    });
+    res.status(201).json(out);
+  }));
+
+router.get('/files/:fileId/download', requireMember, wrap(async (req, res) => {
+  const row = await files.authorized(req.user.id, req.server.id, req.params.fileId);
+  if (!row) return fail(res, 'NOT_FOUND', 'file not found');
+  const disp = encodeURIComponent(row.name).replace(/['()]/g, (c) => '%' + c.charCodeAt(0).toString(16));
+  // The same serving rule as a message attachment: a recognised image, PDF or
+  // text file is shown in place; everything else - including anything named
+  // .html or .svg - is sent as an octet-stream download.
+  const inline = uploads.isInlineMime(row.mime);
+  res.setHeader('Content-Type', inline ? row.mime : uploads.UNKNOWN_MIME);
+  res.setHeader('Content-Disposition', (inline ? 'inline' : 'attachment') + "; filename*=UTF-8''" + disp);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  const stream = files.open(row);
+  stream.on('error', () => { if (!res.headersSent) fail(res, 'NOT_FOUND', 'file not found'); });
+  stream.pipe(res);
+}));
+
+router.delete('/files/:fileId', requireMember, wrap(async (req, res) => {
+  const row = await files.get(req.server.id, req.params.fileId);
+  if (!row) return fail(res, 'NOT_FOUND', 'file not found');
+  if (String(row.uploadedBy) !== String(req.user.id) && !isContentManager(req)) {
+    return fail(res, 'PERMISSION_DENIED', 'only the uploader or a moderator can remove this file');
+  }
+  await files.remove(req.server.id, req.params.fileId);
+  events.emit(req.server.id, 'workspace_file_deleted', { fileId: req.params.fileId });
+  res.json({ ok: true });
+}));
 
 module.exports = router;
