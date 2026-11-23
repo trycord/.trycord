@@ -405,3 +405,40 @@
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   [data-glass="on"] .card, [data-glass="on"] .dialog, [data-glass="on"] .m-card { background: var(--surface); }
 }
+
+/* --- craft pass ------------------------------------------------------------- */
+
+.btn { transition: transform var(--fast) var(--ease), box-shadow var(--fast) var(--ease), background var(--fast) var(--ease), border-color var(--fast) var(--ease); }
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn--primary {
+  background: linear-gradient(180deg, var(--brand-fill-hover), var(--brand-fill));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 18%), 0 4px 12px color-mix(in srgb, var(--brand) 22%, transparent);
+}
+.btn--primary:hover { box-shadow: inset 0 1px 0 rgb(255 255 255 / 20%), 0 6px 18px color-mix(in srgb, var(--brand) 32%, transparent); }
+.btn--danger { box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%), 0 4px 12px color-mix(in srgb, var(--bad) 20%, transparent); }
+.card {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, var(--ink) 4%), var(--surface));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%), var(--shadow-1);
+}
+.cardhead-label { letter-spacing: -0.02em; }
+.cardfoot { border-top-color: var(--line-soft); }
+.stat-value, .factnum { font-variant-numeric: tabular-nums; }
+.nav-item.is-active, .nav-room.is-active { position: relative; }
+.nav-item.is-active::before, .nav-room.is-active::before {
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px;
+  border-radius: var(--r-pill); background: var(--brand);
+}
+.msg-reaction, .chip, .filter-chip { transition: transform var(--fast) var(--ease), background var(--fast) var(--ease); }
+.msg-reaction:hover { transform: translateY(-1px); }
+.avatar { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 6%); }
+.blank-glyph, .m-empty__icon { width: 44px; height: 44px; display: grid; place-items: center;
+  border-radius: 50%; background: var(--surface-2); }
+.toast { animation: tc-toast-in var(--normal) var(--ease); }
+@keyframes tc-toast-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+.dialog, .palette { animation: tc-dialog-in var(--normal) var(--ease); }
+@keyframes tc-dialog-in { from { opacity: 0; transform: translateY(8px) scale(0.99); } }
+* { scrollbar-color: var(--line) transparent; scrollbar-width: thin; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
+::-webkit-scrollbar-track { background: transparent; }

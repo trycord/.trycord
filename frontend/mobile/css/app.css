@@ -526,3 +526,18 @@ button.m-row:hover, .m-row[role="menuitem"]:hover { background: var(--m-card-2);
   backdrop-filter: blur(18px) saturate(150%);
 }
 [data-glass="on"] .m-drawer-veil { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+
+/* --- craft pass ------------------------------------------------------------- */
+
+.m-go { box-shadow: inset 0 1px 0 rgb(255 255 255 / 16%), 0 3px 10px color-mix(in srgb, var(--m-brand) 20%, transparent); }
+.m-go:active { transform: translateY(1px); box-shadow: none; }
+.m-go--quiet { box-shadow: none; }
+.m-card { background: linear-gradient(180deg, color-mix(in srgb, var(--m-card) 94%, var(--m-ink) 4%), var(--m-card)); }
+.m-door { transition: background var(--fast) var(--ease), transform var(--fast) var(--ease); }
+.m-door:active { transform: scale(0.96); }
+.m-msg__reaction { transition: transform var(--fast) var(--ease); }
+.m-msg__reaction:active { transform: scale(0.94); }
+.m-toast { animation: m-toast-in var(--normal) var(--ease); }
+@keyframes m-toast-in { from { opacity: 0; transform: translateY(10px); } }
+.m-avatar, .avatar { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 7%); }
+* { scrollbar-width: none; }
