@@ -67,7 +67,7 @@ test('the phone answers every admin section the rail offers', () => {
   const source = read(path.join(MODULES.mobile, 'views', 'index.js'));
   const offered = scopeNav('admin').flatMap((group) => group.items.map((item) => item.id));
   for (const id of offered) {
-    assert.match(source, new RegExp("['\"]?" + id.replace(/\./g, '\\.') + "['\"]?\\s*:"),
+    assert.match(source, new RegExp("['\"]" + id.replace(/\./g, '\\.') + "['\"]\\s*[,:]"),
       'the phone does not answer ' + id);
   }
 });

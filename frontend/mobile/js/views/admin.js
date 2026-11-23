@@ -7,13 +7,14 @@
 // diagnostics, backups, Continuum and the public page editor. A reader who is
 // not an operator is told so once, by the server's own answer.
 
-import { el, clear } from '../../../packages/dom.js';
-import { icon } from '../../../packages/icons.js';
 import { avatar } from '../../../js/ui/primitives.js';
-import Api from '../../../packages/api.js';
 import { nameOf } from '../../../packages/store.js';
 import { navigate, path } from '../../../packages/nav.js';
-import { sheet, closeSheet, confirm, toast, failed, hold, failure, field, emptyState } from '../ui.js';
+import {
+  el, clear, icon, Api, sheet, closeSheet, confirm, toast, failed, hold, failure,
+  field, emptyState, items, when, statusWord, row, cardOf, fact, wordsSheet,
+  isOperator, refusal, describeValue as describe,
+} from './kit.js';
 
 const REPORT_FILTERS = [
   ['', 'All'],
@@ -29,116 +30,10 @@ const REPORT_MOVES = {
   DISMISSED: 'Dismiss',
 };
 
-const STATUS_WORDS = {
-  OPEN: 'Open',
-  INVESTIGATING: 'Being investigated',
-  RESOLVED: 'Resolved',
-  DISMISSED: 'Dismissed',
-  UNDER_REVIEW: 'Under review',
-  APPROVED: 'Approved',
-  DENIED: 'Denied',
-  PENDING: 'Waiting',
-};
-
-function statusWord(status) {
-  return STATUS_WORDS[String(status || '').toUpperCase()] || String(status || '—').replace(/_/g, ' ');
-}
-
-function items(payload) {
-  if (Array.isArray(payload)) return payload;
-  if (payload && Array.isArray(payload.items)) return payload.items;
-  return [];
-}
-
-// -- shared pieces -------------------------------------------------------------
-
-let operator = null;
-
-async function isOperator() {
-  if (operator !== null) return operator;
-  try {
-    await Api.adminMe();
-    operator = true;
-  } catch {
-    operator = false;
-  }
-  return operator;
-}
-
-function refusal() {
-  return emptyState('shield', 'Not your console',
-    'Only operators can open this.');
-}
-
-function row(entry) {
-  const node = el(entry.onClick ? 'button' : 'div', {
-    class: 'm-row' + (entry.danger ? ' m-row--danger' : ''),
-    type: entry.onClick ? 'button' : null,
-    onClick: entry.onClick || null,
-  });
-  if (entry.lead) node.appendChild(entry.lead);
-  node.appendChild(el('div', { class: 'm-row__body' },
-    el('div', { class: 'm-row__name truncate' }, entry.title || ''),
-    entry.sub ? el('div', { class: 'm-row__note truncate' }, entry.sub) : null));
-  if (entry.side) node.appendChild(el('div', { class: 'm-row__meta' }, entry.side));
-  if (entry.chevron && entry.onClick) node.appendChild(el('span', { class: 'm-row__chevron' }, icon('chevron-right', { size: 16 })));
-  return node;
-}
-
-function cardOf(kicker, children) {
-  const card = el('div', { class: 'm-card' });
-  if (kicker) card.appendChild(el('div', { class: 'm-kicker' }, kicker));
-  for (const child of children) if (child) card.appendChild(child);
-  return card;
-}
-
-function fact(label, value) {
-  return el('div', { class: 'm-row' },
-    el('div', { class: 'm-row__body' }, el('div', { class: 'm-row__name' }, label)),
-    el('div', { class: 'm-row__meta' }, el('div', { class: 'm-row__note' }, value == null ? '—' : String(value))));
-}
-
-// A sheet that asks for words before an action that records them. Every
-// decision the console takes carries a reason; this is where the reason is
-// written.
-function reasonSheet(options, run) {
-  const words = el('textarea', {
-    class: 'm-area', rows: '4', maxlength: '2000',
-    placeholder: options.placeholder || 'What happened',
-    'aria-label': options.fieldLabel || 'Reason',
-  });
-  const go = el('button', { class: 'm-go m-go--block' + (options.danger ? ' m-go--danger' : ''), type: 'button' }, options.confirmLabel || 'Save');
-  go.addEventListener('click', async () => {
-    const reason = words.value.trim();
-    if (!reason) {
-      toast('Write the reason first — it is saved with the action.', { type: 'danger' });
-      return;
-    }
-    go.disabled = true;
-    try {
-      await run(reason);
-      closeSheet();
-    } catch (error) {
-      failed(error);
-      go.disabled = false;
-    }
-  });
-  const layer = sheet({ title: options.title || 'A reason', note: options.note || null });
-  layer.body.appendChild(field(options.fieldLabel || 'Reason', words));
-  layer.body.appendChild(go);
-  return layer;
-}
-
 function personLead(person) {
   return avatar(person, { size: 'sm' });
 }
 
-function when(stamp) {
-  if (!stamp) return '';
-  const date = new Date(stamp);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
 
 // -- sections ------------------------------------------------------------------
 
@@ -250,7 +145,7 @@ async function person(host, chosen, back) {
     });
     if (!yes) return;
     const reason = await new Promise((done) => {
-      reasonSheet({ title: 'The reason', confirmLabel: plan.title, danger: true, placeholder: 'Why?' }, done);
+      wordsSheet({ title: 'The reason', confirmLabel: plan.title, danger: true, placeholder: 'Why?' }, done);
     });
     body.reason = reason;
     try {
@@ -280,7 +175,7 @@ async function person(host, chosen, back) {
 
   const noteRow = row({
     title: 'Add a note', lead: el('span', { class: 'm-row__chevron' }, icon('edit', { size: 16 })), chevron: true,
-    onClick: () => reasonSheet({
+    onClick: () => wordsSheet({
       title: 'A note on the account',
       note: 'Notes are for staff only.',
       confirmLabel: 'Add the note',
@@ -309,7 +204,7 @@ async function person(host, chosen, back) {
     sub: 'The roles this account holds on this instance',
   }), row({
     title: 'Give the operator role', lead: el('span', { class: 'm-row__chevron' }, icon('shield', { size: 16 })), chevron: true,
-    onClick: () => reasonSheet({
+    onClick: () => wordsSheet({
       title: 'Make them an operator', confirmLabel: 'Give the role', placeholder: 'Why this account is trusted with the console',
     }, async (reason) => {
       await Api.adminSetRole(user.id, 'admin');
@@ -404,7 +299,7 @@ async function community(host, chosen, back) {
   const act = async (title, text, call, danger) => {
     if (!(await confirm({ title, text, confirmLabel: title, danger: !!danger }))) return;
     const reason = await new Promise((done) => {
-      reasonSheet({ title: 'The reason', confirmLabel: title, danger: !!danger, placeholder: 'Why?' }, done);
+      wordsSheet({ title: 'The reason', confirmLabel: title, danger: !!danger, placeholder: 'Why?' }, done);
     });
     try {
       await call(reason);
@@ -532,7 +427,7 @@ async function report_(host, chosen, back) {
   host.appendChild(cardOf('The case', [
     row({
       title: 'Add a note', lead: el('span', { class: 'm-row__chevron' }, icon('edit', { size: 16 })), chevron: true,
-      onClick: () => reasonSheet({
+      onClick: () => wordsSheet({
         title: 'A note on the case', note: 'Notes are for staff only.', confirmLabel: 'Add the note',
         placeholder: 'What the next person looking at this case should know',
       }, async (body) => {
@@ -543,7 +438,7 @@ async function report_(host, chosen, back) {
     }),
     row({
       title: 'Copy in evidence', lead: el('span', { class: 'm-row__chevron' }, icon('paperclip', { size: 16 })), chevron: true,
-      onClick: () => reasonSheet({
+      onClick: () => wordsSheet({
         title: 'Evidence', note: 'Evidence is copied into the case as it looks now, so it stays if the original changes.', confirmLabel: 'Add the evidence',
         placeholder: 'What you saw, in your own words',
       }, async (body) => {
@@ -596,7 +491,7 @@ async function appeal_(host, chosen, back) {
   const decide = async (decision) => {
     const approving = decision === 'APPROVED';
     const answer = await new Promise((done) => {
-      reasonSheet({
+      wordsSheet({
         title: approving ? 'Approve the appeal?' : 'Deny the appeal?',
         note: approving
           ? 'The enforcement is lifted on the server, and the decision is recorded with your name.'
@@ -667,7 +562,7 @@ async function gdpr(host) {
           const actions = el('div', { class: 'm-row__meta' },
             el('button', {
               class: 'm-go', type: 'button',
-              onClick: () => reasonSheet({
+              onClick: () => wordsSheet({
                 title: 'Review the request', confirmLabel: 'Approve', placeholder: 'The note the decision carries',
               }, async (note) => {
                 await Api.adminReviewGdprRequest(request.id, 'APPROVED', note);
@@ -677,7 +572,7 @@ async function gdpr(host) {
             }, 'Approve'),
             el('button', {
               class: 'm-go m-go--quiet', type: 'button',
-              onClick: () => reasonSheet({
+              onClick: () => wordsSheet({
                 title: 'Deny the request', confirmLabel: 'Deny', danger: true, placeholder: 'Why the request is refused',
               }, async (note) => {
                 await Api.adminReviewGdprRequest(request.id, 'DENIED', note);
@@ -738,12 +633,6 @@ function settingRow(entry) {
   return node;
 }
 
-function describe(value) {
-  if (value === true) return 'on';
-  if (value === false) return 'off';
-  if (value == null || value === '') return '—';
-  return String(value);
-}
 
 async function editSetting(entry) {
   const control = typeof entry.value === 'boolean'
@@ -843,7 +732,7 @@ async function incidents(host) {
   await paint();
   host.appendChild(row({
     title: 'Put something on the timeline', lead: el('span', { class: 'm-row__chevron' }, icon('plus', { size: 16 })), chevron: true,
-    onClick: () => reasonSheet({
+    onClick: () => wordsSheet({
       title: 'A timeline entry', confirmLabel: 'Post it', placeholder: 'What happened, and what it means for readers',
     }, async (body) => {
       await Api.createIncident({ title: body.slice(0, 80), body, status: 'INVESTIGATING' });

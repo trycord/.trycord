@@ -94,7 +94,7 @@ img { display: block; max-width: 100%; }
 .m-empty__text { max-width: 40ch; font-size: var(--m-sm); }
 
 .m-doors { display: grid; gap: var(--tc-space-2); }
-.m-door { display: flex; align-items: center; gap: var(--tc-space-3); width: 100%; min-height: 60px;
+.m-door { position: relative; display: flex; align-items: center; gap: var(--tc-space-3); width: 100%; min-height: 60px;
   padding: var(--tc-space-3) var(--m-pad); border: 1px solid var(--m-line); border-radius: var(--tc-radius-lg);
   background: var(--m-card); color: var(--m-ink); text-align: left; }
 .m-door:hover { border-color: var(--m-brand-line); }
@@ -342,3 +342,52 @@ button.m-row:hover, .m-row[role="menuitem"]:hover { background: var(--m-card-2);
 .m-chrome--raw .m-send-slot,
 .m-chrome--raw .m-banner { display: none !important; }
 .m-chrome--raw .m-chrome__body { min-height: 100%; }
+
+/* Doors ride as one dock, not a stack of separate cards. */
+.m-doors {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0 var(--tc-space-3) calc(var(--tc-space-3) + env(safe-area-inset-bottom, 0px));
+  padding: 5px; gap: 4px;
+  border: 1px solid var(--m-line); border-radius: var(--tc-radius-xl);
+  background: color-mix(in srgb, var(--m-card) 88%, transparent);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 22%);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+.m-door { min-height: 52px; padding: 4px; flex-direction: column; gap: 2px; justify-content: center;
+  border: 0; background: transparent; border-radius: var(--tc-radius-md); }
+.m-door__icon { width: 24px; height: 24px; }
+.m-door__label { flex: none; font-size: var(--m-xs); font-weight: 750; }
+.m-door__pip { position: absolute; top: 4px; margin-left: 38px; }
+
+/* The dock floats above the screen, not inside its flow. */
+.m-chrome { grid-template-rows: auto minmax(0, 1fr) 0; }
+.m-screen { padding-bottom: calc(var(--m-bar-h) + 48px); }
+.m-doors {
+  position: fixed; left: var(--tc-space-3); right: var(--tc-space-3);
+  bottom: calc(var(--tc-space-3) + env(safe-area-inset-bottom, 0px));
+  z-index: 35; margin: 0;
+}
+.m-chrome--raw .m-doors { display: none !important; }
+
+/* The places drawer, opened by swiping in from the left edge or the bar. */
+.m-drawer-veil { position: fixed; inset: 0; z-index: 44; background: rgb(0 0 0 / 55%); }
+.m-drawer {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 45;
+  width: min(330px, 88vw); padding: calc(var(--tc-space-6) + env(safe-area-inset-top, 0px)) var(--tc-space-4) var(--tc-space-4);
+  background: var(--m-card); border-right: 1px solid var(--m-line);
+  box-shadow: 12px 0 40px rgb(0 0 0 / 40%);
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: var(--tc-space-3);
+  animation: m-drawer-in var(--normal) var(--m-ease);
+}
+@keyframes m-drawer-in { from { transform: translateX(-100%); } }
+.m-drawer__head { display: grid; gap: 3px; padding-bottom: var(--tc-space-4); border-bottom: 1px solid var(--m-line); }
+.m-drawer__name { font-size: var(--m-xl); font-weight: 850; }
+.m-drawer__desc { color: var(--m-ink-2); font-size: var(--m-sm); }
+.m-drawer__list { overflow-y: auto; display: grid; gap: 2px; align-content: start; }
+.m-bar__list { color: var(--m-brand); }
+[data-glass="on"] .m-drawer {
+  background: color-mix(in srgb, var(--m-card) 66%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
+}
+[data-glass="on"] .m-drawer-veil { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }

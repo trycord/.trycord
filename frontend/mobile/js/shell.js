@@ -37,10 +37,14 @@ export function mountShell() {
   const bell = el('a', {
     class: 'm-bar__btn m-bar__mark', href: path('/notifications'), 'aria-label': 'Alerts',
   }, icon('bell', { size: 22 }), bellBadge);
+  const listBtn = el('button', {
+    class: 'm-bar__btn m-bar__list', type: 'button', 'aria-label': 'Show places',
+    onClick: () => openServerList(),
+  }, icon('layers', { size: 22 }));
   const actions = el('div', { class: 'm-bar__actions' });
   const banner = el('div', { class: 'm-banner', hidden: true, role: 'status' });
   const bar = el('header', { class: 'm-bar' },
-    backBtn, mark, barFace, titles, actions, bell);
+    backBtn, listBtn, mark, barFace, titles, actions, bell);
 
   const screen = el('main', { class: 'm-screen', id: 'm-screen', tabindex: '-1' });
   const composerSlot = el('div', { class: 'm-send-slot', hidden: true });
@@ -51,11 +55,15 @@ export function mountShell() {
   const root = el('div', { class: 'm-root' },
     el('div', { class: 'm-chrome' }, top, content, doorsRow));
   const toasts = el('div', { class: 'm-toasts', id: 'm-toasts' });
-  root.appendChild(toasts);
+  const drawerVeil = el('div', { class: 'm-drawer-veil', hidden: true });
+  const drawer = el('aside', { class: 'm-drawer', hidden: true, 'aria-label': 'Your places' });
+  drawerVeil.addEventListener('click', closeServerList);
+  root.append(toasts, drawerVeil, drawer);
 
-  refs = { banner, bar, backBtn, mark, barFace, titles, actions, bell, bellBadge, screen, composerSlot, doorsRow, toasts, node: root };
+  refs = { banner, bar, backBtn, mark, listBtn, barFace, titles, actions, bell, bellBadge, screen, composerSlot, doorsRow, toasts, drawer, drawerVeil, node: root };
   paintDoors();
   watchKeyboard();
+  watchSwipe();
   return root;
 }
 
@@ -106,6 +114,67 @@ function lightDoors(address) {
   }
 }
 
+function currentPlace() {
+  const title = refs.titles.children[0].textContent;
+  return (State.servers || []).find((server) => (server.name || '') === title) || null;
+}
+
+function openServerList() {
+  if (!refs || !refs.drawer) return;
+  const place = currentPlace();
+  const head = el('div', { class: 'm-drawer__head' },
+    el('div', { class: 'm-kicker' }, 'Where you are'),
+    el('div', { class: 'm-drawer__name' }, place ? (place.name || 'A place') : (refs.titles.children[0].textContent || 'Trycord')),
+    el('div', { class: 'm-drawer__desc' }, place ? (place.description || 'No description yet.') : 'Your places and conversations.'));
+  const rows = (State.servers || []).map((server) => el('button', {
+    class: 'm-row', type: 'button',
+    onClick: () => { closeServerList(); navigate(path('/server/' + server.id)); },
+  },
+    el('span', { class: 'm-row__chevron' }, server.icon_url
+      ? el('img', { src: server.icon_url, alt: '', style: { width: '24px', height: '24px', borderRadius: '6px' } })
+      : icon('layers', { size: 18 })),
+    el('div', { class: 'm-row__body' },
+      el('div', { class: 'm-row__name' }, server.name || 'A place'),
+      el('div', { class: 'm-row__note truncate' }, server.description || 'No description yet.'))));
+  refs.drawer.replaceChildren(head, el('div', { class: 'm-drawer__list' },
+    ...(rows.length ? rows : [el('div', { class: 'm-empty' }, 'No places yet.')])),
+    el('button', { class: 'm-go m-go--quiet m-go--block', type: 'button', onClick: () => { closeServerList(); navigate(path('/communities')); } }, 'All places'));
+  refs.drawer.hidden = false;
+  refs.drawerVeil.hidden = false;
+  refs.node.dataset.drawer = 'open';
+}
+
+function closeServerList() {
+  if (!refs || !refs.drawer) return;
+  refs.drawer.hidden = true;
+  refs.drawerVeil.hidden = true;
+  delete refs.node.dataset.drawer;
+}
+
+function watchSwipe() {
+  if (!refs || !refs.node) return;
+  let startX = 0; let startY = 0; let armed = false; let tracking = false;
+  refs.node.addEventListener('touchstart', (event) => {
+    if (refs.node.querySelector('.m-chrome--raw')) return;
+    const t = event.touches[0];
+    startX = t.clientX; startY = t.clientY;
+    armed = startX < 28 && refs.node.dataset.drawer !== 'open';
+    tracking = true;
+  }, { passive: true });
+  refs.node.addEventListener('touchmove', (event) => {
+    if (!tracking || !armed) return;
+    const dx = event.touches[0].clientX - startX;
+    if (dx < 0) { armed = false; return; }
+    if (dx > 56) { openServerList(); armed = false; tracking = false; }
+  }, { passive: true });
+  refs.node.addEventListener('touchend', (event) => {
+    if (!tracking) return;
+    const t = event.changedTouches[0];
+    if (refs.node.dataset.drawer === 'open' && t.clientX - startX < -56) closeServerList();
+    tracking = false;
+  }, { passive: true });
+}
+
 // The screen painter. `screen` is the description from the view above.
 export function paintScreen(screen) {
   const s = screen || {};
@@ -140,6 +209,7 @@ export function paintScreen(screen) {
   if (s.head && s.head.actions) for (const node of s.head.actions) refs.actions.appendChild(node);
 
   refs.bell.hidden = raw || !signedIn();
+  refs.listBtn.hidden = raw;
 
   clear(refs.screen);
   // A bare screen manages its own padding, and a raw one is not the shell's

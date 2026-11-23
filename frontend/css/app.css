@@ -730,6 +730,19 @@ textarea.input, .field textarea { min-height: 88px; resize: vertical; line-heigh
   .cmdbar-omni { max-width: 240px; }
 }
 
+/* The rebuilt shell reads as separate panels, not one painted stripe. */
+.rail {
+  margin: var(--tc-space-3) 0 var(--tc-space-3) var(--tc-space-3);
+  border: 1px solid var(--line); border-radius: var(--r-xl);
+  background: var(--surface); box-shadow: var(--shadow-1);
+}
+.context {
+  margin: var(--tc-space-3) 0 var(--tc-space-3) var(--tc-space-3);
+  border: 1px solid var(--line); border-right: 0;
+  border-radius: var(--r-xl) 0 0 var(--r-xl); overflow: hidden;
+}
+.stage { background: var(--bg); }
+
 
 /* ---- features.css ---- */
 

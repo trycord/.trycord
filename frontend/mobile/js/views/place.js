@@ -155,6 +155,7 @@ export function renderPlace(ctx) {
     node: host,
     head: {
       title: (serverById(serverId) || {}).name || 'A place',
+      sub: (serverById(serverId) || {}).description || '',
       back: true,
       actions: [
         el('button', { class: 'm-bar__btn', type: 'button', 'aria-label': 'Members', onClick: membersSheet }, icon('users', { size: 20 })),

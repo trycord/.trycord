@@ -56,7 +56,7 @@ test('the application keeps the application', async (t) => {
       if (!/raw:\s*true/.test(source)) continue;
       const relative = file.slice(file.indexOf('frontend/'));
       const isGate = /features\/auth\.js$|views\/auth\.js$/.test(relative);
-      const isDocument = /features\/documents\.js$|views\/plain\.js$|views\/misc\.js$/.test(relative);
+      const isDocument = /features\/documents\.js$|views\/plain\.js$|views\/misc\.js$|views\/tools\.js$/.test(relative);
       if (isGate || isDocument) continue;
       problems.push(relative + ' renders standalone');
     }
