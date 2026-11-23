@@ -13,7 +13,7 @@ import {
 import { navigate, path } from '../../../packages/nav.js';
 import { nameOf, refreshMutes, State } from '../../../packages/store.js';
 import { request } from '../../../packages/api.js';
-import { readPrefs, patchPrefs } from '../prefs.js';
+import { readPrefs, resetPrefs, rememberGlass } from '../prefs.js';
 
 // -- the index ----------------------------------------------------------------
 
@@ -270,7 +270,7 @@ async function privacy(host) {
           title: entry.reason || 'A report',
           sub: statusWord(entry.targetType || entry.target_type) + (entry.createdAt ? ' · ' + when(entry.createdAt) : ''),
           side: el('span', { class: 'm-row__note' }, statusWord(entry.status)),
-        })) : [emptyState('flag', 'Nothing filed', 'A report you file is answered here.')]));
+        })) : [emptyState('flag', 'Nothing filed', 'Reports you send show up here.')]));
     } catch (error) {
       reportsCard.replaceChildren(el('div', { class: 'm-kicker' }, 'Your reports'), failure(error, paintReports));
     }
@@ -383,7 +383,7 @@ async function notifications(host) {
             } catch (error) { failed(error); }
           },
         }, 'Unmute'),
-      })) : [emptyState('volume-off', 'Nothing muted', 'A channel you mute stops pinging.')]));
+      })) : [emptyState('volume-off', 'Nothing muted', 'Muted channels stay quiet.')]));
   } catch (error) {
     mutedCard.replaceChildren(failure(error, () => { host.replaceChildren(); return notifications(host); }));
   }
@@ -441,7 +441,8 @@ function currentTheme() {
 async function appearance(host) {
   const themeCard = cardOf('The theme', []);
   const motionCard = cardOf('Motion', []);
-  host.append(themeCard, motionCard);
+  const glassCard = cardOf('Glass', []);
+  host.append(themeCard, glassCard, motionCard);
 
   try {
     const themes = items(await Api.themes());
@@ -466,6 +467,18 @@ async function appearance(host) {
   } catch (error) {
     themeCard.replaceChildren(el('div', { class: 'm-kicker' }, 'The theme'), failure(error, () => { host.replaceChildren(); return appearance(host); }));
   }
+
+  const glassBox = el('input', { class: 'm-input', type: 'checkbox', 'aria-label': 'Glass surfaces' });
+  glassBox.checked = !!readPrefs().glass;
+  glassBox.addEventListener('change', () => {
+    rememberGlass(glassBox.checked);
+    toast(glassBox.checked ? 'Glass on' : 'Glass off');
+  });
+  glassCard.appendChild(row({
+    title: 'Glass surfaces',
+    sub: 'Panels show the colour behind them.',
+    lead: glassBox,
+  }));
 
   let motion = '';
   try { motion = localStorage.getItem('trycord.motion') || ''; } catch { /* session-only */ }
@@ -493,7 +506,7 @@ async function appearance(host) {
       title: 'Reset the phone\'s stored choices', chevron: true,
       onClick: async () => {
         if (!(await confirm({ title: 'Reset the stored choices?', text: 'Tabs and density go back to what a new device would see.', confirmLabel: 'Reset' }))) return;
-        patchPrefs({});
+        resetPrefs();
         toast('Reset');
       },
     }),

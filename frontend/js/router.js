@@ -241,6 +241,10 @@ export async function run() {
   }
 
   const page = match.page;
+  // Each page carries its own name on the document, so the visual language can
+  // give a conversation, a console and a document their own character without
+  // every screen being the same shell with different words in it.
+  try { document.documentElement.dataset.page = page.id; } catch { /* no document */ }
   const params = match.params;
   const rest = match.rest;
 

@@ -77,14 +77,14 @@ export function fact(label, value) {
 export function wordsSheet(options, run) {
   const words = el('textarea', {
     class: 'm-area', rows: '4', maxlength: options.maxlength || 2000,
-    placeholder: options.placeholder || 'What happened, and what you did about it',
+    placeholder: options.placeholder || 'What happened',
     'aria-label': options.fieldLabel || 'Reason',
   });
   const go = el('button', { class: 'm-go m-go--block' + (options.danger ? ' m-go--danger' : ''), type: 'button' }, options.confirmLabel || 'Save');
   go.addEventListener('click', async () => {
     const reason = words.value.trim();
     if (options.required !== false && !reason) {
-      toast('Write something first — it is saved with the action.', { type: 'danger' });
+      toast('Write a reason first.', { type: 'danger' });
       return;
     }
     go.disabled = true;
@@ -130,7 +130,7 @@ export async function decide(title, text, run, options) {
       title: opts.reasonTitle || 'The reason',
       confirmLabel: opts.confirmLabel || title,
       danger: !!opts.danger,
-      placeholder: opts.placeholder || 'Why, in the words a reviewer reads',
+      placeholder: opts.placeholder || 'Why?',
     }, done);
   });
   return true;
@@ -152,7 +152,7 @@ export async function isOperator() {
 
 export function refusal() {
   return emptyState('shield', 'Not your console',
-    'This instance does not answer to you. The pages exist for its operators.');
+    'Only operators can open this.');
 }
 
 // The standard screen a console page returns: a stack the section fills on

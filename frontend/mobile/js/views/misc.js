@@ -1,14 +1,15 @@
 // The remaining addresses the phone answers.
 //
-// The directory, discovery, search, collections and the public documents. The
-// extension console is the operator's and lives on the desk; the phone says so
-// honestly rather than pretending to run it.
+// The directory, discovery, search, the extension console and the public
+// documents. Each is a real screen with the same rows and cards as the rest of
+// the phone, reading the same API the desk reads.
 
 import {
-  el, clear, icon, Api, toast, failed, hold, failure, emptyState,
-  items, row, cardOf, consoleScreen,
+  el, icon, Api, toast, failed, hold, failure, emptyState,
+  items, row, cardOf, fact, confirm, consoleScreen,
 } from './kit.js';
 import { State } from '../../../packages/store.js';
+import { request } from '../../../packages/api.js';
 import { path, publicPath } from '../../../packages/nav.js';
 import { renderPlaces } from './places.js';
 
@@ -84,7 +85,7 @@ function search(host) {
           + String(hit.content || '').slice(0, 80),
         sub: hit.channelName || hit.channel_name || '',
       })) : [emptyState('search', 'No messages found',
-        'Nothing in the communities you are in matches that.')]));
+        'No messages in your communities match.')]));
     } catch (error) {
       results.replaceChildren(failure(error, run));
     }
@@ -125,11 +126,99 @@ async function collections(host) {
 
 // -- extensions ---------------------------------------------------------------
 
-function extensions(host) {
-  host.appendChild(cardOf('Extensions', [
-    el('p', { class: 'm-sheet__note' },
-      'The extension console — what may be installed, what is installed, and what it is allowed to do — is an operator surface. Open Trycord on a wider screen to manage it.'),
-  ]));
+const EXT = '/api/extensions';
+
+// The extension console, on a phone. The same four sections the desk opens,
+// with the same server calls: what is offered, what is installed, what the
+// operator allows, and the workflows that run.
+async function extensions(host) {
+  const tabs = el('div', { class: 'm-chips' });
+  const stage = el('div', { class: 'm-stack' });
+  host.append(tabs, stage);
+  const sections = [['registry', 'Registry'], ['installed', 'Installed'], ['policy', 'Policy'], ['workflows', 'Workflows']];
+  let active = 'registry';
+
+  const paintTabs = () => {
+    tabs.replaceChildren(...sections.map(([id, label]) => el('button', {
+      class: 'm-chip' + (active === id ? ' m-chip--on' : ''),
+      type: 'button',
+      'aria-pressed': String(active === id),
+      onClick: () => { active = id; paintTabs(); paint(); },
+    }, label)));
+  };
+
+  const install = async (pkg) => {
+    const wanted = (pkg.capabilities || pkg.requestedCapabilities || []).map((c) =>
+      typeof c === 'string' ? c : (c.id || c.name || ''));
+    if (!(await confirm({
+      title: 'Install ' + (pkg.name || pkg.id) + '?',
+      text: wanted.length ? 'It asks for: ' + wanted.join(', ') + '. Only install packages you trust.' : 'Only install packages you trust.',
+      confirmLabel: 'Install',
+    }))) return;
+    try {
+      const result = await request('POST', EXT + '/install', {
+        body: { id: pkg.id, version: pkg.version || null, grants: wanted },
+      });
+      toast((result && result.granted ? result.granted.length + ' capabilities granted.' : 'Installed.'), { type: 'success' });
+      await paint();
+    } catch (error) { failed(error); }
+  };
+
+  const paint = async () => {
+    stage.replaceChildren(hold());
+    try {
+      if (active === 'registry') {
+        const answer = await request('GET', EXT + '/registry');
+        const rows = items(answer.extensions || answer.packages || answer);
+        stage.replaceChildren(cardOf('Available', rows.length
+          ? rows.map((pkg) => row({
+            lead: el('span', { class: 'm-row__chevron' }, icon('package', { size: 16 })),
+            title: pkg.name || pkg.id,
+            sub: pkg.version || (pkg.description || '').slice(0, 80),
+            side: el('button', { class: 'm-go m-go--quiet', type: 'button', onClick: () => install(pkg) }, 'Install'),
+          }))
+          : [emptyState('package', 'No packages offered', 'This instance has no extension registry.')]));
+      } else if (active === 'installed') {
+        const answer = await request('GET', EXT + '/installed');
+        const rows = items(answer.extensions || answer);
+        stage.replaceChildren(cardOf('Installed', rows.length
+          ? rows.map((ext) => row({
+            title: ext.name || ext.id,
+            sub: (ext.version || '') + (ext.enabled === false ? ' · off' : ' · on'),
+            side: el('button', {
+              class: 'm-go m-go--quiet', type: 'button',
+              onClick: async () => {
+                try {
+                  await request('POST', EXT + '/' + encodeURIComponent(ext.id) + (ext.enabled === false ? '/enable' : '/disable'));
+                  toast(ext.enabled === false ? 'On' : 'Off');
+                  await paint();
+                } catch (error) { failed(error); }
+              },
+            }, ext.enabled === false ? 'Turn on' : 'Turn off'),
+          }))
+          : [emptyState('package', 'Nothing installed', 'Packages you install show up here.')]));
+      } else if (active === 'policy') {
+        const answer = await request('GET', EXT + '/policy');
+        const policy = (answer && answer.policy) || answer || {};
+        stage.replaceChildren(cardOf('Policy', Object.entries(policy).map(([key, value]) =>
+          fact(key, typeof value === 'object' ? JSON.stringify(value) : value))));
+      } else {
+        const answer = await request('GET', EXT + '/workflows');
+        const rows = items(answer.workflows || answer);
+        stage.replaceChildren(cardOf('Workflows', rows.length
+          ? rows.map((flow) => row({
+            title: flow.name || flow.id,
+            sub: (flow.status || flow.state || '') + (flow.description ? ' · ' + flow.description.slice(0, 60) : ''),
+          }))
+          : [emptyState('activity', 'No workflows', 'Workflows this instance runs show up here.')]));
+      }
+    } catch (error) {
+      stage.replaceChildren(failure(error, paint));
+    }
+  };
+
+  paintTabs();
+  await paint();
 }
 
 // -- public documents ---------------------------------------------------------

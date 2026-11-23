@@ -69,7 +69,7 @@ async function overview(host, ctx) {
       fact('Made', when(server.created_at || server.createdAt)),
       fact('Address', server.slug ? '/' + server.slug : '—'),
     ]));
-    const edit = () => formSheet({ title: 'The words of the place', confirmLabel: 'Save' }, [
+    const edit = () => formSheet({ title: 'Name and description', confirmLabel: 'Save' }, [
       ['Name', el('input', { class: 'm-input', type: 'text', maxlength: '60', value: server.name || '', 'aria-label': 'Name' })],
       ['Description', el('textarea', { class: 'm-area', rows: '3', maxlength: '400', 'aria-label': 'Description' }, server.description || '')],
     ], async () => {
@@ -117,7 +117,7 @@ async function appearance(host, ctx) {
     const server = await Api.server(serverId);
     clear(host);
     const face = el('div', { class: 'm-card' },
-      el('div', { class: 'm-kicker' }, 'The face of the place'),
+      el('div', { class: 'm-kicker' }, 'Picture'),
       el('div', { class: 'm-profile__actions', style: { justifyContent: 'flex-start' } },
         avatar(server, { size: 'lg' })));
     host.appendChild(face);
@@ -208,7 +208,7 @@ async function emojis(host, ctx) {
         })) : [emptyState('smile', 'No emojis yet', 'A name and a picture: type :name: in a message and the picture appears.')]));
 
       if (mayManage) {
-        const name = el('input', { class: 'm-input', type: 'text', maxlength: '30', placeholder: 'sparkle', 'aria-label': 'The name, as it will be typed between colons' });
+        const name = el('input', { class: 'm-input', type: 'text', maxlength: '30', placeholder: 'sparkle', 'aria-label': 'Emoji name' });
         const file = el('input', { class: 'm-input', type: 'file', accept: EMOJI_ACCEPT, 'aria-label': 'The picture' });
         const go = el('button', { class: 'm-go m-go--block', type: 'button' }, 'Name it and keep it');
         go.addEventListener('click', async () => {
@@ -345,7 +345,7 @@ async function members(host, ctx) {
           sub: '@' + (member.username || '') + (member.nickname ? ' · called ' + member.nickname : ''),
           chevron: true,
           onClick: () => memberSheet(serverId, member, () => paint(query)),
-        })) : [emptyState('users', query ? 'Nobody by that name' : 'No members', query ? 'Try another spelling.' : 'The people of this place appear here.')]));
+        })) : [emptyState('users', query ? 'Nobody by that name' : 'No members', query ? 'Try another spelling.' : 'Members show up here.')]));
     } catch (error) {
       card.replaceChildren(failure(error, () => paint(query)));
     }
@@ -383,7 +383,7 @@ async function memberSheet(serverId, member, onDone) {
       onClick: async () => {
         const reason = await new Promise((done) => wordsSheet({
           title: 'A time out', confirmLabel: 'Apply it', danger: true,
-          placeholder: 'Why, in the words a reviewer reads',
+          placeholder: 'Why?',
         }, done));
         await Api.timeoutMember(serverId, member.id, 60, reason);
         toast('Timed out');
@@ -403,7 +403,7 @@ async function memberSheet(serverId, member, onDone) {
       onClick: async () => {
         const reason = await new Promise((done) => wordsSheet({
           title: 'Remove ' + (nameOf(member) || 'this member') + '?', confirmLabel: 'Remove', danger: true,
-          placeholder: 'Why, in the words a reviewer reads',
+          placeholder: 'Why?',
         }, done));
         await Api.kickMember(serverId, member.id, reason);
         toast('Removed');
@@ -415,7 +415,7 @@ async function memberSheet(serverId, member, onDone) {
       onClick: async () => {
         const reason = await new Promise((done) => wordsSheet({
           title: 'Ban ' + (nameOf(member) || 'this member') + '?', confirmLabel: 'Ban', danger: true,
-          placeholder: 'Why, in the words a reviewer reads',
+          placeholder: 'Why?',
         }, done));
         await Api.banMember(serverId, member.id, reason);
         toast('Banned');
@@ -478,7 +478,7 @@ async function moderation(host, ctx) {
             class: 'm-go m-go--quiet', type: 'button', 'aria-label': 'Lift the ban',
             onClick: async () => {
               const reason = await new Promise((done) => wordsSheet({
-                title: 'Lift the ban?', fieldLabel: 'The words the decision carries', confirmLabel: 'Lift',
+                title: 'Lift the ban?', fieldLabel: 'Reason', confirmLabel: 'Lift',
                 placeholder: 'Why the ban is lifted', required: false,
               }, done));
               await Api.unbanMember(serverId, ban.userId || ban.user_id || ban.id, reason);
@@ -609,10 +609,10 @@ async function ownership(host, ctx) {
   const serverId = ctx.serverId;
   if (!isOwner(serverId)) {
     host.appendChild(emptyState('key', 'Only the owner reads this',
-      'Who owns the place is decided here, by the owner.'));
+      'Only the owner can change this.'));
     return;
   }
-  const transferCard = cardOf('Hand the place over', []);
+  const transferCard = cardOf('Give ownership away', []);
   const deleteCard = cardOf('End the place', []);
   host.append(transferCard, deleteCard);
 
@@ -623,19 +623,19 @@ async function ownership(host, ctx) {
         const answer = await Api.serverMembers(serverId, { limit: '200' });
         const rows = items(answer.members || answer);
         if (!rows.length) {
-          toast('There is nobody to give it to.', { type: 'danger' });
+          toast('No one else is here yet.', { type: 'danger' });
           return;
         }
         await new Promise((done) => formSheet({
-          title: 'Hand the place over',
+          title: 'Give ownership away',
           note: 'The new owner can do everything here, including removing you. This cannot be undone by you.',
-          confirmLabel: 'Hand it over', danger: true,
+          confirmLabel: 'Give it away', danger: true,
         }, [
           ['The new owner', el('select', { class: 'm-input', 'aria-label': 'The new owner' },
             rows.map((member) => el('option', { value: member.id }, nameOf(member) || member.username || 'A member')))],
         ], done));
         const pick = document.querySelector('.m-sheet select');
-        if (!(await confirm({ title: 'Hand the place over?', text: 'It is theirs from now on.', confirmLabel: 'Hand it over', danger: true }))) return;
+        if (!(await confirm({ title: 'Give ownership away?', text: 'They will own it from now on.', confirmLabel: 'Give it away', danger: true }))) return;
         await Api.transferServer(serverId, pick.value);
         toast('The place is theirs');
         host.replaceChildren();
@@ -719,7 +719,7 @@ async function integrations(host, ctx) {
               } catch (error) { failed(error); }
             },
           }, 'Delete') : null,
-        })) : [emptyState('plug', 'No webhooks', 'A webhook lets an outside thing speak in a channel.')]));
+        })) : [emptyState('plug', 'No webhooks', 'Webhooks let other apps post here.')]));
 
       if (mayManage) {
         card.appendChild(row({

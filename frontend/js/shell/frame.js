@@ -130,7 +130,9 @@ export function buildFrame() {
     hidden: true,
   }, icon('panel-left', { size: 18 }));
   const commandBar = el('header', { class: 'cmdbar', id: 'command-bar', 'aria-label': 'Command bar' },
-    sidebarButton, navToggle, omnibox, el('div', { class: 'spacer' }), inspectorToggle, connection, alertsSlot);
+    el('div', { class: 'cmdbar__start' }, sidebarButton, navToggle),
+    el('div', { class: 'cmdbar__center' }, omnibox),
+    el('div', { class: 'cmdbar__end' }, inspectorToggle, connection, alertsSlot));
 
   // -- the rail --------------------------------------------------------------
   const rail = el('nav', {
@@ -164,6 +166,8 @@ export function buildFrame() {
   const stage = el('main', { class: 'stage', id: 'trycord-main' }, screen, stageGrip);
 
   // -- floating layers -------------------------------------------------------
+  const body = el('div', { class: 'shell-body' }, rail, column, stage);
+
   const inspectorHead = el('header', { class: 'inspector-head', id: 'inspector-head' });
   const inspectorBody = el('div', { class: 'inspector-body', id: 'inspector-view' });
   const inspectorGrip = el('div', {
@@ -181,10 +185,10 @@ export function buildFrame() {
   const root = el('div', {
     class: 'ws', id: 'shell', 'aria-label': 'Trycord',
     dataset: { context: 'closed', nav: 'expanded' },
-  }, skip, commandBar, rail, column, stage, inspector, scrim, dock);
+  }, skip, commandBar, body, inspector, scrim, dock);
 
   const refs = {
-    root, commandBar, navToggle, omnibox, kbd, connection, alertsSlot, inspectorToggle,
+    root, body, commandBar, navToggle, omnibox, kbd, connection, alertsSlot, inspectorToggle,
     rail, column, columnHead, columnBody, columnFoot, columnGrip,
     stage, stageHead, stageBody, composerSlot, stageGrip,
     inspector, inspectorGrip, inspectorHead, inspectorBody,

@@ -8,6 +8,7 @@
 
 import { mountShell, paintScreen, paintComposer, refreshChrome, setConnection } from './shell.js';
 import { applyTheme } from '../../packages/theme.js';
+import { applyGlass, onPrefsChange } from './prefs.js';
 import { TrycordConfig } from '../../packages/config.js';
 import {
   State, on as onStore, loadInstance, loadLegal, loadSession,
@@ -27,6 +28,8 @@ setBase(mountFromModuleUrl(import.meta.url));
 bind(RENDERERS);
 
 function mount() {
+  applyGlass();
+  onPrefsChange(applyGlass);
   const root = mountShell();
   const host = document.getElementById('app');
   if (host) host.appendChild(root);

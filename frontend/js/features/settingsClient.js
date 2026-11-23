@@ -10,7 +10,7 @@
 import { el } from '../../packages/dom.js';
 import Api from '../../packages/api.js';
 import theme, { THEMES, CUSTOM_TOKEN_DEFS, DEFAULT_CUSTOM_TOKENS } from '../../packages/theme.js';
-import { readPrefs, patchPrefs, applyDensity, rememberRegions, rememberStageWidth, DENSITIES, REGIONS, STAGE_MIN, STAGE_MAX } from '../prefs.js';
+import { readPrefs, patchPrefs, applyDensity, rememberGlass, rememberRegions, rememberStageWidth, DENSITIES, REGIONS, STAGE_MIN, STAGE_MAX } from '../prefs.js';
 import { switchControl, fieldRow } from '../ui/primitives.js';
 import { head, card, blank, fault, fold, facts } from '../ui/page.js';
 import { toast } from '../ui/overlays.js';
@@ -160,6 +160,11 @@ export function appearanceView() {
     },
     'Less motion');
 
+  const glass = switchControl(readPrefs().glass, async (on) => {
+    rememberGlass(on);
+    toast(on ? 'Glass surfaces on' : 'Glass surfaces off');
+  }, 'Glass surfaces');
+
   const statusLine = el('p', { class: 'palette-status', role: 'status', 'aria-live': 'polite' });
   // What is marked current is the stored choice, not the resolved attribute:
   // 'custom' resolves visually to the default palette but stays a choice.
@@ -206,6 +211,10 @@ export function appearanceView() {
         rows: [el('div', {},
           el('p', { class: 'card-note' }, 'How wide the conversation is. The grip on the stage does the same.'),
           stageWidthControl())],
+      }),
+      card({
+        label: 'Glass', glyph: 'droplet',
+        rows: [fieldRow('Glass surfaces', 'Panels show the colour behind them.', glass)],
       }),
       card({
         label: 'Motion', glyph: 'wind',

@@ -67,7 +67,7 @@ async function isOperator() {
 
 function refusal() {
   return emptyState('shield', 'Not your console',
-    'This instance does not answer to you. The pages exist for its operators.');
+    'Only operators can open this.');
 }
 
 function row(entry) {
@@ -104,7 +104,7 @@ function fact(label, value) {
 function reasonSheet(options, run) {
   const words = el('textarea', {
     class: 'm-area', rows: '4', maxlength: '2000',
-    placeholder: options.placeholder || 'What happened, and what you did about it',
+    placeholder: options.placeholder || 'What happened',
     'aria-label': options.fieldLabel || 'Reason',
   });
   const go = el('button', { class: 'm-go m-go--block' + (options.danger ? ' m-go--danger' : ''), type: 'button' }, options.confirmLabel || 'Save');
@@ -250,7 +250,7 @@ async function person(host, chosen, back) {
     });
     if (!yes) return;
     const reason = await new Promise((done) => {
-      reasonSheet({ title: 'The reason', confirmLabel: plan.title, danger: true, placeholder: 'Why, in the words a reviewer reads' }, done);
+      reasonSheet({ title: 'The reason', confirmLabel: plan.title, danger: true, placeholder: 'Why?' }, done);
     });
     body.reason = reason;
     try {
@@ -404,7 +404,7 @@ async function community(host, chosen, back) {
   const act = async (title, text, call, danger) => {
     if (!(await confirm({ title, text, confirmLabel: title, danger: !!danger }))) return;
     const reason = await new Promise((done) => {
-      reasonSheet({ title: 'The reason', confirmLabel: title, danger: !!danger, placeholder: 'Why, in the words a reviewer reads' }, done);
+      reasonSheet({ title: 'The reason', confirmLabel: title, danger: !!danger, placeholder: 'Why?' }, done);
     });
     try {
       await call(reason);
@@ -1060,7 +1060,7 @@ async function federation(host) {
           sub: (report.instanceName || report.instanceId || '') + (report.createdAt ? ' · ' + when(report.createdAt) : ''),
           side: el('span', { class: 'm-row__note' }, statusWord(report.status)),
         }))
-        : [emptyState('globe', 'Nothing from the peers', 'Reports other instances filed with this one appear here.')]));
+        : [emptyState('globe', 'Nothing from the peers', 'Reports from other sites appear here.')]));
     } catch (error) {
       list.replaceChildren(failure(error, paint));
     }

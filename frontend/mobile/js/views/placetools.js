@@ -43,7 +43,7 @@ async function roles(host, ctx) {
             class: 'm-go m-go--quiet', type: 'button', 'aria-label': 'Edit the role',
             onClick: () => roleEditor(serverId, role, paint),
           }, 'Edit') : null,
-        })) : [emptyState('shield', 'No roles yet', 'A role is a set of permissions with a name.')]));
+        })) : [emptyState('shield', 'No roles yet', 'Roles decide what people can do.')]));
 
       if (mayManage) {
         card.appendChild(row({
@@ -163,7 +163,7 @@ async function invites(host, ctx) {
               } catch (error) { failed(error); }
             },
           }, 'Delete') : null,
-        })) : [emptyState('mail', 'No invitations', 'An invitation brings somebody in with a word.')]));
+        })) : [emptyState('mail', 'No invitations', 'Invites let people join.')]));
 
       if (mayManage) {
         card.appendChild(row({
@@ -277,7 +277,7 @@ async function channelPins(host, ctx) {
               } catch (error) { failed(error); }
             },
           }, 'Unpin'),
-        })) : [emptyState('pin', 'Nothing pinned', 'Pin a message to keep it at hand.')]));
+        })) : [emptyState('pin', 'Nothing pinned', 'Pinned messages show up here.')]));
     } catch (error) {
       card.replaceChildren(failure(error, paint));
     }
@@ -339,7 +339,7 @@ async function onboarding(host, ctx) {
     clear(host);
     if (!preview.enabled || !(preview.questions || []).length) {
       host.appendChild(emptyState('home', 'There is no welcome here',
-        'This community has not set one up, so there is nothing to see. Carry on as you are.'));
+        'No welcome questions here.'));
       return;
     }
     const choices = {};

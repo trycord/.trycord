@@ -38,16 +38,18 @@ export function mountShell() {
     class: 'm-bar__btn m-bar__mark', href: path('/notifications'), 'aria-label': 'Alerts',
   }, icon('bell', { size: 22 }), bellBadge);
   const actions = el('div', { class: 'm-bar__actions' });
+  const banner = el('div', { class: 'm-banner', hidden: true, role: 'status' });
   const bar = el('header', { class: 'm-bar' },
     backBtn, mark, barFace, titles, actions, bell);
 
-  const banner = el('div', { class: 'm-banner', hidden: true, role: 'status' });
   const screen = el('main', { class: 'm-screen', id: 'm-screen', tabindex: '-1' });
   const composerSlot = el('div', { class: 'm-send-slot', hidden: true });
+  const top = el('div', { class: 'm-chrome__top' }, banner, bar);
+  const content = el('div', { class: 'm-chrome__body' }, screen, composerSlot);
   const doorsRow = el('nav', { class: 'm-doors', 'aria-label': 'Primary' });
 
   const root = el('div', { class: 'm-root' },
-    el('div', { class: 'm-chrome' }, banner, bar, screen, composerSlot, doorsRow));
+    el('div', { class: 'm-chrome' }, top, content, doorsRow));
   const toasts = el('div', { class: 'm-toasts', id: 'm-toasts' });
   root.appendChild(toasts);
 

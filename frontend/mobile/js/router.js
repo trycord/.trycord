@@ -61,6 +61,7 @@ async function paintRoute(seq) {
   }
 
   const page = match ? match.page : null;
+  if (root && page) root.dataset.page = page.id;
   if (!page) {
     paintScreen({ head: { title: 'Nothing here' }, node: notFoundNode() });
     return;

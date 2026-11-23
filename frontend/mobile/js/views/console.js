@@ -45,7 +45,7 @@ async function keys(host) {
               await paint();
             },
           }, 'Revoke'),
-        })) : [emptyState('key', 'No keys yet', 'An integration that speaks for you needs a key, with only the scopes it needs.')]));
+        })) : [emptyState('key', 'No keys yet', 'Apps use keys. Give each key only what it needs.')]));
 
       card.appendChild(row({
         title: 'Make a key', lead: el('span', { class: 'm-row__chevron' }, icon('plus', { size: 16 })), chevron: true,
@@ -57,7 +57,7 @@ async function keys(host) {
           } catch { /* the key can still be made with a scope typed by hand */ }
           await new Promise((done) => formSheet({
             title: 'A new key',
-            note: 'The secret is shown once, when the key is made. It is never shown again.',
+            note: "Copy the secret now. You won't see it again.",
             confirmLabel: 'Make the key',
           }, [
             ['Its name', el('input', { class: 'm-input', type: 'text', maxlength: '60', 'aria-label': 'The name of the key' })],
@@ -190,7 +190,7 @@ async function federation(host) {
             } catch (error) { failed(error); }
           },
         }, 'Stop'),
-      })) : [emptyState('send', 'Nothing leaves', 'A community signed to travel appears here.')]));
+      })) : [emptyState('send', 'Nothing leaves', 'Communities you share appear here.')]));
   } catch (error) {
     outgoingCard.replaceChildren(failure(error, () => { host.replaceChildren(); return federation(host); }));
   }
@@ -215,7 +215,7 @@ async function federation(host) {
         title: report.reason || 'A report',
         sub: (report.instanceName || report.instanceId || '') + (report.createdAt ? ' · ' + when(report.createdAt) : ''),
         side: el('span', { class: 'm-row__note' }, statusWord(report.status)),
-      })) : [emptyState('flag', 'Nothing from the peers', 'Reports other instances filed with this one appear here.')]));
+      })) : [emptyState('flag', 'Nothing from the peers', 'Reports from other sites appear here.')]));
   } catch (error) {
     reportsCard.replaceChildren(failure(error, () => { host.replaceChildren(); return federation(host); }));
   }
@@ -237,7 +237,7 @@ async function status(host) {
           title: entry.title || 'An entry',
           sub: String(entry.body || '').slice(0, 120) + (entry.createdAt ? ' · ' + when(entry.createdAt) : ''),
           side: el('span', { class: 'm-row__note' }, statusWord(entry.status || entry.kind)),
-        })) : [emptyState('activity', 'Nothing on the timeline', 'Incidents and maintenance appear here as they happen.')]));
+        })) : [emptyState('activity', 'Nothing on the timeline', 'Outages and updates appear here.')]));
     } catch (error) {
       card.replaceChildren(failure(error, paint));
     }

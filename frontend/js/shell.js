@@ -30,7 +30,7 @@ import {
 import { createInspector } from './shell/inspector.js';
 import { openPalette, shortcutLabel } from './shell/palette.js';
 import {
-  applyDensity, applyLayoutWidths, applyRegions, rememberContextWidth, rememberStageWidth,
+  applyDensity, applyGlass, applyLayoutWidths, applyRegions, rememberContextWidth, rememberStageWidth,
   onPrefsChange, regionEnabled, CONTEXT_MIN, CONTEXT_MAX, STAGE_MIN, STAGE_MAX,
 } from './prefs.js';
 import { setOverride, viewportWantsMobile, siblingMount } from '../packages/chooser.js';
@@ -52,6 +52,7 @@ export function mountShell() {
   refs.inspector = createInspector(frame);
 
   applyDensity();
+  applyGlass();
   applyLayoutWidths(frame.root);
   applyRegions(frame.root);
 
@@ -111,6 +112,7 @@ export function mountShell() {
   // The arrangement is a reader's choice made in the settings screen, so the
   // shell follows it the moment it changes rather than at the next reload.
   onPrefsChange(() => {
+    applyGlass();
     applyLayoutWidths(frame.root);
     applyRegions(frame.root);
     // A panel that is no longer part of the arrangement is taken away, but the

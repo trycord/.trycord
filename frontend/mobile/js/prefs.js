@@ -24,6 +24,8 @@ export const TABS = ['dms', 'communities', 'you'];
 
 const DEFAULTS = {
   density: 'cozy',
+  // Glass is opt-in: readable contrast comes first.
+  glass: false,
   tabs: TABS.slice(),
 };
 
@@ -55,6 +57,7 @@ function normalise(raw) {
   const tabs = TABS.filter((id) => wanted.indexOf(id) !== -1);
   return {
     density: DENSITIES.indexOf(source.density) !== -1 ? source.density : DEFAULTS.density,
+    glass: source.glass === true,
     // A bar with no destination on it is not a bar; the first one is always
     // there.
     tabs: tabs.length ? tabs : DEFAULTS.tabs.slice(),
@@ -81,6 +84,12 @@ export function patchPrefs(patch) {
   return next;
 }
 
+// Put this account's phone back the way a new device would see it. The
+// settings screen offers this as a real action, so the write has to be real.
+export function resetPrefs() {
+  return patchPrefs({ density: DEFAULTS.density, tabs: DEFAULTS.tabs.slice() });
+}
+
 export function onPrefsChange(handler) {
   listeners.add(handler);
   return () => listeners.delete(handler);
@@ -95,6 +104,18 @@ export function rememberTabs(tabs) {
   return patchPrefs({ tabs });
 }
 
+export function rememberGlass(on) {
+  return patchPrefs({ glass: !!on });
+}
+
+// The document carries the choice so the stylesheet can answer with one
+// attribute; every surface changes without a repaint of the screen.
+export function applyGlass() {
+  try {
+    document.documentElement.dataset.glass = readPrefs().glass ? 'on' : 'off';
+  } catch { /* no document */ }
+}
+
 export function applyDensity() {
   const { density } = readPrefs();
   try {
@@ -105,6 +126,7 @@ export function applyDensity() {
 }
 
 export default {
-  readPrefs, patchPrefs, onPrefsChange, rememberDensity, rememberTabs, applyDensity,
+  readPrefs, patchPrefs, onPrefsChange, rememberDensity, rememberTabs, rememberGlass,
+  applyDensity, applyGlass,
   DENSITIES, TABS,
 };

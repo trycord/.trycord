@@ -39,6 +39,9 @@ export const OVERVIEW_WIDGETS = ['queue', 'reports', 'appeals', 'audit'];
 
 const DEFAULTS = {
   density: 'cozy',
+  // Glass surfaces are an opt-in look, not the default: translucent panels
+  // cost more to draw and some readers need solid contrast.
+  glass: false,
   contextWidth: 276,
   inspectorWidth: 336,
   // The reading measure of the stage. Wider than a comfortable column, because
@@ -94,6 +97,7 @@ function normalise(raw) {
   const source = raw && typeof raw === 'object' ? raw : {};
   return {
     density: DENSITIES.indexOf(source.density) !== -1 ? source.density : DEFAULTS.density,
+    glass: source.glass === true,
     contextWidth: clamp(source.contextWidth, CONTEXT_MIN, CONTEXT_MAX, DEFAULTS.contextWidth),
     inspectorWidth: clamp(source.inspectorWidth, INSPECTOR_MIN, INSPECTOR_MAX, DEFAULTS.inspectorWidth),
     stageWidth: clamp(source.stageWidth, STAGE_MIN, STAGE_MAX, DEFAULTS.stageWidth),
@@ -185,6 +189,18 @@ export function applyRegions(root) {
   return shown;
 }
 
+export function rememberGlass(on) {
+  return patchPrefs({ glass: !!on });
+}
+
+// The document carries the choice before the shell paints, so the stylesheet
+// can answer with one attribute and nothing has to be re-rendered.
+export function applyGlass() {
+  try {
+    document.documentElement.dataset.glass = readPrefs().glass ? 'on' : 'off';
+  } catch { /* no document */ }
+}
+
 export function applyDensity() {
   const { density } = readPrefs();
   try {
@@ -206,7 +222,8 @@ export function applyLayoutWidths(root) {
 export default {
   readPrefs, patchPrefs, onPrefsChange, rememberContextWidth, rememberInspectorWidth,
   rememberStageWidth, rememberInspectorTab, rememberInspectorOpen, rememberRegions,
-  regionEnabled, applyDensity, applyLayoutWidths, applyRegions,
+  regionEnabled, applyDensity, applyGlass, applyLayoutWidths, applyRegions,
+  rememberGlass,
   DENSITIES, REGIONS,
   CONTEXT_MIN, CONTEXT_MAX, INSPECTOR_MIN, INSPECTOR_MAX, STAGE_MIN, STAGE_MAX,
 };
