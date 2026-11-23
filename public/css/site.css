@@ -246,6 +246,7 @@ button { cursor: pointer; }
   background: var(--color-surface);
 }
 .cinema {
+  position: relative;
   border-radius: 18px; overflow: hidden; border: 1px solid var(--color-border);
   background: var(--color-surface-sunken);
 }
@@ -547,4 +548,66 @@ button { cursor: pointer; }
 @media (prefers-reduced-motion: no-preference) {
   .js .reveal { opacity: 0; transform: translateY(12px); }
   .js .reveal.is-visible { opacity: 1; transform: none; }
+}
+
+/* --- the classes the pages still needed ----------------------------------- */
+
+.masthead { display: flex; align-items: center; }
+.asym__item { min-width: 0; }
+.editorial__copy { display: grid; gap: 14px; align-content: center; }
+.split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; align-items: center; }
+.cta {
+  display: grid; gap: 18px; justify-items: center; text-align: center;
+  padding: 56px 32px; border-radius: 24px;
+  background: linear-gradient(135deg, var(--color-accent-subtle), var(--color-surface));
+  border: 1px solid var(--color-border);
+}
+.cta .btn { margin-top: 8px; }
+.band { padding-block: 88px; border-block: 1px solid var(--color-border-subtle); }
+.band--eclipse {
+  position: relative; overflow: hidden;
+  background: radial-gradient(70ch 40ch at 20% 0%, var(--color-accent-muted), transparent 70%), var(--color-surface-sunken);
+}
+.mock-body { display: grid; min-height: 260px; }
+.stack__frame { position: relative; perspective: 1000px; min-height: 320px; }
+.stack__card {
+  position: absolute; inset: 0; border-radius: 18px;
+  border: 1px solid var(--color-border); background: var(--color-surface);
+  box-shadow: 0 24px 60px -24px var(--color-overlay-scrim);
+  transition: transform 0.25s var(--ease-out);
+}
+.stack__card--front { transform: rotateX(3deg) rotateY(-6deg) translateZ(30px); z-index: 2; }
+.stack__card--back { transform: rotateX(-3deg) rotateY(5deg) translateZ(-30px); z-index: 1; opacity: 0.7; }
+.stack__frame:hover .stack__card--front { transform: rotateX(0) rotateY(0) translateZ(40px); }
+.pager__link--current { color: var(--color-accent); border-color: var(--color-accent); }
+.mt-5 { margin-top: 1rem; }
+
+/* --- the bolder visual lead ------------------------------------------------- */
+
+.hero h1 em {
+  font-style: normal;
+  background: linear-gradient(100deg, var(--color-accent), var(--color-accent-hover));
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+}
+.hero .btn-primary { position: relative; overflow: hidden; }
+.hero .btn-primary::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 18%) 50%, transparent 70%);
+  transform: translateX(-100%); transition: transform 0.5s var(--ease-out);
+}
+.hero .btn-primary:hover::after { transform: translateX(100%); }
+.showcase__body { box-shadow: 0 40px 90px -40px var(--color-overlay-scrim); }
+.card:hover { box-shadow: 0 0 0 1px var(--color-accent-muted), 0 18px 40px -20px var(--color-overlay-scrim); }
+.feature-icon {
+  background: linear-gradient(140deg, var(--color-accent), var(--color-accent-hover));
+  color: var(--color-on-accent); box-shadow: 0 8px 20px -8px var(--color-glow-accent);
+}
+.section-head .kicker::before {
+  content: ''; display: inline-block; width: 22px; height: 2px;
+  background: var(--color-accent); vertical-align: middle; margin-right: 10px;
+}
+.site-footer .brand .mark { color: var(--color-accent); }
+@media (prefers-reduced-motion: reduce) {
+  .hero .btn-primary::after, .stack__card, .card { transition: none; }
 }
