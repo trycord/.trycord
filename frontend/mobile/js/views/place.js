@@ -41,7 +41,7 @@ export function renderPlace(ctx) {
       class: 'm-row', type: 'button',
       onClick: () => navigate(path('/server/' + serverId + '/channel/' + channel.id)),
     },
-      el('span', { class: 'm-row__chevron', style: { color: 'var(--text-3)' } }, icon(voiceRoom ? 'volume' : 'hash', { size: 18 })),
+      el('span', { class: 'm-row__chevron', style: { color: 'var(--m-ink-3)' } }, icon(voiceRoom ? 'volume' : 'hash', { size: 18 })),
       el('div', { class: 'm-row__body' },
         el('div', { class: 'm-row__name' }, channel.name || 'A channel'),
         note ? el('div', { class: 'm-row__note' }, note) : null),

@@ -442,3 +442,10 @@
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 99px; }
 ::-webkit-scrollbar-track { background: transparent; }
+.cfg-mail__mode {
+  display: grid; gap: 4px; width: 100%; text-align: left;
+  padding: var(--tc-space-3) var(--tc-space-4);
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); color: var(--ink);
+}
+.cfg-mail__mode:hover, .cfg-mail__mode.active { border-color: var(--brand-line); background: var(--brand-soft); }

@@ -24,6 +24,7 @@
   /* Ember is an accent, not a background. Fill steps keep their own ink. */
   --brand: var(--tc-brand);
   --brand-hover: var(--tc-brand-hover);
+  --brand-strong: var(--tc-brand-strong);
   --brand-fill: var(--tc-brand-strong);
   --brand-fill-hover: var(--tc-brand);
   --brand-ink: #FFFFFF;

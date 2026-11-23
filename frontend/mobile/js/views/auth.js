@@ -67,7 +67,7 @@ function authShell(title, lede, form, swap) {
       brandMark({ size: 44 }),
       el('div', { class: 'm-auth__wordmark' }, 'Trycord'),
       el('p', { class: 'm-auth__lede' }, lede)),
-    el('div', { class: 'm-auth__title' }, el('h1', { style: { 'font-size': 'var(--fs-h2)' } }, title)),
+    el('div', { class: 'm-auth__title' }, el('h1', { style: { 'font-size': 'var(--m-xl)' } }, title)),
     el('form', { class: 'm-auth__form', onSubmit: (event) => { event.preventDefault(); form.submit(); } }, form.nodes),
     swap);
 }
