@@ -85,7 +85,7 @@ async function roleEditor(serverId, role, onDone) {
   let catalog = [];
   try {
     const answer = await Api.rolePermissions(serverId);
-    catalog = Array.isArray(answer) ? answer : (answer && answer.permissions) || [];
+    catalog = items(answer && (answer.all || answer.permissions || answer));
   } catch { /* the editor still opens: the name and colour save without it */ }
   const name = el('input', { class: 'm-input', type: 'text', maxlength: '40', value: role ? (role.name || '') : '', 'aria-label': 'The name of the role' });
   const color = el('input', { class: 'm-input', type: 'text', maxlength: '9', value: role ? (role.color || '') : '', placeholder: '#FF4D24', 'aria-label': 'The colour of the role' });
@@ -175,10 +175,10 @@ async function invites(host, ctx) {
               ['Uses before it ends (empty = no limit)', el('input', { class: 'm-input', type: 'number', min: '0', 'aria-label': 'Maximum uses' })],
               ['Hours before it ends (empty = never)', el('input', { class: 'm-input', type: 'number', min: '0', 'aria-label': 'Hours until expiry' })],
             ], done));
-            const uses = body.querySelector('input[type=number]');
-            const maxUses = Number(uses && uses.value) || undefined;
-            const create = {};
-            if (maxUses) create.maxUses = maxUses;
+            const uses = body.querySelectorAll('input[type=number]');
+            const maxUses = Number(uses[0] && uses[0].value) || null;
+            const expiresInHours = Number(uses[1] && uses[1].value) || null;
+            const create = { code: null, maxUses, expiresInHours };
             const out = await Api.createInvite(serverId, create);
             toast('Invitation ' + (out.code || 'made'));
             await paint();
@@ -386,55 +386,6 @@ async function onboarding(host, ctx) {
   }
 }
 
-// -- a place on another instance ----------------------------------------------
-
-async function federatedCommunity(host, ctx) {
-  const instanceId = ctx.params.instanceId;
-  const communityId = ctx.params.communityId;
-  host.appendChild(hold());
-  try {
-    const peers = items(await Api.continuumFederated());
-    const entry = peers.find((peer) => String(peer.communityId || peer.id) === String(communityId)
-      && String(peer.instanceId || peer.origin_instance_id || '') === String(instanceId)) || {};
-    clear(host);
-    const joined = !!(entry.joined || entry.member);
-    host.appendChild(cardOf(entry.name || 'A place across the Continuum', [
-      fact('Instance', instanceId),
-      fact('Community', communityId),
-      fact('Membership', joined ? 'Joined' : 'Not joined'),
-      entry.description ? el('p', { class: 'm-sheet__note' }, String(entry.description).slice(0, 300)) : null,
-    ]));
-    host.appendChild(el('button', {
-      class: 'm-go m-go--block', type: 'button',
-      onClick: async () => {
-        try {
-          if (joined) await Api.continuumLeaveCommunity(instanceId, communityId);
-          else await Api.continuumJoinCommunity(instanceId, communityId);
-          toast(joined ? 'Left' : 'Joined');
-          host.replaceChildren();
-          await federatedCommunity(host, ctx);
-        } catch (error) { failed(error); }
-      },
-    }, joined ? 'Leave this place' : 'Join this place'));
-
-    const relayCard = cardOf('What is relayed', []);
-    host.appendChild(relayCard);
-    try {
-      const messages = items(await Api.continuumRelayedMessages(instanceId, communityId, 40));
-      relayCard.appendChild(...(messages.length ? messages.map((message) => row({
-        title: message.authorName || message.author || 'A reader',
-        sub: String(message.content || '').slice(0, 120),
-        side: el('span', { class: 'm-row__note' }, when(message.createdAt || message.created_at)),
-      })) : [emptyState('globe', 'Nothing relayed yet', 'Messages from this place appear here as the Continuum carries them.')]));
-    } catch (error) {
-      relayCard.appendChild(failure(error, () => { host.replaceChildren(); return federatedCommunity(host, ctx); }));
-    }
-  } catch (error) {
-    clear(host);
-    host.appendChild(failure(error, () => { host.replaceChildren(); return federatedCommunity(host, ctx); }));
-  }
-}
-
 const SECTIONS = {
   'community.roles': roles,
   'community.invites': invites,
@@ -442,7 +393,6 @@ const SECTIONS = {
   'community.channelPins': channelPins,
   'community.new': newCommunity,
   'community.onboarding': onboarding,
-  'federated.community': federatedCommunity,
 };
 
 // The community's settings studio reuses the roles, invitations and category
@@ -452,5 +402,5 @@ export const invitesSection = invites;
 export const categoriesSection = categories;
 
 export function renderPlacetools(ctx) {
-  return consoleScreen(ctx.page.id, SECTIONS);
+  return consoleScreen(ctx.page.id, SECTIONS, ctx);
 }

@@ -1,293 +1,94 @@
-/* The application's semantic layer over the token library.
+/* The semantic layer of the rebuild.
  *
- * The library (inlined above by build-css.js) owns the palette, the type scale
- * and the timing. This file names the surfaces, the states and the measurements
- * the interface actually uses, so a component never reaches for a raw hex or a
- * magic pixel.
- *
- * Trycord is a workbench: navigation is quiet and structural, the conversation
- * is the most legible thing on screen, and the ember accent marks only what is
- * live, selected or primary.
- *
- * Reader-authored palettes arrive as inline --c-* properties from
- * packages/theme.js. The semantic names below fall back through them, so a
- * custom palette restyles the whole application without a second stylesheet.
+ * The raw values live in the canonical library (assets/trycord-assets/tokens).
+ * This file gives those values the names the interface speaks. Nothing here
+ * copies a previous composition: the widths, the type scale and the rhythm
+ * are the decisions of this design, not a record of an older one.
  */
 
 :root {
-  /* -- measurement --------------------------------------------------------- */
-  --rail-w: 68px;
-  --context-w: 276px;
-  --inspector-w: 336px;
-  --stage-w: 1180px;
-  --cmdbar-h: 52px;
-  --head-h: 54px;
-  --composer-max: 300px;
-  --content-max: 1040px;
-  /* A working surface is not a reading column. A studio - the workspace, the
-     settings console, anything with two panes side by side - uses the width
-     it is given, up to a point: a workspace squeezed into the width of an
-     article is a workspace nobody can work in. */
-  --workspace-max: 1760px;
+  color-scheme: dark;
 
-  /* The readable floor. */
-  --text-xs: 0.75rem;
+  /* Surfaces, three steps apart, with a line between each. */
+  --bg: var(--tc-bg);
+  --bg-deep: var(--tc-bg-deep);
+  --surface: var(--tc-surface);
+  --surface-2: var(--tc-surface-hover);
+  --surface-3: color-mix(in srgb, var(--tc-surface-hover) 72%, var(--tc-text) 8%);
+  --line: var(--tc-border);
+  --line-soft: color-mix(in srgb, var(--tc-border) 62%, transparent);
+  --ink: var(--tc-text);
+  --ink-2: var(--tc-text-muted);
+  --ink-3: color-mix(in srgb, var(--tc-text-muted) 68%, transparent);
 
-  /* -- type ---------------------------------------------------------------- */
-  --fs-display: clamp(1.9rem, 1.45rem + 1.7vw, 2.7rem);
-  --fs-h1: 1.45rem;
-  --fs-h2: 1.15rem;
-  --fs-h3: 1rem;
-  --fs-body: 0.9375rem;
-  --fs-sm: 0.875rem;
-  --fs-meta: 0.8125rem;
-  --fs-micro: 0.75rem;
-  /* The smaller size steps the components spend: extra small below the micro,
-     medium between body and small, large above the heading, extra large above
-     the display. They are the step ladder the type scale walks, so a component
-     that needs a size between two known steps asks for one rather than for a
-     value no token holds. */
-  --fs-xs: 0.6875rem;
-  --fs-md: 0.9375rem;
-  --fs-lg: 1.45rem;
-  --fs-xl: 1.9rem;
-  --weight-body: 450;
-  --weight-medium: 550;
-  --weight-strong: 650;
-  --weight-bold: 750;
-  --weight-black: 850;
-  --tracking-tight: -0.02em;
-  --tracking-label: 0.11em;
-
-  /* -- space --------------------------------------------------------------- */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-7: 28px;
-  --space-8: 40px;
-  --space-9: 56px;
-
-  /* The spacing steps between items, as the layouts ask for them. */
-  --gap-sm: var(--space-2);
-  --gap-md: var(--space-4);
-
-  /* -- radii and motion ---------------------------------------------------- */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
-  --radius-pill: var(--tc-radius-pill);
-  --line-3: rgba(246, 245, 243, 0.20);
-  --dur-1: var(--tc-motion-fast);
-  --dur-2: var(--tc-motion-normal);
-  --dur-3: 300ms;
-  --ease: var(--tc-ease);
-  --ease-out: cubic-bezier(.16, 1, .3, 1);
-
-  /* -- layering ------------------------------------------------------------
-   * The bands, from the page upwards:
-   *
-   *   nav    the shell's own chrome - the command bar
-   *   scrim  the backdrop that dims the page behind a panel
-   *   panel  the shell's panels - the place column, the inspector, the
-   *          voice dock. One band, so a panel is never above another
-   *          panel, and a panel is never above the menus, the toasts or
-   *          the dialogs that belong to the reader's attention.
-   *   menu   the menus
-   *   overlay the sheets and the dialogs
-   *   toast  the notices
-   *   popover the thing that follows the pointer
-   *   modal  the last word
-   *
-   * A panel that sits above the menus is a panel that covers the menu the
-   * reader just opened; a panel above the toasts hides the answer to what
-   * they just did. So the panels are one band, and the band is below every
-   * one of those.
-   */
-  --z-nav: 30;
-  --z-scrim: 35;
-  --z-panel: 40;
-  --z-menu: 75;
-  --z-overlay: 80;
-  --z-toast: 90;
-  --z-popover: 100;
-  --z-modal: 110;
-
-  --font: var(--tc-font-sans);
-  --mono: var(--tc-font-mono);
-
-  /* -- interactive accents -------------------------------------------------- */
-  --brand: var(--c-accent, var(--tc-brand));
+  /* Ember is an accent, not a background. Fill steps keep their own ink. */
+  --brand: var(--tc-brand);
+  --brand-hover: var(--tc-brand-hover);
   --brand-fill: var(--tc-brand-strong);
   --brand-fill-hover: var(--tc-brand);
   --brand-ink: #FFFFFF;
-  --role-colour: var(--brand);
-  --text-on-brand: var(--tc-text-on-brand);
-  --warn-soft: color-mix(in srgb, var(--warning) 12%, transparent);
-  --weight-semibold: var(--weight-strong);
-}
-
-/* Density. The attribute lives on <html> and is written by js/prefs.js; the
- * default block is cozy, and the two other arrangements change measurements
- * rather than type, so a row is still a row. The rail's width is part of the
- * arrangement: a dense workspace gives the communities less room. */
-:root,
-:root[data-density="cozy"] {
-  --row-h: 44px;
-  --row-pad: 9px 10px;
-  --gap-row: 8px;
-  --msg-gap: 15px;
-  --panel-pad: 16px;
-  --section-gap: 24px;
-  --rail-w: 68px;
-}
-:root[data-density="compact"] {
-  --row-h: 36px;
-  --row-pad: 6px 8px;
-  --gap-row: 4px;
-  --msg-gap: 10px;
-  --panel-pad: 12px;
-  --section-gap: 18px;
-  --rail-w: 54px;
-}
-:root[data-density="comfortable"] {
-  --row-h: 52px;
-  --row-pad: 12px 12px;
-  --gap-row: 10px;
-  --msg-gap: 20px;
-  --panel-pad: 20px;
-  --section-gap: 32px;
-  --rail-w: 82px;
-}
-
-/* Ember - the default dark palette. A deep, warm charcoal so the panels
- * read as steps of one material, and the ember is the only colour on
- * screen that asks for the eye. */
-:root,
-[data-theme="trycord"],
-[data-theme="dark"] {
-  color-scheme: dark;
-  --app-bg: var(--c-pg, #101114);
-  --panel: var(--c-base, #17181C);
-  --panel-2: #1E2025;
-  --panel-3: #26282F;
-  --panel-1: var(--panel);
-  --raised: #2B2E36;
-  --rail-bg: #0B0C0E;
-
-  --line: rgba(246, 245, 243, .07);
-  --line-2: rgba(246, 245, 243, .13);
-
-  --text-1: var(--c-txt, #F2F1EF);
-  --text-2: #A8ACB6;
-  --text-3: #7E828D;
-
-  --hover: rgba(242, 241, 239, .055);
-  --active: rgba(242, 241, 239, .095);
-  --selected: color-mix(in srgb, var(--brand) 18%, transparent);
-
-  --brand-soft: color-mix(in srgb, var(--brand) 14%, transparent);
-  --brand-line: color-mix(in srgb, var(--brand) 45%, transparent);
+  --brand-soft: color-mix(in srgb, var(--tc-brand) 16%, transparent);
+  --brand-line: color-mix(in srgb, var(--tc-brand) 42%, var(--tc-border));
   --focus: var(--tc-brand-focus);
 
-  --danger: var(--tc-danger);
-  --success: var(--tc-success);
-  --warning: var(--tc-warning);
+  --good: var(--tc-success);
+  --warn: var(--tc-warning);
+  --bad: var(--tc-danger);
   --info: var(--tc-info);
+  --good-soft: color-mix(in srgb, var(--tc-success) 14%, transparent);
+  --warn-soft: color-mix(in srgb, var(--tc-warning) 14%, transparent);
+  --bad-soft: color-mix(in srgb, var(--tc-danger) 14%, transparent);
 
-  --shadow-1: 0 1px 2px rgba(8, 9, 11, .5);
-  --shadow-2: 0 12px 32px -12px rgba(8, 9, 11, .7);
-  --shadow-3: 0 30px 80px -20px rgba(8, 9, 11, .85);
+  /* Type — one scale, two weights, a readable measure. */
+  --font: var(--tc-font-sans);
+  --mono: var(--tc-font-mono);
+  --fs-xs: 11px;
+  --fs-sm: 12.5px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 21px;
+  --fs-2xl: 28px;
+  --fs-3xl: clamp(30px, 4vw, 44px);
+  --leading: 1.55;
 
-  --ember-wash: radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--brand) 18%, transparent), transparent 70%);
+  /* Shape and motion — containers softer than controls. */
+  --r-sm: var(--tc-radius-sm);
+  --r-md: var(--tc-radius-md);
+  --r-lg: var(--tc-radius-lg);
+  --r-xl: var(--tc-radius-xl);
+  --r-pill: var(--tc-radius-pill);
+  --fast: var(--tc-motion-fast);
+  --normal: var(--tc-motion-normal);
+  --ease: var(--tc-ease);
 
-  --scrollbar: rgba(242, 241, 239, .12);
-  --scrollbar-hover: rgba(242, 241, 239, .22);
+  /* Frame widths — the narrow window line is drawn in shell.css. */
+  --rail-w: 68px;
+  --context-w: 276px;
+  --stage-max: 860px;
+  --page-max: 1120px;
+
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 16%);
+  --shadow-2: 0 12px 32px rgb(0 0 0 / 28%);
+  --shadow-3: 0 24px 64px rgb(0 0 0 / 42%);
 }
 
-/* Daylight */
 [data-theme="light"] {
   color-scheme: light;
-  --app-bg: #F1F2F5;
-  --panel: #F7F8FA;
-  --panel-2: #FFFFFF;
-  --panel-3: #ECEEF2;
-  --raised: #FFFFFF;
-  --rail-bg: #E7E9ED;
-
-  --line: rgba(27, 28, 33, .08);
-  --line-2: rgba(27, 28, 33, .15);
-
-  --text-1: #1B1C21;
-  --text-2: #4E535C;
-  --text-3: #6A6F7A;
-
-  --hover: rgba(27, 28, 33, .045);
-  --active: rgba(27, 28, 33, .085);
-  --selected: rgba(201, 54, 24, .13);
-
-  --brand: var(--c-accent, #C93618);
-  --brand-fill: #C93618;
-  --brand-fill-hover: #B02F14;
-  --brand-soft: rgba(201, 54, 24, .10);
-  --brand-line: rgba(201, 54, 24, .38);
-  --focus: #B02F14;
-
-  --danger: #B3261E;
-  --success: #1B7A4E;
-  --warning: #8A5A00;
-  --info: #1F5FBF;
-
-  --shadow-1: 0 1px 2px rgba(20, 22, 28, .06);
-  --shadow-2: 0 10px 30px -12px rgba(20, 22, 28, .22);
-  --shadow-3: 0 28px 60px -20px rgba(20, 22, 28, .28);
-
-  --ember-wash: radial-gradient(120% 80% at 50% 0%, rgba(201, 54, 24, .10), transparent 70%);
-
-  --scrollbar: rgba(20, 22, 28, .16);
-  --scrollbar-hover: rgba(20, 22, 28, .26);
+  --bg: var(--tc-bg);
+  --bg-deep: var(--tc-bg-deep);
+  --surface: var(--tc-surface);
+  --surface-2: var(--tc-surface-hover);
+  --surface-3: color-mix(in srgb, var(--tc-surface-hover) 80%, var(--tc-text) 4%);
+  --line: var(--tc-border);
+  --line-soft: color-mix(in srgb, var(--tc-border) 70%, transparent);
+  --ink: var(--tc-text);
+  --ink-2: var(--tc-text-muted);
+  --ink-3: color-mix(in srgb, var(--tc-text-muted) 74%, transparent);
+  --shadow-1: 0 1px 2px rgb(20 22 28 / 8%);
+  --shadow-2: 0 12px 32px rgb(20 22 28 / 12%);
+  --shadow-3: 0 24px 64px rgb(20 22 28 / 18%);
 }
 
-/* Midnight */
-[data-theme="midnight"] {
-  color-scheme: dark;
-  --app-bg: #0B0E17;
-  --panel: #121623;
-  --panel-2: #171C2C;
-  --panel-3: #1E2436;
-  --raised: #262D42;
-  --rail-bg: #080B13;
-
-  --line: rgba(190, 210, 255, .085);
-  --line-2: rgba(190, 210, 255, .15);
-
-  --text-1: #EAEFFB;
-  --text-2: #9AA6C4;
-  --text-3: #98A2B8;
-
-  --hover: rgba(190, 210, 255, .06);
-  --active: rgba(190, 210, 255, .1);
-  --selected: color-mix(in srgb, var(--brand) 18%, transparent);
-
-  --brand-soft: color-mix(in srgb, var(--brand) 16%, transparent);
-  --brand-line: color-mix(in srgb, var(--brand) 42%, transparent);
-  --focus: var(--tc-brand-focus);
-
-  --danger: #F87171;
-  --success: #4ADE9B;
-  --warning: #FBBF67;
-  --info: #8FB4FF;
-
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, .42);
-  --shadow-2: 0 10px 28px -8px rgba(0, 0, 0, .62);
-  --shadow-3: 0 26px 64px -18px rgba(0, 0, 0, .76);
-
-  --ember-wash: radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--brand) 24%, transparent), transparent 70%);
-
-  --scrollbar: rgba(190, 210, 255, .15);
-  --scrollbar-hover: rgba(190, 210, 255, .24);
+@media (prefers-reduced-motion: reduce) {
+  :root { --fast: 0ms; --normal: 0ms; }
 }

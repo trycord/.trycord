@@ -165,14 +165,17 @@ async function security(host) {
     }));
   };
 
-  const changePassword = () => formSheet({ title: 'A new password', confirmLabel: 'Change the password' }, [
-    ['The current password', el('input', { class: 'm-input', type: 'password', autocomplete: 'current-password', 'aria-label': 'The current password' })],
-    ['The new password', el('input', { class: 'm-input', type: 'password', autocomplete: 'new-password', 'aria-label': 'The new password' })],
-  ], async () => {
-    const box = document.querySelectorAll('.m-sheet .m-input');
-    await Api.changePassword({ currentPassword: box[0].value, newPassword: box[1].value });
-    toast('The password is changed');
-  });
+  const changePassword = () => {
+    const layer = formSheet({ title: 'A new password', confirmLabel: 'Change the password' }, [
+      ['The current password', el('input', { class: 'm-input', type: 'password', autocomplete: 'current-password', 'aria-label': 'The current password' })],
+      ['The new password', el('input', { class: 'm-input', type: 'password', autocomplete: 'new-password', 'aria-label': 'The new password' })],
+    ], async (body) => {
+      const picks = body.querySelectorAll('input');
+      await Api.changePassword({ currentPassword: picks[0].value, newPassword: picks[1].value });
+      toast('The password is changed');
+    });
+    return layer;
+  };
 
   passwordCard.appendChild(row({
     title: 'Change the password', lead: el('span', { class: 'm-row__chevron' }, icon('key', { size: 16 })), chevron: true,
@@ -593,5 +596,5 @@ const SECTIONS = {
 };
 
 export function renderSettings(ctx) {
-  return consoleScreen(ctx.page.id, SECTIONS);
+  return consoleScreen(ctx.page.id, SECTIONS, ctx);
 }

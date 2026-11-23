@@ -201,5 +201,5 @@ const SECTIONS = {
 };
 
 export function renderMisc(ctx) {
-  return consoleScreen(ctx.page.id, SECTIONS);
+  return consoleScreen(ctx.page.id, SECTIONS, ctx);
 }

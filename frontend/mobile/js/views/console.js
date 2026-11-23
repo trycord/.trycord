@@ -283,5 +283,5 @@ const SECTIONS = {
 };
 
 export function renderConsole(ctx) {
-  return consoleScreen(ctx.page.id, SECTIONS);
+  return consoleScreen(ctx.page.id, SECTIONS, ctx);
 }

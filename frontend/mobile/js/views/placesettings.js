@@ -769,5 +769,5 @@ const SECTIONS = {
 };
 
 export function renderPlaceSettings(ctx) {
-  return consoleScreen(ctx.page.id, SECTIONS);
+  return consoleScreen(ctx.page.id, SECTIONS, ctx);
 }

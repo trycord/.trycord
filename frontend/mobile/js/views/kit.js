@@ -110,7 +110,7 @@ export function formSheet(options, controls, run) {
   go.addEventListener('click', async () => {
     go.disabled = true;
     try {
-      await run();
+      await run(layer.body);
       closeSheet();
     } catch (error) {
       failed(error);
@@ -156,19 +156,21 @@ export function refusal() {
 }
 
 // The standard screen a console page returns: a stack the section fills on
-// mount, with the fault box if the fill fails and a retry that works.
-export function consoleScreen(pageId, sections) {
+// mount, with the fault box if the fill fails and a retry that works. The
+// context is passed through: the community's screens read the community id
+// from it, so dropping it here faults every one of those pages.
+export function consoleScreen(pageId, sections, ctx) {
   const host = el('div', { class: 'm-stack' });
   const draw = sections[pageId] || sections[''];
   return {
     node: host,
     onMount: async () => {
       try {
-        await draw(host);
+        await draw(host, ctx);
       } catch (error) {
         host.replaceChildren(failure(error, () => {
           host.replaceChildren();
-          return draw(host);
+          return draw(host, ctx);
         }));
       }
     },

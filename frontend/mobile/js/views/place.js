@@ -8,13 +8,14 @@ import { icon } from '../../../packages/icons.js';
 import Api from '../../../packages/api.js';
 import {
   State, channelsOf, categoriesOf, isMuted, serverById,
-  refreshServerTree, refreshServer,
+  refreshServerTree, refreshServer, on as onStore,
 } from '../../../packages/store.js';
 import { navigate, path } from '../../../packages/nav.js';
+import { federatedName, federatedIsJoined } from '../../../packages/places.js';
 import { avatar } from '../../../js/ui/primitives.js';
 import { current as voice } from '../../../packages/voiceSession.js';
 import { join as joinVoice } from '../../../packages/voiceSession.js';
-import { sheet, closeSheet, failed, toast, emptyState, hold, failure, field, attachLongPress } from '../ui.js';
+import { sheet, closeSheet, confirm, failed, toast, emptyState, hold, failure, field, attachLongPress } from '../ui.js';
 import { channelActions, categoryActions, memberActions } from '../actions.js';
 import { nameOf, normalizeUser } from '../../../packages/store.js';
 
@@ -164,4 +165,104 @@ export function renderPlace(ctx) {
     onMount: load,
     cleanup() { version += 1; },
   };
+}
+
+// A community on another instance, drawn with this screen's own pieces. It is
+// still a place: the same card, the same rows, the same follow action a member
+// takes from the Places door. What it cannot do is pretend the community is
+// local - its channels and its people belong to the instance that hosts it.
+
+function federatedFor(instanceId, communityId) {
+  return (State.federated || []).find((entry) =>
+    String(entry.originInstanceId) === String(instanceId)
+    && String(entry.originCommunityId) === String(communityId)) || null;
+}
+
+export function renderFederatedCommunity(ctx) {
+  const instanceId = ctx.params.instanceId;
+  const communityId = ctx.params.communityId;
+  const host = el('div', { class: 'm-stack' });
+  const identity = el('div', { class: 'm-card' });
+  const channels = el('div', { class: 'm-card' });
+  const relayed = el('div', { class: 'm-card' });
+  host.append(identity, channels, relayed);
+
+  const paintIdentity = () => {
+    const community = federatedFor(instanceId, communityId);
+    const joined = community ? federatedIsJoined(community) : false;
+    const origin = community && community.originName ? community.originName : 'another instance';
+    clear(identity);
+    identity.append(
+      el('div', { class: 'm-kicker' }, 'Hosted on ' + origin),
+      el('div', { class: 'm-row' },
+        el('div', { class: 'm-row__body' },
+          el('div', { class: 'm-row__name' }, community ? federatedName(community) : 'A community on another instance'),
+          el('div', { class: 'm-row__note' }, community && community.description
+            ? community.description
+            : 'It lives there, and that instance decides who may read it.')),
+        el('button', {
+          class: 'm-go' + (joined ? ' m-go--quiet' : ''), type: 'button',
+          onClick: async () => {
+            try {
+              if (joined) {
+                if (!(await confirm({
+                  title: 'Stop following this community?',
+                  text: 'You stop seeing what is relayed. The community itself is not affected — it lives on another instance.',
+                  confirmLabel: 'Stop following',
+                }))) return;
+                await Api.continuumLeaveCommunity(instanceId, communityId);
+                toast('You stopped following it', { type: 'success' });
+              } else {
+                await Api.continuumJoinCommunity(instanceId, communityId);
+                toast('You are following it', { type: 'success' });
+              }
+              await load();
+            } catch (error) { failed(error); }
+          },
+        }, joined ? 'Stop following' : 'Follow')),
+      el('p', { class: 'm-sheet__note' },
+        'This community is not yours to change. The people on ' + origin
+        + ' decide who may read it, who may post, and who may remove whom.'),
+    );
+  };
+
+  const paintChannels = () => {
+    const community = federatedFor(instanceId, communityId);
+    const list = (community && community.channels) || [];
+    clear(channels);
+    channels.appendChild(el('div', { class: 'm-kicker' }, 'Channels'));
+    channels.append(...(list.length ? list.map((channel) => el('div', { class: 'm-row' },
+      el('span', { class: 'm-row__chevron' }, icon(channel.type === 'voice' ? 'volume' : 'hash', { size: 16 })),
+      el('div', { class: 'm-row__body' },
+        el('div', { class: 'm-row__name' }, channel.name || 'A channel'),
+        el('div', { class: 'm-row__note' }, channel.topic || (channel.canPost ? 'Open to you' : 'Read only'))))) : [
+      emptyState('hash', 'No channels published', 'The instance that owns this place has not published any that can be read from here.'),
+    ]));
+  };
+
+  async function load() {
+    paintIdentity();
+    paintChannels();
+    clear(relayed);
+    relayed.append(el('div', { class: 'm-kicker' }, 'What was relayed'), hold());
+    try {
+      const rows = await Api.continuumRelayedMessages(instanceId, communityId, 40);
+      const list = Array.isArray(rows) ? rows : [];
+      relayed.append(el('div', { class: 'm-kicker' }, 'What was relayed'),
+        ...(list.length ? list.map((entry) => el('div', { class: 'm-row' },
+          el('span', { class: 'm-row__chevron' }, icon('message', { size: 16 })),
+          el('div', { class: 'm-row__body' },
+            el('div', { class: 'm-row__name truncate' }, String(entry.content || '').slice(0, 120) || 'A message'),
+            el('div', { class: 'm-row__note' }, (entry.author_name || entry.author || 'Somebody')
+              + (entry.created_at ? ' · ' + entry.created_at.slice(0, 16) : ''))))) : [
+          emptyState('share', 'Nothing relayed yet', 'Messages reach this instance when somebody here follows the community.'),
+        ]));
+    } catch (error) {
+      clear(relayed);
+      relayed.append(el('div', { class: 'm-kicker' }, 'What was relayed'), failure(error, load));
+    }
+  }
+
+  const off = onStore('federated', () => { paintIdentity(); paintChannels(); });
+  return { node: host, onMount: load, cleanup() { off(); } };
 }
