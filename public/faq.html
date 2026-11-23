@@ -126,98 +126,25 @@
 
   <main id="main" class="page" data-crumbs="Documentation" data-next="1">
     <div class="wrap">
-      <div class="page-head">
-        <p class="kicker">FAQ</p>
-        <h1>Frequently asked questions</h1>
-        <p class="lede">
-          Answers to the questions people ask most about running, using and
-          contributing to Trycord.
-        </p>
-      </div>
-
-      <div class="prose-layout">
-        <article class="prose">
-          <h2>What is Trycord?</h2>
-          <p>
-            Trycord is a self-hostable community messaging platform. It is open
-            source, runs on your own hardware, and gives communities control over
-            their data, their rules and their communication.
-          </p>
-
-          <h2>How do I run my own instance?</h2>
-          <p>
-            Clone the repository, install dependencies, and start the server.
-            The <a href="/docs">documentation</a> walks through every step,
-            including database configuration, mail setup and reverse proxying.
-          </p>
-
-          <h2>Is there a hosted version?</h2>
-          <p>
-            There is one official instance, at <code>trycord.dev</code>, and it
-            is run by the project. It is not a service with plans and a
-            sign-up wall: it is one instance among the ones anyone may run,
-            and nothing in the software depends on it. Every other instance is
-            operated by whoever runs it, and your account, your communities and
-            your messages live on the instance you chose and nowhere else. You
-            can make an account here and try the interface right away.
-          </p>
-
-          <h2>What databases are supported?</h2>
-          <p>
-            SQLite (default, zero configuration), MySQL and PostgreSQL. The
-            database is a configuration profile, so moving between them is an
-            environment change rather than a different build.
-          </p>
-
-          <h2>How does voice and video work?</h2>
-          <p>
-            Trycord includes an in-house STUN/TURN server and a peer-to-peer
-            WebRTC mesh for small groups. Voice is off by default and must be
-            enabled by the instance operator. No third-party media service is
-            required.
-          </p>
-
-          <h2>Can I federate with other instances?</h2>
-          <p>
-            Cross-instance federation (Continuum) exists as a setting and a
-            shared vocabulary, but it is not yet a working federation of
-            separate servers. It is off by default.
-          </p>
-
-          <h2>How do I report a bug or request a feature?</h2>
-          <p>
-            Open an issue on
-            <a href="https://github.com/trycord/.trycord" rel="noopener">GitHub</a>.
-            Security vulnerabilities should be reported privately (see the
-            <a href="/security">security page</a>).
-          </p>
-
-          <h2>What licence is Trycord released under?</h2>
-          <p>
-            MIT. You can use, modify and distribute it freely. See the
-            <a href="/licenses">licences page</a> for details.
-          </p>
-
-          <h2>How do I update my instance?</h2>
-          <p>
-            Pull the latest code, rebuild, and restart. The changelog records
-            what changed. Database migrations run automatically on startup.
-          </p>
-
-          <h2>Can I theme Trycord?</h2>
-          <p>
-            Yes. Custom themes work by writing the same design tokens the
-            product uses. The <a href="/docs">documentation</a> covers theming
-            in detail.
-          </p>
-        </article>
-
-        <aside class="toc" aria-label="On this page">
-          <p class="toc-title">On this page</p>
-        </aside>
+      <header class="page-head">
+        <p class="kicker">Questions</p>
+        <h1>Frequently asked</h1>
+        <p class="lede">Short answers about running and using a Trycord instance.</p>
+      </header>
+      <div class="prose">
+        <h2>Does Trycord need a separate chat provider?</h2>
+        <p>No. Messages, files, voice configuration and moderation records are served by the instance you run.</p>
+        <h2>Can I use an instance someone else runs?</h2>
+        <p>Yes. Create an account on that instance and open its web or phone client. Your account belongs to that instance.</p>
+        <h2>What does the operator control?</h2>
+        <p>The signing secret, database, allowed origins, storage paths, themes, federation policy, instance settings and the public pages served at the site root.</p>
+        <h2>Are messages encrypted?</h2>
+        <p>The client supports device keys and sealed messages for conversations. The server holds public keys and a recovery-sealed copy; private keys stay in the browser that created them.</p>
+        <h2>Where do I report a security issue?</h2>
+        <p>See the <a href="/security">security page</a> for the disclosure address. Do not file public issues for vulnerabilities.</p>
       </div>
     </div>
-  </main>
+</main>
 
   <footer class="site-footer">
     <div class="wrap footer-grid">

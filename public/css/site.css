@@ -593,7 +593,7 @@ button { cursor: pointer; }
 .hero .btn-primary { position: relative; overflow: hidden; }
 .hero .btn-primary::after {
   content: ''; position: absolute; inset: 0;
-  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 18%) 50%, transparent 70%);
+  background: linear-gradient(110deg, transparent 30%, color-mix(in srgb, var(--color-text-inverse) 18%, transparent) 50%, transparent 70%);
   transform: translateX(-100%); transition: transform 0.5s var(--ease-out);
 }
 .hero .btn-primary:hover::after { transform: translateX(100%); }
@@ -611,3 +611,21 @@ button { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .hero .btn-primary::after, .stack__card, .card { transition: none; }
 }
+
+/* Account controls draw from the same token layer as every other surface. */
+.login-points { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+.login-points li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: start; color: var(--color-text-secondary); }
+.login-point-mark {
+  display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
+  background: var(--color-accent-subtle); color: var(--color-accent);
+  font: 800 0.72rem var(--font-mono);
+}
+.login-submit {
+  width: 100%; min-height: 46px; border-radius: 11px;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent); color: var(--color-on-accent);
+  font-weight: 800;
+  box-shadow: 0 6px 18px -8px var(--color-glow-accent);
+}
+.login-submit:hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.login-submit:disabled { opacity: 0.6; }

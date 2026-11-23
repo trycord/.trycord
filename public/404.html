@@ -3,23 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Trycord">
-  <link rel="apple-touch-icon" href="/assets/trycord-assets/app/trycord-app-icon.svg">
-  <title>Page not found: Trycord</title>
-  <meta name="description" content="The page you were looking for does not exist here.">
-  <meta name="robots" content="noindex">
+  <title>Page not found - Trycord</title>
+  <meta name="description" content="The page you asked for is not here.">
   <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
   <script src="/js/theme.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to main content</a>
-
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="wrap masthead">
       <a class="brand" href="/">
@@ -124,42 +116,15 @@
       </div>
     </div>
   </header>
-
-  <main id="main" class="error-hero">
+  <main id="main" class="page">
     <div class="wrap">
-      <p class="kicker">404</p>
-      <h1>This page went missing.</h1>
-      <p class="lede">
-        The address you followed does not exist here. It may have moved, or it may
-        never have been a page at all. Here are the ways back in.
-      </p>
-      <div class="cta">
-        <a class="btn" href="/">Back home</a>
-        <a class="btn btn-ghost" href="/app/" data-app-link>Open the app</a>
-      </div>
-
-      <div class="split mt-5">
-        <div>
-          <h2>Looking for something?</h2>
-          <ul class="plain-list">
-            <li><a href="/communities">Browse public communities</a></li>
-            <li><a href="/features">See the features</a></li>
-            <li><a href="/docs">Read the documentation</a></li>
-          </ul>
-        </div>
-        <div>
-          <h2>Or the usual places</h2>
-          <ul class="plain-list">
-            <li><a href="/status">Check instance status</a></li>
-            <li><a href="/support">Get support</a></li>
-            <li><a href="/changelog">Read the changelog</a></li>
-            <li><a href="/roadmap">See the roadmap</a></li>
-          </ul>
-        </div>
+      <div class="error-hero">
+        <p class="kicker">404</p><h1>That page is not here</h1>
+        <p class="lede">The address may have moved, or it may have been typed incorrectly.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center"><a class="btn btn-primary" href="/">Go to the home page</a><a class="btn" href="/docs">Read the docs</a></div>
       </div>
     </div>
   </main>
-
   <footer class="site-footer">
     <div class="wrap footer-grid">
       <div class="footer-col footer-brand">
@@ -229,7 +194,6 @@
       <span class="muted">Your instance, your conversations, your rules.</span>
     </div>
   </footer>
-
   <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>

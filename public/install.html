@@ -126,95 +126,26 @@
 
   <main id="main" class="page" data-crumbs="Documentation" data-next="1">
     <div class="wrap">
-      <div class="page-head">
-        <p class="kicker">Install</p>
-        <h1>Run your own Trycord instance</h1>
-        <p class="lede">
-          Trycord is self-hosted. This page walks through installing and
-          running your own instance from scratch.
-        </p>
-      </div>
-
-      <div class="prose-layout">
-        <article class="prose">
-          <h2>Prerequisites</h2>
-          <p>
-            You need Node.js 18 or later, and a place to run it. A small VPS,
-            a Raspberry Pi, or a laptop on your network all work. No external
-            services are required for the default install.
-          </p>
-
-          <h2>Quick start</h2>
-          <pre><code>git clone https://github.com/trycord/.trycord.git
-cd .trycord
-npm install
-cp .env.example .env
-node backend/src/server.js</code></pre>
-          <p>
-            The server starts on port 9971 by default. Open
-            <code>http://localhost:9971</code> in your browser to see the app.
-          </p>
-
-          <h2>Configuration</h2>
-          <p>
-            All settings are available in the Configuration Centre at
-            <code>/admin/settings</code> once you are signed in as an
-            administrator. The most important ones:
-          </p>
-          <ul>
-            <li><strong>Instance name</strong> — shown to users and in the browser tab</li>
-            <li><strong>Public URL</strong> — the address users reach your instance at</li>
-            <li><strong>Registration</strong> — open, invite-only, or closed</li>
-            <li><strong>Mail</strong> — for password resets and verification (optional)</li>
-          </ul>
-
-          <h2>Database</h2>
-          <p>
-            SQLite is the default — a single file, zero configuration. MySQL
-            and PostgreSQL are supported for larger deployments. Changing the
-            database is an environment variable, not a different build.
-          </p>
-
-          <h2>Reverse proxy</h2>
-          <p>
-            For production, put Trycord behind nginx or Caddy with TLS. Set
-            <code>SERVER_HOST_TYPE=nginx</code> so the server trusts the proxy
-            headers. The <a href="/docs">documentation</a> covers proxy
-            configuration in detail.
-          </p>
-
-          <h2>Voice and media</h2>
-          <p>
-            Voice is off by default. To enable it, turn on the voice provider
-            in the Configuration Centre. The in-house STUN/TURN server starts
-            automatically on port 3478, and no third-party media service is
-            needed. Open <code>http://localhost:9973/</code> on the machine
-            itself to see whether the voice stack is working - the page says
-            WORKING or NOT WORKING, and says why when it says the second one.
-          </p>
-
-          <h2>Updating</h2>
-          <p>
-            Pull the latest code, rebuild, and restart. Database migrations run
-            automatically on startup. The <a href="/changelog">changelog</a>
-            records what changed.
-          </p>
-
-          <h2>Getting help</h2>
-          <p>
-            The <a href="/docs">documentation</a> covers configuration, theming,
-            the desktop app and the architecture. If you get stuck, open an
-            issue on <a href="https://github.com/trycord/.trycord" rel="noopener">GitHub</a>
-            or ask on <a href="https://discord.gg/dSF7eqsJuP" rel="noopener">Discord</a>.
-          </p>
-        </article>
-
-        <aside class="toc" aria-label="On this page">
-          <p class="toc-title">On this page</p>
-        </aside>
+      <header class="page-head">
+        <p class="kicker">Documentation</p>
+        <h1>Install Trycord</h1>
+        <p class="lede">One Node service provides the API, the gateway, the job worker, the web clients and this website.</p>
+      </header>
+      <div class="prose">
+        <h2>1. Install dependencies</h2>
+        <pre class="panel"><code>cd backend
+npm install</code></pre>
+        <h2>2. Configure the instance</h2>
+        <p>Copy the example environment file, set a signing secret and choose the database profile. Generate the secret with:</p>
+        <pre class="panel"><code>node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"</code></pre>
+        <h2>3. Initialise and start</h2>
+        <pre class="panel"><code>npm run seed
+npm start</code></pre>
+        <p>The server listens on <span class="mono">http://localhost:9971</span> by default and serves the API, the web clients and the public site from that port. If your client directory is not in the default location, set <span class="mono">TRYCORD_CLIENT_DIR</span> to the directory that contains <span class="mono">index.html</span>.</p>
+        <p><a class="text-link" href="/docs">Full configuration reference</a></p>
       </div>
     </div>
-  </main>
+</main>
 
   <footer class="site-footer">
     <div class="wrap footer-grid">

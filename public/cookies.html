@@ -1,25 +1,17 @@
 <!doctype html>
 <html lang="en">
 <head>
-
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Trycord">
-  <link rel="apple-touch-icon" href="/assets/trycord-assets/app/trycord-app-icon.svg">
-    <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
+  <title>Cookies and storage - Trycord</title>
+  <meta name="description" content="What Trycord stores in your browser.">
+  <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
   <script src="/js/theme.js"></script>
-  <title>Cookies — Trycord</title>
-  <meta name="description" content="What cookies and local storage Trycord uses and why.">
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to main content</a>
-
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="wrap masthead">
       <a class="brand" href="/">
@@ -124,121 +116,17 @@
       </div>
     </div>
   </header>
-
-  <main id="main" class="page" data-crumbs="Legal">
+  <main id="main" class="page">
     <div class="wrap">
-      <div class="page-head">
-        <p class="kicker">Cookies</p>
-        <h1>Cookies and local storage</h1>
-        <p class="lede">
-          What Trycord keeps in your browser, why each thing is there, and how
-          to get rid of it. The short version: no cookies are set, and
-          nothing is tracked.
-        </p>
-      </div>
-      <div class="prose-layout">
-        <article class="prose">
-          <div class="draft-note" role="note">
-            <strong>Legal review required before publication.</strong> This
-            document comes from the Trycord project as a starting point for an
-            instance. It is not legal advice, and nobody has reviewed it for the
-            instance serving it. The field marked <code>OPERATOR</code> is a
-            fact only the operator can supply: the address for questions about
-            storage and consent on this instance. Fill it in, and have a
-            qualified lawyer read the result, before presenting this document as
-            binding.
-            The contact points in these documents are the project's own. If you run your own
-            instance, replace them with yours before you publish them.
-          </div>
-          <p class="small muted">
-            <strong>Version:</strong> <code>1.0</code> &middot;
-            <strong>Template last revised:</strong> <code>2026-09-20</code> &middot;
-            <strong>Effective on this instance:</strong>
-            <span class="op-field" data-op="effective-date">OPERATOR: the date this document takes effect on this instance</span>
-          </p>
-
-          <h2>1. No cookies are set</h2>
-          <p>
-            The server sets no cookies at all, and the application never reads
-            one. There is no advertising cookie, no tracking cookie, no
-            third-party cookie, and no cookie that follows you to another site.
-            If a cookie appears in your browser for this instance, it was put
-            there by something else.
-          </p>
-
-          <h2>2. What the browser stores instead</h2>
-          <p>
-            A few things are kept in your browser's local storage, which is
-            part of the browser rather than part of the site. They stay on your
-            device and are not sent anywhere until the application needs them.
-          </p>
-          <ul>
-            <li><strong>Your session token.</strong> When you sign in, the server issues a signed token and the browser keeps it under a key that includes the instance's own address, so a token from one instance is never handed to another. It is sent back on each request as an authorisation header. Clearing it signs you out; it is not a cookie and it is not readable by another site.</li>
-            <li><strong>Your theme and your preferences.</strong> The light or dark choice, any custom palette, the motion setting, and the layout of your workspace are stored so they survive a reload.</li>
-            <li><strong>The API address you are using.</strong> If you point the client at a different instance, that address is remembered, along with the token for that instance, under that instance's own key.</li>
-            <li><strong>This site's theme choice.</strong> The website keeps it under its own key, separately from the application's, so a theme picked here never changes how the app looks.</li>
-          </ul>
-
-          <h2>3. Why each one is there</h2>
-          <p>
-            The token is the session: without it the server cannot tell who you
-            are, and you cannot post, read private channels, or send a direct
-            message. The preferences are convenience. The API address is what
-            lets one browser hold a session on more than one instance at once,
-            which is the point of self-hosting.
-          </p>
-          <p>
-            None of them is used to build a profile of you, to count visits, or
-            to measure an advertising campaign, because there is no such
-            campaign.
-          </p>
-
-          <h2>4. Other sites</h2>
-          <p>
-            A page on this site can embed an image or a link from somewhere
-            else, and a browser will tell that other place your address when
-            it does. The website itself embeds nothing from another origin.
-            The application connects only to the instance it is talking to.
-          </p>
-
-          <h2>5. Clearing it</h2>
-          <p>
-            You can clear site data in your browser's settings at any time.
-            Doing so signs you out, resets the stored preferences, and forgets
-            the instance you were pointed at. Nothing on the server is affected:
-            your account, your messages and your settings are still there when
-            you sign in again.
-          </p>
-          <p>
-            Clearing a single item is usually possible as well: the browser's
-            storage viewer lists each key, and removing the session token signs
-            you out on that instance only.
-          </p>
-
-          <h2>6. Consent</h2>
-          <p>
-            Some jurisdictions require consent before non-essential storage is
-            used. Trycord stores nothing that is not needed for the service to
-            work, and asks for nothing, but the operator of an instance is the
-            one who has to answer that question for their users:
-            <span class="op-field" data-op="cookie-contact">OPERATOR: how consent is handled on this instance, if the law where it operates requires it</span>.
-          </p>
-
-          <h2>7. Changes</h2>
-          <p>
-            If the software starts storing something new, this page changes
-            with it, and the version and the date at the top of the page tell
-            you when.
-          </p>
-        </article>
-        <aside class="toc" aria-label="On this page">
-          <p class="toc-title">On this page</p>
-        </aside>
+      <header class="page-head"><p class="kicker">Privacy</p><h1>Cookies and local storage</h1><p class="lede">A short account of what this site and the clients keep on your device.</p></header>
+      <div class="prose">
+        <h2>This website</h2><p>The site stores your light or dark choice so the pages open the way you left them. It does not set advertising or tracking cookies.</p>
+        <h2>The web client</h2><p>The client keeps your sign-in token and layout choices in this browser. The token is never written into a link. Signing out removes it.</p>
+        <h2>Encrypted conversations</h2><p>Device keys are kept in the browser that created them. The server holds public keys and a recovery-sealed copy of the private material.</p>
+        <h2>Your control</h2><p>Clearing site data in your browser removes the stored session, theme and layout choices. You will need to sign in again.</p>
       </div>
     </div>
   </main>
-
-
   <footer class="site-footer">
     <div class="wrap footer-grid">
       <div class="footer-col footer-brand">
@@ -308,7 +196,6 @@
       <span class="muted">Your instance, your conversations, your rules.</span>
     </div>
   </footer>
-
   <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>

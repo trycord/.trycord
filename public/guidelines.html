@@ -1,25 +1,17 @@
 <!doctype html>
 <html lang="en">
 <head>
-
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Trycord">
-  <link rel="apple-touch-icon" href="/assets/trycord-assets/app/trycord-app-icon.svg">
-    <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
+  <title>Guidelines - Trycord</title>
+  <meta name="description" content="Guidelines for running and using Trycord.">
+  <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
   <script src="/js/theme.js"></script>
-  <title>Community Guidelines — Trycord</title>
-  <meta name="description" content="Community standards for members and communities on Trycord instances.">
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to main content</a>
-
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="wrap masthead">
       <a class="brand" href="/">
@@ -124,187 +116,20 @@
       </div>
     </div>
   </header>
-
-  <main id="main" class="page" data-crumbs="Legal">
+  <main id="main" class="page">
     <div class="wrap">
-      <div class="page-head">
-        <p class="kicker">Guidelines</p>
-        <h1>Acceptable Use</h1>
-        <p class="lede">
-          The rules that apply to everyone using any Trycord instance:
-          members, community owners, moderators and administrators. They exist
-          so that every community starts from the same place, and so that
-          there is a floor under what any of them may decide.
-        </p>
-      </div>
-      <div class="prose-layout">
-        <article class="prose">
-          <div class="draft-note" role="note">
-            <strong>Legal review required before publication.</strong> This
-            document comes from the Trycord project as a starting point for an
-            instance. It is not legal advice, and nobody has reviewed it for the
-            instance serving it. The field marked <code>OPERATOR</code> is a
-            fact only the operator can supply: where a report about a breach
-            of these rules should go. Fill it in, and have a qualified lawyer
-            read the result, before presenting this document as binding.
-            The contact points in these documents are the project's own. If you run your own
-            instance, replace them with yours before you publish them.
-          </div>
-          <p class="small muted">
-            <strong>Version:</strong> <code>1.0</code> &middot;
-            <strong>Template last revised:</strong> <code>2026-09-20</code> &middot;
-            <strong>Effective on this instance:</strong>
-            <span class="op-field" data-op="effective-date">OPERATOR: the date these rules take effect on this instance</span>
-          </p>
+      <header class="page-head"><p class="kicker">Guidelines</p><h1>Using Trycord well</h1><p class="lede">For people running an instance and people using one.</p></header>
+      <div class="prose">
+        <h2>If you run an instance</h2><p>Keep the signing secret private, take database backups, and tell your members who to contact when something breaks. Decide who can moderate before you need a moderator.</p>
+        <h2>If you run a community</h2><p>Write down what the place is for. Give roles only the permissions they need. Read the report queue rather than letting it pile up.</p>
+        <h2>If you use a community</h2><p>Follow the rules set by the people who run it. Report problems with the report button on the message, file or person.</p>
+        <h2>What we will not do</h2><p>We do not read your instance. There is no central service holding your messages or your files.</p>
 
-          <h2>1. Who they apply to</h2>
-          <p>
-            These rules apply to every account on this instance, whoever opened
-            it. That includes people who moderate a community, people who own
-            one, people who build bots or integrations, and the operator. A
-            rule that applies to members but not to moderators is not a rule;
-            it is a preference.
-          </p>
-          <p>
-            They sit underneath the <a href="/terms">Terms of Service</a> and
-            underneath any rules a community sets for itself. A community may
-            add rules. It may not remove these.
-          </p>
-
-          <h2>2. Treat people with respect</h2>
-          <p>
-            Do not harass, threaten, stalk, defame, or incite violence against
-            anyone. That covers direct messages as much as public channels, and
-            it covers the people who moderate the community as much as the
-            people who post in it. Hateful content, and content that targets
-            somebody for who they are, has no place here.
-          </p>
-
-          <h2>3. Child sexual abuse material is prohibited, without exception</h2>
-          <p>
-            No instance may host child sexual abuse material, and no instance
-            may be used to ask for it, offer it, trade it, or help somebody
-            else to get it. There is no exception for a small community, for a
-            private one, for a community that has a rule against it, for
-            material that is fictional, for material that has been altered or
-            generated, or for material that is described rather than shown.
-          </p>
-          <p>
-            The prohibition covers every route into the instance: messages,
-            direct messages, files and attachments, profile pictures, avatars,
-            banners, community icons, link previews, uploads that nobody has
-            opened yet, the output of a bot, the result of an extension or
-            integration, and content that arrived over federation from another
-            instance. A route that is technically obscure is still a route.
-          </p>
-          <p>
-            Attempting it is prohibited as well. Asking for such material,
-            offering it, arranging to obtain it, and helping someone else
-            obtain it are all covered.
-          </p>
-          <p>
-            Running an instance does not create an exception. An operator who
-            knows such material is present and does not remove it, or who is
-            told about it and does not act, is responsible for that failure
-            under the law that applies to them. Nobody can grant permission to
-            break this rule.
-          </p>
-          <p>
-            Reports go to
-            <span class="op-field" data-op="guidelines-report-contact">OPERATOR: where a report of child sexual abuse material, or any other breach of these rules, is sent on this instance</span>,
-            and, where the law requires it, to the authority in the country
-            where it happened. The
-            <a href="/trust-and-safety">Trust and Safety</a> page describes
-            what happens next.
-          </p>
-
-          <h2>4. Keep what you post lawful</h2>
-          <p>
-            Do not post content that is illegal where it is posted, content
-            that infringes someone else's rights, or content that encourages
-            others to break the law. Do not distribute malware, and do not
-            distribute material you have no right to distribute.
-          </p>
-
-          <h2>5. Respect other people's privacy</h2>
-          <p>
-            Do not share private information about another person without their
-            agreement, and do not publish material you obtained from somewhere
-            that was not yours to share it from. Direct messages are private
-            and are not federated unless the sender has turned that on. If you
-            are asked to keep something private, keep it private.
-          </p>
-
-          <h2>6. Do not deceive</h2>
-          <p>
-            Do not impersonate another person, and do not present yourself as
-            somebody you are not in a way that misleads people about who they
-            are dealing with. Do not misrepresent where content came from.
-            Editing a message to change what it says after the fact is allowed;
-            presenting an edited message as the original is not.
-          </p>
-
-          <h2>7. Do not abuse the service</h2>
-          <p>
-            Do not scrape the service, resell access to it, overload it, or work
-            around rate limits, bans, or permission checks. Do not create
-            accounts to evade a limit or a ban. Do not send bulk unsolicited
-            messages.
-          </p>
-          <p>
-            A bot, an extension or an integration is allowed, and it is held
-            to the same rules as a person: it may not post what a person may
-            not post, and the person who installed it is responsible for what
-            it does.
-          </p>
-
-          <h2>8. Respect other people's work</h2>
-          <p>
-            Do not post content that infringes copyright, and do not pass off
-            somebody else's work as your own. If something of yours was used
-            without permission, report it to the operator.
-          </p>
-
-          <h2>9. Community rules</h2>
-          <p>
-            Communities may set stricter rules for their own members, and
-            breaking them is a matter for that community's moderators first. A
-            community rule may not weaken anything in this document, and it may
-            not make private material public.
-          </p>
-          <p>
-            The rules for running a community, including what a community owes
-            the people in it, are on the
-            <a href="/community-guidelines">running a community</a> page.
-          </p>
-
-          <h2>10. What happens when the rules are broken</h2>
-          <p>
-            An operator or a moderator may warn somebody, remove content, time
-            out an account, suspend it, or terminate it. The action should fit
-            the conduct, and the same conduct should get the same answer. The
-            <a href="/trust-and-safety">Trust and Safety</a> page describes
-            the steps and the records that are kept.
-          </p>
-
-          <h2>11. Appeals</h2>
-          <p>
-            Anyone actioned can ask for the decision to be looked at again, and
-            an instance that takes action must offer that route. The
-            <a href="/support">Support</a> page explains how to use it. An
-            appeal cannot override the prohibition on child sexual abuse
-            material, and it cannot require anybody to keep or return illegal
-            material.
-          </p>
-        </article>
-        <aside class="toc" aria-label="On this page">
-          <p class="toc-title">On this page</p>
-        </aside>
+        <h2>Content that is never allowed</h2>
+        <p>We prohibit child sexual abuse material on every part of Trycord, whether it appears in a message, an attachment or a file, or arrives through a bot, an integration, an extension or federation from another instance. Running your own instance does not create an exception to this rule: no operator can allow it, and no configuration creates an exception.</p>
       </div>
     </div>
   </main>
-
-
   <footer class="site-footer">
     <div class="wrap footer-grid">
       <div class="footer-col footer-brand">
@@ -374,7 +199,6 @@
       <span class="muted">Your instance, your conversations, your rules.</span>
     </div>
   </footer>
-
   <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>

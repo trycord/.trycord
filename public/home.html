@@ -126,96 +126,47 @@
   </header>
 
   <main id="main">
-    <!--
-      The hero is the brand's own geometry: the desktop client in a window and
-      the phone beside it, laid out flat in a single frame. Both are drawn from
-      the same miniatures the rest of the page uses - a picture of the product,
-      not a claim to be running it.
-    -->
     <section class="hero">
       <div class="wrap">
         <div class="hero-grid">
           <div class="hero-copy">
-            <p class="kicker">Private community messaging</p>
-            <h1>Chat on a <em>server</em> you run</h1>
-            <p class="lede">
-              Trycord is group chat you can run yourself. Communities with their own
-              channels, roles and permissions, one-to-one messages, and moderation
-              that the server enforces rather than the browser. Point a domain at it
-              and invite your group, or join an instance someone else runs.
-            </p>
-            <div class="cta">
-              <a class="btn btn-primary btn--pill" href="/app/register" data-app-link>Create an account</a>
-              <a class="btn btn-ghost btn--pill" href="/features">See the features</a>
+            <p class="kicker">Self-hosted community chat</p>
+            <h1>A chat server you run yourself</h1>
+            <p class="lede">Trycord is one server for your accounts, communities, channels, files and moderation record. Point a domain at it, invite your people, and keep the whole conversation on hardware you choose.</p>
+            <div class="section-head" style="margin:0;display:flex;gap:12px;flex-wrap:wrap">
+              <a class="btn btn-primary" href="/register">Create an account</a>
+              <a class="btn" href="/docs">Read the docs</a>
             </div>
+            <p class="small muted">Already have an instance? <a href="/login">Sign in</a>.</p>
           </div>
 
-          <div class="showcase showcase--hero">
-            <div class="showcase__body">
-              <div class="hero-preview">
-                <div class="device device--desktop">
-                  <div class="app-window">
-                    <div class="app-titlebar">
-                      <span class="dot" aria-hidden="true"></span>
-                      <span class="dot" aria-hidden="true"></span>
-                      <span class="dot" aria-hidden="true"></span>
-                      <span class="app-url">Trycord</span>
-                    </div>
-                    <div class="mini-channel-group" aria-hidden="true">
-                      <p class="mini-channel-label">Studio Twelve</p>
-                      <div class="mini-channel"><span class="hash">#</span><span>general</span></div>
-                      <div class="mini-channel"><span class="hash">#</span><span>showcase</span></div>
-                      <div class="mini-channel"><span class="hash">#</span><span>feedback</span></div>
-                      <div class="mini-channel"><span class="hash">#</span><span>off-topic</span></div>
-                    </div>
-                    <div class="mini-messages" role="presentation">
-                      <div class="mini-msg">
-                        <div class="mini-avatar av-1" aria-hidden="true">M</div>
-                        <div>
-                          <div class="mini-msg-head"><span class="who">Mira</span><span class="when">Today at 9:09</span></div>
-                          <p>The build went out this morning &mdash; changelog is in the usual channel.</p>
-                        </div>
-                      </div>
-                      <div class="mini-msg">
-                        <div class="mini-avatar av-2" aria-hidden="true">K</div>
-                        <div>
-                          <div class="mini-msg-head"><span class="who">Kai</span><span class="when">Today at 9:11</span></div>
-                          <p>Nice. Locking the release thread once CI is green.</p>
-                        </div>
-                      </div>
-                    </div>
+          <div class="hero-preview" aria-label="A Trycord community in the web client">
+            <div class="app-window">
+              <div class="app-titlebar">
+                <span class="showcase__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="app-url">trycord.dev / c / studio-twelve</span>
+              </div>
+              <div class="app-body">
+                <div class="mini-channel-list">
+                  <div class="mock-appbar"><span class="mock-appbar__name">Studio Twelve</span></div>
+                  <div class="mini-channel-group">
+                    <p class="mini-channel-label">Channels</p>
+                    <div class="mini-channel is-active"><span class="hash">#</span> general</div>
+                    <div class="mini-channel"><span class="hash">#</span> releases</div>
+                    <div class="mini-channel"><span class="hash">#</span> feedback</div>
+                  </div>
+                  <div class="mini-members">
+                    <p class="mini-channel-label">Members</p>
+                    <div class="mini-member"><span class="mini-presence presence-online"></span> Mira</div>
+                    <div class="mini-member"><span class="mini-presence presence-online"></span> Rowan</div>
+                    <div class="mini-member"><span class="mini-presence presence-idle"></span> Kai</div>
                   </div>
                 </div>
-
-                <div class="device device--phone">
-                  <div class="device__screen">
-                    <div class="mock-speaker" aria-hidden="true"></div>
-                    <div class="mock-appbar">
-                      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-                        <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
-                        <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
-                        <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
-                        <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
-                      </svg>
-                      <div>
-                        <div class="mock-appbar__name">Studio Twelve</div>
-                        <div class="mock-appbar__sub">128 members &middot; 4 channels</div>
-                      </div>
-                    </div>
-                    <div class="mock-body">
-                      <p class="mock-label">Channels</p>
-                      <div class="mock-row mock-row--active"><span class="hash">#</span> general <span class="mock-badge">3</span></div>
-                      <div class="mock-row"><span class="hash">#</span> showcase</div>
-                      <div class="mock-row"><span class="hash">#</span> feedback</div>
-                      <div class="mock-row"><span class="hash">#</span> off-topic</div>
-                    </div>
-                    <nav class="mock-tabs" aria-hidden="true">
-                      <span class="is-active"><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></g></svg></span>
-                      <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></g></svg></span>
-                      <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></g></svg></span>
-                      <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></g></svg></span>
-                      <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></g></svg></span>
-                    </nav>
+                <div style="flex:1;min-width:0">
+                  <div class="mock-appbar"><span class="mock-appbar__name"># general</span><span class="mock-appbar__sub">Releases and day-to-day talk</span></div>
+                  <div class="mini-messages">
+                    <div class="mini-msg"><span class="mini-avatar"></span><span><span class="mini-msg-head">Mira</span> The 1.0.0-rc1 build is up. Changelog is in <span class="hash">#releases</span>.</span></div>
+                    <div class="mini-msg"><span class="mini-avatar"></span><span><span class="mini-msg-head">Rowan</span> Confirmed. The report queue and appeals are both writing to the audit chain now.</span></div>
                   </div>
                 </div>
               </div>
@@ -225,242 +176,97 @@
       </div>
     </section>
 
-    <!--
-      The strip under the hero. Four facts about what the product is, divided by
-      rules rather than by gaps.
-    -->
     <section class="section">
       <div class="wrap">
-        <div class="strip">
-          <div class="strip__cell">
-            <p class="kicker">The server</p>
-            <b>One process</b>
-            <span>The client, the API, the realtime gateway and this site, all served from one port.</span>
-          </div>
-          <div class="strip__cell">
-            <p class="kicker">The data</p>
-            <b>Your database</b>
-            <span>Messages, files and accounts live where you put them. Nothing is mirrored somewhere else.</span>
-          </div>
-          <div class="strip__cell">
-            <p class="kicker">The door</p>
-            <b>Your call</b>
-            <span>Registration can be open, approved by an admin, or closed with invites by code.</span>
-          </div>
-          <div class="strip__cell">
-            <p class="kicker">The source</p>
-            <b>Open, MIT</b>
-            <span>The whole repository is public and MIT licensed, and the development is in the open.</span>
-          </div>
+        <div class="section-head">
+          <p class="kicker">What the server does</p>
+          <h2>What you get</h2>
+          <p class="lede">Messages, files, voice settings and moderation all live on the same instance. You install one server, not a stack of services.</p>
+        </div>
+        <div class="cards cards--3">
+          <a class="card" href="/features">
+            <span class="feature-icon" aria-hidden="true">#</span>
+            <h3>Channels and conversations</h3>
+            <p>Text channels, threads, direct messages, pinned messages, slow mode and channel-specific permissions. Messages carry reactions and attachments, including images your community names as custom emoji.</p>
+            <span class="text-link">See the features</span>
+          </a>
+          <a class="card" href="/features#moderation">
+            <span class="feature-icon" aria-hidden="true">!</span>
+            <h3>Moderation with a record</h3>
+            <p>Reports against messages, people and files become cases with frozen evidence. Warnings, timeouts, bans and appeals are enforced by the server and written to a hash-chained audit log.</p>
+            <span class="text-link">How moderation works</span>
+          </a>
+          <a class="card" href="/features#files">
+            <span class="feature-icon" aria-hidden="true">+</span>
+            <h3>Files and shared work</h3>
+            <p>Message attachments, community-owned workspace files, spaces, documents, boards and polls live with the community that made them. Nothing disappears when a chat scrolls away.</p>
+            <span class="text-link">See the workspace</span>
+          </a>
         </div>
       </div>
     </section>
 
-    <!--
-      The feature band: three cards over the sunken surface, each holding a
-      piece of the client's interface at the scale a card can carry.
-    -->
-    <section class="cinema">
+    <section class="band band--eclipse">
       <div class="wrap">
-        <div class="cinema__head">
-          <h2>What a community <em>leans on</em></h2>
-          <p>
-            Channels and roles, messages and files, presence, moderation and the
-            appeals that follow it. The features page has the whole list, with
-            what is off by default and what is still being built.
-          </p>
+        <div class="section-head">
+          <p class="kicker">Two clients</p>
+          <h2>Web, desktop and phone</h2>
+          <p class="lede">The web client has three columns, a command palette and resizable panels. The phone client has three doors, long-press menus and sheets. Both use the same account and the same API.</p>
         </div>
-
-
+        <div class="cards cards--2">
+          <a class="card" href="/download">
+            <h3>Desktop and browser</h3>
+            <p>Open the web client in a browser or install the desktop shell. The native application carries the same interface, with its own window and origin.</p>
+            <span class="text-link">Get the desktop app</span>
+          </a>
+          <a class="card" href="/app/">
+            <h3>Phone</h3>
+            <p>A separate client served at /mobile, with conversations, places and your profile as the three doors. It opens the same communities and the same messages.</p>
+            <span class="text-link">Open the app</span>
+          </a>
+        </div>
       </div>
     </section>
 
-    <!--
-      The product sheet: the self-hosting path, in the frame of a browser, with
-      the commands the documentation actually gives.
-    -->
     <section class="section">
       <div class="wrap">
-        <div class="section-head section-head--statement">
-          <p class="kicker">Run it yourself</p>
-          <h2>Three commands and a secret</h2>
-          <p>
-            The server is one process and one database file. A fresh install works
-            with the defaults, and the only value you have to set is the signing
-            secret.
-          </p>
+        <div class="section-head">
+          <p class="kicker">Run it</p>
+          <h2>Running it</h2>
+          <p class="lede">Trycord is one Node service: API, gateway, jobs and the web clients on one port. The install guide takes you from a fresh machine to a signed-in account.</p>
         </div>
-
-        <div class="showcase">
-          <div class="showcase__bar">
-            <span class="showcase__dots" aria-hidden="true"><span></span><span></span><span></span></span>
-            <span class="showcase__url">your-host:9971</span>
-          </div>
-          <div class="showcase__body">
-            <pre><code>git clone https://github.com/trycord/.trycord.git
-cd .trycord
-cp .env.docker.example .env
-# edit .env and set JWT_SECRET
-docker compose up -d
-
-docker compose logs -f          # follow the boot log
-docker compose ps               # health status
-curl -fsS localhost:9971/api/health</code></pre>
-          </div>
+        <div class="steps">
+          <div class="step" data-step="01"><h3>Install</h3><p>Install the backend dependencies and choose your database profile.</p><a class="text-link" href="/install">Install guide</a></div>
+          <div class="step" data-step="02"><h3>Configure</h3><p>Set the signing secret, the origins you serve and the paths the server reads its clients from.</p><a class="text-link" href="/docs">Configuration</a></div>
+          <div class="step" data-step="03"><h3>Start</h3><p>The one process serves the API, the gateway, the web clients and this website on the port you choose.</p><a class="text-link" href="/docs">Run the server</a></div>
         </div>
-
-        <div class="features">
-          <article class="feature">
-            <div class="feature-copy">
-              <h3>Install the server</h3>
-              <p>Node with SQLite for a small instance, or Docker Compose with MySQL. A fresh install works with the defaults.</p>
-            </div>
-            <div class="feature-icon" aria-hidden="true">
-              <svg class="icon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/></g></svg>
-            </div>
-          </article>
-          <article class="feature">
-            <div class="feature-copy">
-              <h3>Point it at a domain</h3>
-              <p>Set the public URL so links in email and invites are correct, and put a reverse proxy in front of it for TLS.</p>
-            </div>
-            <div class="feature-icon" aria-hidden="true">
-              <svg class="icon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"/></g></svg>
-            </div>
-          </article>
-          <article class="feature">
-            <div class="feature-copy">
-              <h3>Invite who you want</h3>
-              <p>Keep registration open, invite by code, or close the instance entirely. The server enforces whichever you choose.</p>
-            </div>
-            <div class="feature-icon" aria-hidden="true">
-              <svg class="icon" viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></g></svg>
-            </div>
-          </article>
-        </div>
-
-        <p class="mt-5"><a class="text-link" href="/docs">Read the self-hosting guide</a></p>
       </div>
     </section>
 
-    <!--
-      The figures. Facts about the product, in a row divided by rules. None of
-      them are numbers about how many people use it.
-    -->
     <section class="section">
       <div class="wrap">
+        <div class="section-head">
+          <p class="kicker">The details</p>
+          <h2>A few details</h2>
+        </div>
         <div class="figures">
-          <div class="figures__cell">
-            <b>Two clients, <em>one code</em></b>
-            <span>The same client runs in a browser tab and in a desktop window, and on a phone in its own composition.</span>
-          </div>
-          <div class="figures__cell">
-            <b>Enforced on the <em>server</em></b>
-            <span>Permissions, moderation and rate limits are checked by the server, not by the interface.</span>
-          </div>
-          <div class="figures__cell">
-            <b>A <em>database</em>, not a service</b>
-            <span>SQLite to begin with, MySQL when the community grows, and your data either way.</span>
-          </div>
-          <div class="figures__cell">
-            <b>Bots that <em>act</em></b>
-            <span>A REST API, a realtime gateway and an SDK, so a community can connect things without a person relaying messages.</span>
-          </div>
+          <div class="figures__cell"><strong>One database</strong><span class="muted">Accounts, messages, files and moderation history in the same store.</span></div>
+          <div class="figures__cell"><strong>Your own domain</strong><span class="muted">The server serves the site, the app and the API from the origin you configure.</span></div>
+          <div class="figures__cell"><strong>Continuum ready</strong><span class="muted">Follow communities on trusted peer instances and read what they relay.</span></div>
+          <div class="figures__cell"><strong>Readable source</strong><span class="muted">The API, clients, tests and docs are in the repository, MIT licensed.</span></div>
         </div>
       </div>
     </section>
 
-    <!--
-      The editorial section: the type does the work, and the product sits beside
-      it at an angle.
-    -->
-    <section class="section">
-      <div class="wrap editorial__body">
-        <div>
-          <h2 class="editorial__type"><span>Run the</span><span>server</span><span>yourself</span></h2>
-          <div class="editorial__copy mt-5">
-            <p>
-              There is one official instance, and nothing in the software depends
-              on it. Point a domain at your own, invite your group, and the
-              conversations stay in the database you run.
-            </p>
-            <div class="cta mt-5">
-              <a class="btn btn-primary btn--pill" href="/docs">Read the documentation</a>
-              <a class="btn btn-ghost btn--pill" href="/features">See every feature</a>
-            </div>
-          </div>
-        </div>
-
-        <div class="asym">
-          <div class="asym__item asym__item--phone">
-            <div class="device device--phone">
-              <div class="device__screen">
-                <div class="mock-speaker" aria-hidden="true"></div>
-                <div class="mock-appbar">
-                  <svg class="mark" viewBox="0 0 100 100" aria-hidden="true" focusable="false">
-                    <path d="M50 9 L88 78 Q90 82 85 82 L65 82 L50 56 L35 82 L15 82 Q10 82 12 78 Z" fill="currentColor"/>
-                    <path d="M39 70 L50 51 L61 70 Z" fill="var(--cutout)"/>
-                    <path d="M49 31 L67 31 L67 40 L58 40 L58 49 L49 49 Z" fill="var(--cutout)"/>
-                    <circle cx="72" cy="58" r="7" fill="var(--cutout)"/>
-                  </svg>
-                  <div>
-                    <div class="mock-appbar__name">Night Shift</div>
-                    <div class="mock-appbar__sub">64 members &middot; 3 channels</div>
-                  </div>
-                </div>
-                <div class="mock-body">
-                  <p class="mock-label">Channels</p>
-                  <div class="mock-row mock-row--active"><span class="hash">#</span> lounge</div>
-                  <div class="mock-row"><span class="hash">#</span> build-log</div>
-                  <div class="mock-row"><span class="hash">#</span> music</div>
-                </div>
-                <nav class="mock-tabs" aria-hidden="true">
-                  <span class="is-active"><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></g></svg></span>
-                  <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></g></svg></span>
-                  <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></g></svg></span>
-                  <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></g></svg></span>
-                  <span><svg class="icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></g></svg></span>
-                </nav>
-              </div>
-            </div>
-          </div>
-
-          <div class="asym__item asym__item--wide">
-            <div class="showcase">
-              <div class="showcase__bar">
-                <span class="showcase__dots" aria-hidden="true"><span></span><span></span><span></span></span>
-                <span class="showcase__url">your-instance</span>
-              </div>
-              <div class="showcase__body">
-                <div class="mini-channel-group">
-                  <p class="mini-channel-label">Channels</p>
-                  <div class="mini-channel" aria-hidden="true"><span class="hash">#</span><span>general</span></div>
-                  <div class="mini-channel" aria-hidden="true"><span class="hash">#</span><span>showcase</span></div>
-                  <div class="mini-channel" aria-hidden="true"><span class="hash">#</span><span>feedback</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!--
-      The closing statement, on the sunken band the sections share.
-    -->
     <section class="section">
       <div class="wrap">
-        <div class="band band--eclipse">
-          <p class="kicker">Your call</p>
-          <h2>Join a community, or run the server yourself.</h2>
-          <p>
-            Open the app to join a community on an instance that already exists, or
-            read the documentation and stand up your own. Either way it is the same
-            software, and the server you are on is the one that holds your data.
-          </p>
-          <div class="cta">
-            <a class="btn btn-primary btn--pill" href="/app/" data-app-link>Open the app</a>
-            <a class="btn btn-ghost btn--pill" href="https://discord.gg/dSF7eqsJuP" rel="noopener">Join the Discord</a>
+        <div class="cta">
+          <p class="kicker">Start an instance</p>
+          <h2>Ready when you are</h2>
+          <p class="lede">Sign up here, or follow the install guide and put Trycord on your own machine.</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+            <a class="btn btn-primary" href="/register">Create an account</a>
+            <a class="btn" href="/install">Install Trycord</a>
           </div>
         </div>
       </div>

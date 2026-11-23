@@ -1,12 +1,20 @@
 # Trycord
 
-**A self-hostable community chat platform.**
+**Your community. Your server. Your rules.**
 
-Run your own instance, or use an instance operated by someone else. Your communities, users, messages, permissions, and files remain on the instance you choose.
+Trycord is a self-hostable communication platform for communities that want to own their conversations, identity and data. Run it on your own hardware or use an instance someone else operates — the platform works the same way in both.
 
-> **Development disclaimer**
->
-> No AI was used to develop this platform's implementation. My coding style may resemble AI-generated code because I prioritize consistency, readability, documentation, and maintainability in preparation for future team development.
+[![Release: 1.0.0-rc1](https://img.shields.io/badge/release-1.0.0--rc1-FF4D24?style=for-the-badge)](https://github.com/trycord/.trycord/releases)
+![Self-hosted](https://img.shields.io/badge/self--hosted-yes-3ECF8E?style=for-the-badge)
+![License: MIT](https://img.shields.io/badge/license-MIT-5B9CF6?style=for-the-badge)
+
+### See it
+
+| The web client | The phone | The public site |
+|---|---|---|
+| ![The Trycord web client](docs/screenshots/desktop.png) | ![Trycord on the phone](docs/screenshots/phone.png) | ![The Trycord website](docs/screenshots/website.png) |
+
+The visual system is built from the shared `trycord-assets` tokens: one palette, one type scale, one spacing language across the server, the web client, the phone and the public site.
 
 ## Table of Contents
 
@@ -20,6 +28,14 @@ Run your own instance, or use an instance operated by someone else. Your communi
 - [Deployment](#deployment)
 - [Security](#security)
 - [License](#license)
+
+## Why Trycord
+
+- **Own the whole stack.** One instance holds the accounts, communities, channels, files and moderation history.
+- **Two clients, one platform.** A full desktop web client and a purpose-built phone client, both speaking the same API.
+- **Moderation that means it.** Reports, cases, timeouts, bans, appeals and an audit chain that actually enforce on the account.
+- **Your look.** Community themes, custom emojis, light and dark palettes, and an optional glass surface, all from one token library.
+
 
 ## Overview
 

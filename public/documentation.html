@@ -3,22 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Trycord">
-  <link rel="apple-touch-icon" href="/assets/trycord-assets/app/trycord-app-icon.svg">
-  <title>Documentation: run and configure your own instance</title>
-  <meta name="description" content="Install Trycord with Docker or by hand, choose SQLite or MySQL, configure mail and origins, put it behind a reverse proxy, back it up, and upgrade it. A self-hosting guide.">
+  <title>Documentation - Trycord</title>
+  <meta name="description" content="How to configure, run and maintain a Trycord instance.">
   <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
   <script src="/js/theme.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to main content</a>
-
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="wrap masthead">
       <a class="brand" href="/">
@@ -123,181 +116,25 @@
       </div>
     </div>
   </header>
-
-  <main id="main" class="page" data-crumbs="Documentation" data-next="1">
+  <main id="main" class="page">
     <div class="wrap">
-      <div class="page-head">
-        <p class="kicker">Documentation</p>
-        <h1>Run and configure your own instance</h1>
-        <p class="lede">
-          One process serves the web client, the REST API, the WebSocket gateway
-          and this public site on a single port. This guide covers the two install
-          paths, the settings that matter, and the deployment details that catch
-          people out. The full reference lives in <code>docs/</code>.
-        </p>
+      <header class="page-head"><p class="kicker">Docs</p><h1>Running Trycord</h1><p class="lede">Start with the install guide. The pages below cover the parts people usually need next.</p></header>
+      <div class="cards cards--3">
+        <a class="card" href="/install"><h3>Install</h3><p>Dependencies, environment file, database and the first start.</p><span class="text-link">Read it</span></a>
+        <a class="card" href="/features"><h3>Features</h3><p>What the server and clients do, including moderation and the workspace.</p><span class="text-link">Read it</span></a>
+        <a class="card" href="/developers"><h3>Developers</h3><p>API keys, bot applications and webhooks.</p><span class="text-link">Read it</span></a>
+        <a class="card" href="/faq"><h3>Questions</h3><p>Short answers about accounts, hosting and encryption.</p><span class="text-link">Read it</span></a>
+        <a class="card" href="/status"><h3>Instance health</h3><p>The status timeline for this instance.</p><span class="text-link">Read it</span></a>
+        <a class="card" href="/security"><h3>Security</h3><p>Supported versions and how to report a problem privately.</p><span class="text-link">Read it</span></a>
       </div>
-
-      <div class="prose-layout">
-        <article class="prose">
-          <h2>What you need</h2>
-          <p>Trycord runs as a single Node process. The default install needs little:</p>
-          <ul>
-            <li><strong>Docker path:</strong> Docker with Compose. Nothing else on the host.</li>
-            <li><strong>Manual path:</strong> Node 22 or newer, and a place to keep the SQLite file.</li>
-            <li><strong>Either path:</strong> a <code>JWT_SECRET</code>. The server has no default for it and will not start without one.</li>
-          </ul>
-          <p>Generate a secret with:</p>
-          <pre><code>node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"</code></pre>
-          <p>Every instance needs its own value. Changing it later signs everyone out and invalidates outstanding password-reset links.</p>
-
-          <h2>Install with Docker</h2>
-          <p>This is the recommended path, and the image is built for it.</p>
-          <pre><code>git clone https://github.com/trycord/.trycord.git
-cd .trycord
-cp .env.docker.example .env
-# edit .env and set JWT_SECRET
-docker compose up -d</code></pre>
-          <p>Three steps, and the only required value is the secret. Then open <code>http://your-host:9971</code>, create the first account, and promote it to platform administrator by adding its username to <code>ADMIN_USERNAMES</code> in <code>.env</code> and restarting.</p>
-          <pre><code>docker compose logs -f          # follow the boot log
-docker compose ps               # health status
-curl -fsS localhost:9971/api/health</code></pre>
-          <p><code>/api/health</code> answers <code>200</code> only when the database is reachable, so it is a real readiness signal rather than "the process is up".</p>
-
-          <h2>Install by hand</h2>
-          <p>Choose this if you need systemd units, a specific Node version, or a reverse proxied layout that a container makes awkward.</p>
-          <pre><code>cd backend
-npm install
-cp .env.example .env
-# edit .env: JWT_SECRET, SERVER_HOST_TYPE and a database profile
-npm run seed
-npm start</code></pre>
-          <p>The server finds the web client next to itself in the default layout. If yours differs, point it at the directory holding <code>index.html</code>:</p>
-          <pre><code>TRYCORD_CLIENT_DIR=/srv/trycord npm start</code></pre>
-          <p>A relative value resolves against <code>backend/</code>. If no client is found, the API still runs and the server lists every path it looked at.</p>
-
-          <h2>The settings that matter</h2>
-          <p><code>backend/.env.example</code> documents every variable; <code>.env.docker.example</code> covers the container. The ones worth understanding:</p>
-          <table class="plain">
-            <thead><tr><th>Setting</th><th>What it does</th></tr></thead>
-            <tbody>
-              <tr><td><code>JWT_SECRET</code></td><td>Signs sessions and reset tokens. Required, no default.</td></tr>
-              <tr><td><code>SERVER_HOST_TYPE</code></td><td><code>express</code> when the server is the public endpoint, <code>nginx</code> when a reverse proxy fronts it. Anything else is a startup error.</td></tr>
-              <tr><td><code>TRUST_PROXY</code></td><td>Set to <code>1</code> only when a reverse proxy on the same host fronts the server.</td></tr>
-              <tr><td><code>CLIENT_ORIGIN</code></td><td>Comma-separated allowlist of origins allowed to read API responses. Empty means a restricted development profile.</td></tr>
-              <tr><td><code>ADMIN_USERNAMES</code></td><td>Usernames promoted to platform administrator at boot. Idempotent.</td></tr>
-              <tr><td><code>TRYCORD_NAME</code></td><td>The instance's display name.</td></tr>
-            </tbody>
-          </table>
-
-          <h2>Choose a database</h2>
-          <p>The database is a profile, not a different build. SQLite is a single file and is fine for small and mid-size instances; move to MySQL when you outgrow it.</p>
-          <pre><code>DB_CLIENT=sqlite
-DB_FILE=/data/trycord.db
-
-# or
-DB_CLIENT=mysql
-DB_HOST=db
-DB_PORT=3306
-DB_NAME=trycord
-DB_USER=trycord
-DB_PASSWORD=change-me</code></pre>
-          <p>A database host that is not loopback is refused unless <code>ALLOW_REMOTE_DB</code> is exactly <code>true</code>, so a CI job that inherits a copied <code>.env</code> cannot quietly write to a live database.</p>
-
-          <h2>Configure mail</h2>
-          <p>Mail powers email verification and password recovery, and nothing else depends on it. There are three modes:</p>
-          <ul>
-            <li><strong>disabled</strong> (the default): nothing is sent, and recovery flows refuse rather than claim success.</li>
-            <li><strong>smtp</strong>: delivery through a relay. Port 465 implies TLS, 587 implies STARTTLS.</li>
-            <li><strong>api</strong>: the server posts JSON to an HTTPS endpoint you name field by field, so no vendor is baked in.</li>
-          </ul>
-          <p>With mail off, email verification is not enforceable and the app will not ask anyone to verify an address.</p>
-
-          <h2>Put it behind a reverse proxy</h2>
-          <p>Forward both HTTP and WebSocket traffic, set <code>SERVER_HOST_TYPE=nginx</code> and <code>TRUST_PROXY=1</code>, and keep the upgrade headers, or the realtime gateway will not connect:</p>
-          <pre><code>location / {
-    proxy_pass http://127.0.0.1:9971;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_read_timeout 7d;
-}</code></pre>
-          <p>The first WebSocket frame carries a single-use ticket, so a short idle timeout looks like a silent disconnect every minute. Set the read timeout generously.</p>
-
-          <h2>Who may call the API</h2>
-          <p><code>CLIENT_ORIGIN</code> is a comma-separated allowlist. Leave it empty and the server runs a restricted development profile; set it and the allowlist is enforced exactly, which is what a public instance wants. Three forms are accepted:</p>
-          <table class="plain">
-            <thead><tr><th>Entry</th><th>Matches</th></tr></thead>
-            <tbody>
-              <tr><td><code>https://trycord.example</code></td><td>that exact origin only</td></tr>
-              <tr><td><code>http://*.trycord.example</code></td><td>any single subdomain, not the apex</td></tr>
-              <tr><td><code>trycord://app</code></td><td>the desktop app</td></tr>
-            </tbody>
-          </table>
-          <p>Scheme and port must match exactly, a wildcard never bridges them, and a bare <code>*</code> is rejected. Always include <code>trycord://app</code> if the desktop client should reach the instance.</p>
-
-          <h2>Back up and upgrade</h2>
-          <p>With Docker, your data lives in two named volumes that survive <code>docker compose down</code> and upgrades: <code>trycord-data</code> for the database and <code>trycord-uploads</code> for avatars and attachments. Back up a volume by copying it out:</p>
-          <pre><code>docker run --rm -v trycord-data:/data -v "$PWD":/backup \
-  alpine tar czf /backup/trycord-data.tar.gz -C /data .</code></pre>
-          <p>To upgrade, pull and rebuild. Your volumes are untouched.</p>
-          <pre><code>git pull
-docker compose build --pull
-docker compose up -d</code></pre>
-
-          <h2>Point the desktop app at it</h2>
-          <p>The packaged desktop app picks its backend at launch. Give it yours and it runs against that instance and nothing else:</p>
-          <pre><code>Trycord --api-url=https://chat.example.org</code></pre>
-          <p>The shipped build reaches the official instance by default. That is a default, not a requirement. See the <a href="/download">download page</a> for how the app is put together.</p>
-
-          <h2>Run a status monitor</h2>
-          <p>The status page at <code>/status</code> works on its own: it probes the instance from the reader's browser. You can also run the bundled status monitor, a second process on its own port that checks the instance on a schedule and serves a report. Because it is a separate process, it keeps answering when the API cannot.</p>
-          <pre><code>cd backend
-npm run status-monitor</code></pre>
-          <p>It checks <code>/</code>, <code>/health</code> and <code>/api/health</code> by default, and exposes an HTML dashboard, <code>/status.json</code> and Prometheus metrics. Every setting is configurable, by environment variable or by a JSON file. Set <code>STATUS_MONITOR_PUBLIC_URL</code> on the server to have the public status page read the monitor's live report instead of probing from the browser.</p>
-          <p>With Docker, start the same image a second time through the override file:</p>
-          <pre><code>docker compose -f docker-compose.yml -f docker-compose.monitor.yml up -d</code></pre>
-
-          <h2>Where the rest lives</h2>
-          <p>The <code>docs/</code> directory holds the long-form references. They ship with the code, so they are the version that matches the server you are running.</p>
-          <div class="cards cards--2">
-            <article class="card">
-              <h3>Deployment and running</h3>
-              <p><code>selfhosting.md</code> covers the whole deployment: the database, mail, the reverse proxy, the volumes, the upgrades. <code>backups.md</code> covers taking a backup and putting it back.</p>
-            </article>
-            <article class="card">
-              <h3>The parts of the system</h3>
-              <p><code>architecture.md</code> says how the API, the gateway, the client and the jobs fit together. <code>services.md</code> lists the services and what each one is for.</p>
-            </article>
-            <article class="card">
-              <h3>Voice and media</h3>
-              <p><code>voice.md</code> covers the relay, the credentials it mints, the stunkey another host needs, and the page that says whether the stack is working.</p>
-            </article>
-            <article class="card">
-              <h3>The client and the shell</h3>
-              <p><code>desktop.md</code> and <code>launcher.md</code> cover the desktop application. <code>theming.md</code> covers the design tokens, <code>pages.md</code> the editable pages, and <code>extensions.md</code> the extension API.</p>
-            </article>
-            <article class="card">
-              <h3>Running a community</h3>
-              <p><code>community-settings.md</code> covers the settings a community administrator has, and <code>continuum.md</code> covers federation between instances.</p>
-            </article>
-            <article class="card">
-              <h3>Checks and audits</h3>
-              <p><code>verification-matrix.md</code> says what is checked and how. <code>production-readiness.md</code>, <code>dashboard.md</code> and the two audit files record what was found and what was done about it.</p>
-            </article>
-          </div>
-          <p>If you find an error in this page, the <a href="/support">support page</a> explains where to say so.</p>
-        </article>
-
-        <aside class="toc" aria-label="On this page">
-          <p class="toc-title">On this page</p>
-        </aside>
-      </div>
+      <section class="prose" style="margin-top:56px">
+        <h2>Where things live</h2>
+        <p>The server reads its clients from the frontend directory and this website from the public directory. If you move them, set <code>TRYCORD_CLIENT_DIR</code> to the directory that contains <code>index.html</code>. Relative paths are resolved against the backend folder.</p>
+        <h2>Ports and origins</h2>
+        <p>One process serves the API, the gateway, the job worker, the web clients and this site. Put it behind a TLS proxy and add the public origin to <code>CLIENT_ORIGIN</code>.</p>
+      </section>
     </div>
   </main>
-
   <footer class="site-footer">
     <div class="wrap footer-grid">
       <div class="footer-col footer-brand">
@@ -367,7 +204,6 @@ npm run status-monitor</code></pre>
       <span class="muted">Your instance, your conversations, your rules.</span>
     </div>
   </footer>
-
   <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>

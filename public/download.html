@@ -126,100 +126,18 @@
 
   <main id="main" class="page" data-crumbs="Product" data-next="1">
     <div class="wrap">
-      <div class="page-head">
-        <p class="kicker">Download</p>
-        <h1>Use it in the browser, or install the app</h1>
-        <p class="lede">
-          Nothing to install to try Trycord: the web client is the same code the
-          desktop app wraps. The desktop build puts that client in its own window
-          and can point at any instance, including one you run.
-        </p>
+      <header class="page-head">
+        <p class="kicker">Clients</p>
+        <h1>Open Trycord</h1>
+        <p class="lede">The browser needs no install. The desktop shell and the phone client use the same account on the same instance.</p>
+      </header>
+      <div class="cards cards--3">
+        <a class="card" href="/app/"><h3>Web client</h3><p>Open /app on your instance. The full desktop interface in a browser tab, with no download.</p><span class="text-link">Open the web client</span></a>
+        <a class="card" href="/app/"><h3>Phone client</h3><p>The one-handed client at /mobile. Three doors, long-press menus and sheets instead of columns.</p><span class="text-link">Open the phone client</span></a>
+        <a class="card" href="/docs"><h3>Desktop shell</h3><p>The native application in the repository wraps the web client in its own window and origin. Build it from the source or use a packaged release when one is published.</p><span class="text-link">Read the client docs</span></a>
       </div>
-
-      <section class="section">
-        <div class="section-head">
-          <p class="kicker">Two ways in</p>
-          <h2>Use it in a tab, or install the app</h2>
-          <p>Same client either way. Look around in the browser with nothing to install; install a build when you want Trycord out of the tab.</p>
-        </div>
-        <div class="cards cards--2">
-          <article class="card">
-            <span class="tag tag--shipped">No install</span>
-            <h3>In the browser</h3>
-            <p>The web client is served by the instance itself. Open it, and you are in: no download, no store, and it always matches the server it came from.</p>
-            <p class="mt-5"><a class="btn btn-primary btn-sm" href="/app/" data-app-link>Open the web app</a></p>
-          </article>
-          <article class="card">
-            <span class="tag tag--shipped">Desktop</span>
-            <h3>The desktop app</h3>
-            <p>A window around the same client, for people who want Trycord off the browser tab. Published builds for Windows and Linux are attached to <a href="https://github.com/trycord/.trycord/releases" rel="noopener">GitHub releases</a>, and a macOS build is one command away, below.</p>
-            <p class="mt-5"><a class="btn btn-sm" href="https://github.com/trycord/.trycord/releases" rel="noopener">See releases</a></p>
-          </article>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <p class="kicker">How the desktop app works</p>
-          <h2>One client, pointed at any instance</h2>
-          <p>
-            The desktop app is the same client in its own window. There is no
-            second version of it to keep in step, so a feature that works in
-            the browser works in the window.
-          </p>
-        </div>
-        <div class="steps">
-          <div class="step">
-            <div>
-              <h3>It picks a backend at launch</h3>
-              <p>First the <code>--api-url</code> argument, then the bundled backend file. There is no hidden third option and no silent fallback to somewhere you did not choose.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div>
-              <h3>Point it at your instance</h3>
-              <p>Run it with your server's address and it talks to that one and nothing else:</p>
-              <pre><code>Trycord --api-url=https://chat.example.org</code></pre>
-            </div>
-          </div>
-          <div class="step">
-            <div>
-              <h3>The official instance is a default, not a requirement</h3>
-              <p>The shipped build reaches the official instance out of the box, because most people arrive without a server. Self-hosters replace that with theirs, and the desktop origin must be on the instance's allowed list for API responses to be readable.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <p class="kicker">Build from source</p>
-          <h2>If there is no build for your platform yet</h2>
-          <p>Each target builds on its own platform. Cross-building from Linux is not reliable for Windows or macOS, so build on the system you are targeting.</p>
-        </div>
-        <pre><code>cd trycord-desktop
-npm install
-npm run build:linux      # AppImage
-npm run build:win        # NSIS installer and portable exe
-npm run build:mac        # dmg</code></pre>
-        <p class="muted">The desktop shell's internals, startup behaviour and update model are documented in <code>docs/desktop.md</code> and <code>docs/launcher.md</code>.</p>
-      </section>
-
-      <section class="section">
-        <div class="wrap">
-          <div class="band">
-            <p class="kicker">Hosting it yourself</p>
-            <h2>If you run the instance, you decide who gets in.</h2>
-            <p>The documentation covers Docker, manual installs, databases, mail and reverse proxies.</p>
-            <div class="cta">
-              <a class="btn" href="/docs">Read the documentation</a>
-              <a class="btn btn-ghost" href="/features">See what it does</a>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
-  </main>
+</main>
 
   <footer class="site-footer">
     <div class="wrap footer-grid">

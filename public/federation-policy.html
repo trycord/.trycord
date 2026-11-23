@@ -1,25 +1,17 @@
 <!doctype html>
 <html lang="en">
 <head>
-
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Trycord">
-  <link rel="apple-touch-icon" href="/assets/trycord-assets/app/trycord-app-icon.svg">
-    <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
+  <title>Federation policy - Trycord</title>
+  <meta name="description" content="How Trycord handles federation between instances.">
+  <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
   <script src="/js/theme.js"></script>
-  <title>Federation Policy — Trycord</title>
-  <meta name="description" content="How Trycord instances exchange information, and what is never shared.">
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to main content</a>
-
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="wrap masthead">
       <a class="brand" href="/">
@@ -124,168 +116,20 @@
       </div>
     </div>
   </header>
-
-  <main id="main" class="page" data-crumbs="Legal">
+  <main id="main" class="page">
     <div class="wrap">
-      <div class="page-head">
-        <p class="kicker">Federation policy</p>
-        <h1>Federation Policy</h1>
-        <p class="lede">
-          Trycord can exchange explicitly authorised information with other
-          Trycord instances, so a community can continue across a boundary.
-          Federation is opt-in, it is off by default, and it carries
-          obligations. This page describes both.
-        </p>
-      </div>
-      <div class="prose-layout">
-        <article class="prose">
-          <div class="draft-note" role="note">
-            <strong>Legal review required before publication.</strong> This
-            document comes from the Trycord project as a starting point for an
-            instance. It is not legal advice, and nobody has reviewed it for the
-            instance serving it. The fields marked <code>OPERATOR</code> are
-            facts only the operator can supply: who to contact about
-            federation, and which remote instances this one will and will not
-            talk to. Fill them in, and have a qualified lawyer read the
-            result, before presenting this document as binding.
-            The contact points in these documents are the project's own. If you run your own
-            instance, replace them with yours before you publish them.
-          </div>
-          <p class="small muted">
-            <strong>Version:</strong> <code>1.0</code> &middot;
-            <strong>Template last revised:</strong> <code>2026-09-20</code> &middot;
-            <strong>Effective on this instance:</strong>
-            <span class="op-field" data-op="effective-date">OPERATOR: the date this policy takes effect on this instance</span>
-          </p>
+      <header class="page-head"><p class="kicker">Continuum</p><h1>Federation policy</h1><p class="lede">Federation is a choice an operator makes, not something that happens by default.</p></header>
+      <div class="prose">
+        <h2>Trust is explicit</h2><p>An instance talks only to peers its operator has added. Adding a peer does not grant that peer control over your accounts or channels.</p>
+        <h2>What is shared</h2><p>Communities you choose to follow can relay their public messages to this instance. The relay carries the community name, its channels and the messages sent there.</p>
+        <h2>Moderation across peers</h2><p>A remote community reports to its own operators. Local moderators can restrict a remote member and remove relayed content that breaks local rules. These actions are recorded.</p>
+        <h2>Changes</h2><p>Operators can remove a peer or stop relaying at any time. Turning federation off does not delete the communities you already follow; it stops new traffic.</p>
 
-          <h2>1. What federation is</h2>
-          <p>
-            Federation is how one instance exchanges content with another.
-            It exists so that a community can keep talking to its members when
-            the members are spread across more than one server, and so that
-            two communities that already know each other can share what they
-            choose to share.
-          </p>
-          <p>
-            It is not a social network of instances, and it does not make one
-            instance part of another. Each instance remains its own system,
-            with its own accounts, its own rules, and its own operator.
-          </p>
-
-          <h2>2. It is off unless somebody turns it on</h2>
-          <p>
-            Federation is disabled by default, and an instance that leaves it
-            off is fully functional on its own: communities, channels, direct
-            messages, roles and moderation all work exactly as they do
-            elsewhere. Turning it on is a decision for the operator, and
-            turning it off again must always be possible.
-          </p>
-
-          <h2>3. What is shared, and what never is</h2>
-          <p>
-            Only content that a community or a member has explicitly
-            authorised is shared. Nothing is federated because it happens to
-            be on the instance.
-          </p>
-          <ul>
-            <li><strong>Direct messages are not federated</strong> by default. A member has to turn it on for a conversation, per conversation, and the operator can prevent it entirely.</li>
-            <li><strong>Private channels do not become remotely visible</strong> without an explicit decision by the people who control them.</li>
-            <li><strong>Local bans, permissions and roles stay local.</strong> A remote instance cannot see them, and cannot grant itself access that a local role has not given it.</li>
-            <li><strong>Account data stays where the account is.</strong> A federated account is a reference, not a copy of somebody's account.</li>
-          </ul>
-
-          <h2>4. What turning it on takes on</h2>
-          <p>
-            An operator who enables federation is accepting content from
-            servers they do not control, run by people they have not met,
-            under laws they do not write. Before enabling it, the operator
-            should be able to answer a few questions:
-          </p>
-          <ul>
-            <li>Who is responsible for the content that arrives, and what happens to it when it breaks a rule?</li>
-            <li>Which remote instances will be allowed in, and which will be refused?</li>
-            <li>How will a person whose content arrived here get it removed, and how quickly?</li>
-            <li>What will happen to a remote instance that keeps sending material that breaks the rules here?</li>
-          </ul>
-          <p>
-            The contact for federation questions on this instance is
-            <span class="op-field" data-op="federation-contact">OPERATOR: who to contact about federation on this instance</span>,
-            and the list of remote instances it will talk to is
-            <span class="op-field" data-op="federation-allowlist">OPERATOR: which remote instances this instance will federate with, and how that list is changed</span>.
-          </p>
-
-          <h2>5. A remote instance is not trusted</h2>
-          <p>
-            A remote instance is a server operated by somebody else. It cannot
-            assign itself administrative rights on this instance, it cannot
-            override a local ban, and it cannot see anything here that a local
-            role has not authorised. Where a remote instance sends something
-            that breaks the rules here, the content is treated as content
-            posted here.
-          </p>
-          <p>
-            The rules in the <a href="/guidelines">acceptable use rules</a> apply
-            to federated content exactly as they apply to everything else.
-          </p>
-
-          <h2>6. Moderation across a federation</h2>
-          <p>
-            A member of this instance can be banned here even when their
-            account lives on a remote instance, and a remote instance can
-            refuse to deliver anything from a member banned here. Local
-            decisions are local, and a remote instance's decision does not
-            bind this one, though this instance's may be respected by the
-            other.
-          </p>
-          <p>
-            A complaint about content that arrived by federation is handled
-            here for the content that arrived, and the operator may also pass
-            it to the operator of the remote instance. How that is done is
-            <span class="op-field" data-op="federation-complaints">OPERATOR: how a complaint about a remote instance is made to this operator, and how it is passed on</span>.
-          </p>
-
-          <h2>7. Child safety across a federation</h2>
-          <p>
-            Child sexual abuse material is prohibited on every instance, and
-            federation is not a way around it. Material of that kind that
-            arrives over federation is removed, the account and any bot or
-            integration that sent it is removed, and the remote instance is
-            told, and is cut off where the operator has the ability to cut it
-            off. Where the law requires the material to be reported to an
-            authority, it is reported.
-          </p>
-          <p>
-            An operator who runs an instance does not become exempt from the
-            law that applies to them, and neither does anybody else who runs
-            one. The <a href="/trust-and-safety">Trust and Safety</a> page
-            describes the reporting route.
-          </p>
-
-          <h2>8. Turning it off</h2>
-          <p>
-            Federation can be turned off without taking the instance offline,
-            and doing so should not silently delete the content that has
-            already been exchanged. When it is turned off, remote
-            relationships are closed, delivery failures are visible to the
-            operator, and members are told what has changed.
-          </p>
-
-          <h2>9. Changes to this policy</h2>
-          <p>
-            This policy changes with the software and with the operator's
-            decisions. The version and the date are at the top of the page,
-            and a change that removes a capability people rely on is
-            announced on the instance before it takes effect.
-          </p>
-        </article>
-        <aside class="toc" aria-label="On this page">
-          <p class="toc-title">On this page</p>
-        </aside>
+        <h2>Content that is never allowed</h2>
+        <p>We prohibit child sexual abuse material on every part of Trycord, whether it appears in a message, an attachment or a file, or arrives through a bot, an integration, an extension or federation from another instance. Running your own instance does not create an exception to this rule: no operator can allow it, and no configuration creates an exception.</p>
       </div>
     </div>
   </main>
-
-
   <footer class="site-footer">
     <div class="wrap footer-grid">
       <div class="footer-col footer-brand">
@@ -355,7 +199,6 @@
       <span class="muted">Your instance, your conversations, your rules.</span>
     </div>
   </footer>
-
   <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>

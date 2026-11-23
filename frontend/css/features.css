@@ -290,8 +290,8 @@
 .context-toggle, .inspector-close { color: var(--ink-2); }
 .cropper { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: var(--r-md); background: var(--bg-deep); }
 .cropper__image { width: 100%; height: 100%; object-fit: cover; }
-.cropper__shade { position: absolute; inset: 0; background: rgb(0 0 0 / 55%); }
-.cropper__selection { position: absolute; border: 2px solid var(--brand); border-radius: var(--r-sm); box-shadow: 0 0 0 9999px rgb(0 0 0 / 50%); }
+.cropper__shade { position: absolute; inset: 0; background: color-mix(in srgb, var(--bg-deep) 55%, transparent); }
+.cropper__selection { position: absolute; border: 2px solid var(--brand); border-radius: var(--r-sm); box-shadow: 0 0 0 9999px color-mix(in srgb, var(--bg-deep) 50%, transparent); }
 .cropper__handle { position: absolute; width: 14px; height: 14px; border: 2px solid var(--brand); background: var(--ink); border-radius: 50%; }
 .draft-note, .pagerline { color: var(--ink-2); font-size: var(--fs-sm); }
 .filterchips { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -387,7 +387,7 @@
 [data-glass="on"] .palette {
   background: color-mix(in srgb, var(--surface) 62%, transparent);
   border-color: color-mix(in srgb, var(--line) 72%, transparent);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 9%), var(--shadow-2);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 9%, transparent), var(--shadow-2);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
   backdrop-filter: blur(16px) saturate(150%);
 }
@@ -413,10 +413,10 @@
 .btn:active { transform: translateY(0); }
 .btn--primary {
   background: linear-gradient(180deg, var(--brand-fill-hover), var(--brand-fill));
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 18%), 0 4px 12px color-mix(in srgb, var(--brand) 22%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 18%, transparent), 0 4px 12px color-mix(in srgb, var(--brand) 22%, transparent);
 }
-.btn--primary:hover { box-shadow: inset 0 1px 0 rgb(255 255 255 / 20%), 0 6px 18px color-mix(in srgb, var(--brand) 32%, transparent); }
-.btn--danger { box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%), 0 4px 12px color-mix(in srgb, var(--bad) 20%, transparent); }
+.btn--primary:hover { box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 20%, transparent), 0 6px 18px color-mix(in srgb, var(--brand) 32%, transparent); }
+.btn--danger { box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 12%), 0 4px 12px color-mix(in srgb, var(--bad) 20%, transparent); }
 .card {
   background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 94%, var(--ink) 4%), var(--surface));
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 4%), var(--shadow-1);
@@ -431,7 +431,7 @@
 }
 .msg-reaction, .chip, .filter-chip { transition: transform var(--fast) var(--ease), background var(--fast) var(--ease); }
 .msg-reaction:hover { transform: translateY(-1px); }
-.avatar { box-shadow: inset 0 0 0 1px rgb(255 255 255 / 6%); }
+.avatar { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent); }
 .blank-glyph, .m-empty__icon { width: 44px; height: 44px; display: grid; place-items: center;
   border-radius: 50%; background: var(--surface-2); }
 .toast { animation: tc-toast-in var(--normal) var(--ease); }

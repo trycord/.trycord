@@ -3,22 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Trycord">
-  <link rel="apple-touch-icon" href="/assets/trycord-assets/app/trycord-app-icon.svg">
-  <title>Roadmap: what is shipped, in progress and planned</title>
-  <meta name="description" content="Where Trycord is going: what is shipped and in use, what is being built now and off by default, and what is only an idea. Statuses are drawn from the code, not from ambition.">
+  <title>Roadmap - Trycord</title>
+  <meta name="description" content="What the Trycord project is working toward.">
   <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
   <script src="/js/theme.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to main content</a>
-
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="wrap masthead">
       <a class="brand" href="/">
@@ -123,134 +116,18 @@
       </div>
     </div>
   </header>
-
   <main id="main" class="page">
     <div class="wrap">
-      <div class="page-head">
-        <p class="kicker">Roadmap</p>
-        <h1>Where the project is going</h1>
-        <p class="lede">
-          The labels below separate what works today, what is built but still
-          off by default, and what is only an idea. They reflect the state of the
-          code: if a capability is off by default, backed by a single provider,
-          or only a setting and a name, it is described that way.
-        </p>
+      <header class="page-head"><p class="kicker">Direction</p><h1>Roadmap</h1><p class="lede">These are areas of work, not dates. Finished items move to the changelog.</p></header>
+      <div class="cards cards--2">
+        <div class="card"><span class="tag tag--progress">In progress</span><h3>Federation polish</h3><p>Making Continuum easier to operate: clearer peer policy, better relay history and more predictable moderation across instances.</p></div>
+        <div class="card"><span class="tag tag--progress">In progress</span><h3>Documentation</h3><p>More worked examples for deployment, backup and restoration, and for moderating a community from the first report to the final appeal.</p></div>
+        <div class="card"><span class="tag tag--planned">Planned</span><h3>Workspace depth</h3><p>Richer editing and better search across documents, boards and files a community keeps.</p></div>
+        <div class="card"><span class="tag tag--planned">Planned</span><h3>Client refinements</h3><p>Continue improving accessibility and interaction in both clients, measured with real-browser layout checks.</p></div>
       </div>
-
-      <section class="section">
-        <div class="section-head">
-          <p class="kicker">Shipped</p>
-          <h2>Working, and in use</h2>
-          <p>These are implemented and available today. The <a href="/features">features page</a> covers them in detail.</p>
-        </div>
-        <div class="cards cards--2">
-          <article class="card">
-            <span class="tag tag--shipped">Shipped</span>
-            <h3>Core conversation</h3>
-            <p>Communities, channels and categories, direct messages, friends, reactions, attachments, search, presence and in-app notifications.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag--shipped">Shipped</span>
-            <h3>Community and platform moderation</h3>
-            <p>Roles and permissions, invites, reports, warnings, timeouts and bans, appeals, announcements, and a platform administration surface.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag--shipped">Shipped</span>
-            <h3>Accounts and data rights</h3>
-            <p>Registration with optional approval, two-factor authentication, email verification and recovery, data export and account deletion.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag--shipped">Shipped</span>
-            <h3>Self-hosting</h3>
-            <p>Docker and manual installs, SQLite or MySQL, mail through SMTP or an API, public discovery, bots and webhooks, themes, and the desktop app.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <p class="kicker">In progress</p>
-          <h2>Built, but off by default</h2>
-          <p>These have real code behind them and are deliberately off by default. They stay off until the work is finished.</p>
-        </div>
-        <div class="features">
-          <article class="feature">
-            <div class="feature-copy">
-              <h3>Voice and video <span class="tag tag--progress">In progress</span></h3>
-              <p>The room and signalling model exist behind one provider, with participant limits, optional screen sharing and stage channels. It is off by default and there is no second provider. Turn it on if you want to test it; do not plan a product around it yet.</p>
-            </div>
-          </article>
-          <article class="feature">
-            <div class="feature-copy">
-              <h3>Push notifications to devices <span class="tag tag--progress">In progress</span></h3>
-              <p>The flag and the delivery plumbing exist and default to off. Notifications are dependable in-app today. A notification that reliably wakes a backgrounded phone is a different piece of work, and it is not done.</p>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <p class="kicker">Planned and exploratory</p>
-          <h2>Ideas with a name, not a date</h2>
-          <p>Something here may change shape or may not arrive. Treat it as direction, not as a schedule.</p>
-        </div>
-        <div class="cards cards--3">
-          <article class="card">
-            <span class="tag tag--planned">Exploratory</span>
-            <h3>Cross-instance federation</h3>
-            <p>Instances are independent today, and there is a global sync setting and the beginning of a shared vocabulary for connecting them. A working federation of separate instances does not exist yet.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag--planned">Planned</span>
-            <h3>Messaging polish</h3>
-            <p>Continued work on the everyday surfaces: message editing and history, richer notification controls, and the small things that make a long conversation easier to follow.</p>
-          </article>
-          <article class="card">
-            <span class="tag tag--planned">Planned</span>
-            <h3>Operator experience</h3>
-            <p>More of the deployment lifecycle in one place: clearer upgrade and backup guidance, and fewer places where an operator has to read the source to find out what a setting does.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <p class="kicker">Not currently planned</p>
-          <h2>Things it is fair to assume are not coming</h2>
-        </div>
-        <div class="features">
-          <article class="feature">
-            <div class="feature-copy">
-              <h3>A central hosted service</h3>
-              <p>Trycord is software you run. There is an official instance, but the architecture does not assume a single company in the middle, and that is not going to change into the usual arrangement.</p>
-            </div>
-          </article>
-          <article class="feature">
-            <div class="feature-copy">
-              <h3>Advertising or data brokerage</h3>
-              <p>There is no advertising surface and no plan to build one. An instance's data belongs to the instance, and there is no mechanism to send it anywhere else.</p>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="section">
-        <div class="wrap">
-          <div class="band">
-            <p class="kicker">Have a say</p>
-            <h2>The roadmap is a conversation, not an announcement.</h2>
-            <p>If something here matters to you, or you think the ordering is wrong, the support page explains where to say so.</p>
-            <div class="cta">
-              <a class="btn" href="/support">Get in touch</a>
-              <a class="btn btn-ghost" href="https://github.com/trycord/.trycord/issues" rel="noopener">Open issues on GitHub</a>
-            </div>
-          </div>
-        </div>
-      </section>
+      <p class="muted mt-5">Nothing here is a promise of a release date.</p>
     </div>
   </main>
-
   <footer class="site-footer">
     <div class="wrap footer-grid">
       <div class="footer-col footer-brand">
@@ -320,7 +197,6 @@
       <span class="muted">Your instance, your conversations, your rules.</span>
     </div>
   </footer>
-
   <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>

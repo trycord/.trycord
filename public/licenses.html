@@ -1,25 +1,17 @@
 <!doctype html>
 <html lang="en">
 <head>
-
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#18191D" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Trycord">
-  <link rel="apple-touch-icon" href="/assets/trycord-assets/app/trycord-app-icon.svg">
-    <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
+  <title>Licenses - Trycord</title>
+  <meta name="description" content="Licenses used by the Trycord project.">
+  <link rel="icon" href="/assets/trycord-assets/app/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/design-tokens.css">
   <link rel="stylesheet" href="/css/site.css">
   <script src="/js/theme.js"></script>
-  <title>Licenses — Trycord</title>
-  <meta name="description" content="The licenses covering Trycord software and third-party dependencies.">
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to main content</a>
-
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="wrap masthead">
       <a class="brand" href="/">
@@ -124,192 +116,16 @@
       </div>
     </div>
   </header>
-
-  <main id="main" class="page" data-crumbs="Project">
+  <main id="main" class="page">
     <div class="wrap">
-      <div class="page-head">
-        <p class="kicker">Licenses</p>
-        <h1>Licenses</h1>
-        <p class="lede">
-          What Trycord is released under, what it is built from, and what the
-          licence does not cover. The short version: the software is MIT
-          licensed, and you can run, change and give it away.
-        </p>
-      </div>
-      <div class="prose-layout">
-        <article class="prose">
-          <div class="draft-note" role="note">
-            <strong>Legal review required before publication.</strong> This
-            document comes from the Trycord project as a starting point for an
-            instance. It is not legal advice, and nobody has reviewed it for the
-            instance serving it. The field marked <code>OPERATOR</code> is a
-            fact only the operator can supply: any additional licensing note
-            that applies to this deployment, such as a modification that
-            changes the terms, or a bundled component the operator added. Fill
-            it in, and have a qualified lawyer read the result, before
-            presenting this document as binding.
-            The contact points in these documents are the project's own. If you run your own
-            instance, replace them with yours before you publish them.
-          </div>
-          <p class="small muted">
-            <strong>Version:</strong> <code>1.0</code> &middot;
-            <strong>Template last revised:</strong> <code>2026-09-20</code> &middot;
-            <strong>Effective on this instance:</strong>
-            <span class="op-field" data-op="effective-date">OPERATOR: the date this document takes effect on this instance</span>
-          </p>
-
-          <h2>1. The software</h2>
-          <p>
-            Trycord is released under the MIT licence. The full text is in the
-            <code>LICENSE</code> file at the root of the repository, and it is
-            the licence that applies to the server, the web client, the
-            desktop client and the public website.
-          </p>
-          <p>
-            In short: you may use the software, including commercially; you
-            may copy it, modify it, merge it into your own work, publish it,
-            and distribute it; and you may sublicense it. The one condition is
-            that the copyright notice and the permission notice travel with
-            every copy or substantial portion of it.
-          </p>
-          <p>
-            The licence comes with no warranty. The software is provided as it
-            is, and the responsibility for running it, and for what it does
-            with other people's data, stays with whoever runs it.
-          </p>
-
-          <h2>2. The dependencies</h2>
-          <p>
-            The server is built on established libraries rather than on
-            home-made versions of the parts that are hard to get right:
-            password hashing, token signing, TLS-terminating proxies, database
-            drivers, mail transport and the HTTP stack itself. Each dependency
-            carries its own licence.
-          </p>
-          <p>
-            These are the direct dependencies of the server, with the licence
-            each one carries. Every one of them is compatible with the MIT
-            licence this project uses, and there is no copyleft anywhere in the
-            tree.
-          </p>
-          <table class="licence-table">
-            <caption class="sr-only">The server's direct dependencies and their licences</caption>
-            <thead>
-              <tr><th scope="col">Package</th><th scope="col">Licence</th></tr>
-            </thead>
-            <tbody>
-              <tr><th scope="row">express</th><td>MIT</td></tr>
-              <tr><th scope="row">ws</th><td>MIT</td></tr>
-              <tr><th scope="row">bcrypt</th><td>MIT</td></tr>
-              <tr><th scope="row">jsonwebtoken</th><td>MIT</td></tr>
-              <tr><th scope="row">cors</th><td>MIT</td></tr>
-              <tr><th scope="row">multer</th><td>MIT</td></tr>
-              <tr><th scope="row">mysql2</th><td>MIT</td></tr>
-              <tr><th scope="row">better-sqlite3</th><td>MIT</td></tr>
-              <tr><th scope="row">nodemailer</th><td>MIT-0</td></tr>
-              <tr><th scope="row">dotenv</th><td>BSD-2-Clause</td></tr>
-            </tbody>
-          </table>
-          <p>
-            The client carries one vendored library: <code>@noble/curves</code>
-            (MIT), which supplies the elliptic-curve arithmetic its
-            end-to-end encryption needs. It is vendored into the client
-            rather than fetched from a content delivery network, because the
-            client is served by the instance and must not depend on somebody
-            else's host for the arithmetic its privacy rests on. Its licence
-            text is in <code>frontend/packages/vendor/LICENSE.noble-curves</code>.
-          </p>
-          <p>
-            The SDK, <code>trycord-botjs</code>, is part of this project and
-            carries the same MIT licence. It has no runtime dependencies at
-            all: it speaks HTTP to the instance and nothing else, so a bot
-            that installs it pulls in nobody else's code.
-          </p>
-          <p>
-            None of the core functionality requires a third-party account or a
-            hosted service. Optional integrations, such as mail delivery, an
-            object store for uploads, or a turn server for voice, are clearly
-            marked and can be left unconfigured.
-          </p>
-
-          <h2>3. Fonts and artwork</h2>
-          <p>
-            The website and the clients use Manrope for text and JetBrains Mono
-            for code. Both are distributed under the SIL Open Font License 1.1,
-            which permits use in a website or an application, including
-            commercially. The licence text for both families is included with
-            them in <code>frontend/assets/trycord-assets/fonts/OFL.txt</code>, and the copyright
-            notices for both are in <code>frontend/assets/trycord-assets/fonts/NOTICE.txt</code> — the
-            licence requires the notice of the copyright holder to travel with
-            the font, and there are two families here.
-          </p>
-          <p>
-            The flame mark and the other artwork in this repository are part
-            of the project and are covered by the MIT licence, with the
-            exception of anything that came from somewhere else. The icon and
-            the social preview image are in <code>public/assets</code>.
-          </p>
-          <p>
-            If you redistribute the site, keep the licence texts and the
-            notices with it. That is what the fonts' licence asks for, and it
-            is the polite thing to do with every dependency.
-          </p>
-
-          <h2>4. What the licence does not cover</h2>
-          <p>
-            The MIT licence covers the software. It does not cover the content
-            people post on an instance, the names and logos of the communities
-            on it, or the terms in the <a href="/terms">Terms of Service</a>.
-            Those are between the people who post them and the operator of
-            the instance they are posted on.
-          </p>
-          <p>
-            It also does not make the project responsible for an instance. A
-            self-hoster running this software is running their own service,
-            under their own name, with their own obligations; the licence
-            gives them permission to do that, and nothing more.
-          </p>
-
-          <h2>5. Your own instance</h2>
-          <p>
-            You may run an unmodified instance, a modified one, or one with
-            your own code alongside it. If you modify the software and publish
-            it, the published version is yours to license, provided the
-            notices of the original work travel with it. If you keep the
-            original name and mark, that implies the project endorses your
-            version, which it does not; a fork with a different name is a
-            different thing and does not need a permission to exist.
-          </p>
-
-          <h2>6. Trademarks</h2>
-          <p>
-            The MIT licence grants rights in the code. It does not grant
-            rights in the name Trycord or in the flame mark, and it does not
-            let anybody use them in a way that suggests a connection with the
-            project that does not exist.
-          </p>
-
-          <h2>7. Contributions</h2>
-          <p>
-            A contribution you send to the project is accepted under the same
-            MIT licence as the rest of the software. Say so when you send it,
-            and do not send code you are not allowed to license this way. A
-            change that is accepted is credited the way the project credits
-            contributions generally, which is in the commit history.
-          </p>
-          <p>
-            An operator's own note about the licence of this deployment is
-            <span class="op-field" data-op="license-notice">OPERATOR: any additional licensing note for this deployment</span>.
-          </p>
-        </article>
-        <aside class="toc" aria-label="On this page">
-          <p class="toc-title">On this page</p>
-        </aside>
+      <header class="page-head"><p class="kicker">Project</p><h1>Licenses</h1><p class="lede">The code is MIT licensed. The assets keep their own licenses.</p></header>
+      <div class="prose">
+        <h2>Trycord</h2><p>The server, clients, SDK, public site and tests in this repository are released under the MIT license. See the LICENSE file at the repository root.</p>
+        <h2>Typography</h2><p>Manrope and JetBrains Mono are bundled in the assets library under their own font licenses. Their license text ships with the assets.</p>
+        <h2>Other dependencies</h2><p>Each package installed by npm keeps its own license. The dependency manifests in the repository name those packages.</p>
       </div>
     </div>
   </main>
-
-
   <footer class="site-footer">
     <div class="wrap footer-grid">
       <div class="footer-col footer-brand">
@@ -379,7 +195,6 @@
       <span class="muted">Your instance, your conversations, your rules.</span>
     </div>
   </footer>
-
   <script src="/js/public-api.js"></script>
   <script src="/js/site.js"></script>
 </body>
