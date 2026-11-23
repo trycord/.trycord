@@ -353,7 +353,7 @@ test('recovery is generic and announces the same result either way', async () =>
   env.form.querySelector('input[name="email"]').value = 'somebody@example.test';
   await press(env);
 
-  assert.deepEqual(env.calls.forgot, [{ email: 'somebody@example.test' }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(env.calls.forgot)), [{ email: 'somebody@example.test' }]);
   assert.equal(env.form.hidden, true);
   assert.equal(env.top['[data-forgot-result]'].hidden, false);
   assert.match(env.top['[data-forgot-result-note]'].textContent, /If an account exists/);
@@ -365,7 +365,7 @@ test('a reset reads its token from the path and finishes in one request', async 
   env.form.querySelector('input[name="confirm"]').value = 'a-new-long-password';
   await press(env);
 
-  assert.deepEqual(env.calls.reset, [{
+  assert.deepEqual(JSON.parse(JSON.stringify(env.calls.reset)), [{
     token: 'token-123',
     newPassword: 'a-new-long-password',
     confirmPassword: 'a-new-long-password',
@@ -398,7 +398,7 @@ test('a second factor survives a reset without being handed a session', async ()
 
 test('a verification confirms the token and offers the right next step', async () => {
   const env = await loadAuth('verify', { pathname: '/verify-email/token-456', signedIn: false });
-  assert.deepEqual(env.calls.verify, [{ token: 'token-456' }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(env.calls.verify)), [{ token: 'token-456' }]);
   assert.equal(env.top['[data-verify-status]'].getAttribute('data-tone'), 'success');
   assert.equal(env.top['[data-verify-login]'].hidden, false,
     'a signed-out reader is not offered sign-in');
@@ -424,7 +424,7 @@ test('an expired verification can be resent by a signed-in reader', async () => 
 
   env.top['[data-verify-resend]'].listeners.click();
   await settle();
-  assert.deepEqual(env.calls.resend, [{ email: 'ada@example.test' }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(env.calls.resend)), [{ email: 'ada@example.test' }]);
   assert.equal(env.top['[data-verify-status]'].getAttribute('data-tone'), 'success');
   assert.equal(env.top['[data-verify-resend]'].hidden, true);
 });
