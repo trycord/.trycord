@@ -153,15 +153,6 @@ test('a group conversation', async (t) => {
 
   await t.test('a group is renamed by somebody in it', async () => {
     const list = await ada.get('/api/dms');
-    const db = require('../../src/db');
-    console.log('THE MEMBERS', JSON.stringify(await db.all('SELECT conversation_id, user_id FROM dm_members')));
-    const rows = await db.all(
-      "SELECT m.*, c.name AS conv_name, (SELECT COUNT(*) FROM dm_members cm WHERE cm.conversation_id = m.conversation_id) AS member_count "
-      + "FROM dm_members m JOIN dm_conversations c ON c.id = m.conversation_id WHERE m.user_id = ?",
-      [[ada.user.id]]
-    );
-    console.log('COUNT', JSON.stringify(await db.all('SELECT COUNT(*) AS n FROM dm_members')));
-
     const group = list.data.find((entry) => entry.name === 'The work');
     const res = await ada.patch('/api/dms/' + group.id, { name: 'The real work' });
     assert.equal(res.status, 200, JSON.stringify(res.data));

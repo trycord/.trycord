@@ -389,6 +389,7 @@ const INDEXES = [
   'CREATE INDEX idx_members_server ON server_members(server_id)',
   'CREATE INDEX idx_bans_server ON server_bans(server_id)',
   'CREATE INDEX idx_roles_server ON roles(server_id)',
+  'CREATE INDEX idx_emojis_server ON emojis(server_id)',
   'CREATE INDEX idx_member_roles_lookup ON member_roles(server_id, user_id)',
   'CREATE INDEX idx_channels_server ON channels(server_id)',
   'CREATE INDEX idx_messages_channel ON messages(channel_id, created_at)',
@@ -576,6 +577,7 @@ const INDEXES = [
   'CREATE UNIQUE INDEX idx_channels_slug ON channels(server_id, slug)',
   'CREATE INDEX idx_pins_channel ON pinned_messages(channel_id, pinned_at)',
   'CREATE INDEX idx_reactions_message ON reactions(message_id)',
+  'CREATE INDEX idx_dm_reactions_message ON dm_reactions(message_id)',
   'CREATE INDEX idx_muted_user ON muted_channels(user_id)',
   // V2 privacy, safety, wellbeing and session tables. All are keyed by user_id
   // and read on paths that touch another person, so they are indexed for exactly

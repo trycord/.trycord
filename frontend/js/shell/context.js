@@ -142,8 +142,9 @@ export function serverMenuItems(server) {
   const id = server.id;
   // The report entry is for members, not for the people running the place:
   // an owner or a manager reporting their own community to the platform is
-  // noise, and they have the settings to fix what they dislike.
-  const mine = State.user && server.ownerId === State.user.id;
+  // noise, and they have the settings to fix what they dislike. The server
+  // computes `is_owner` against the reader, so it is the honest answer.
+  const mine = !!(server && server.is_owner);
   return [
     { header: server.name },
     { label: 'Open', icon: 'arrow-right', onSelect: () => navigate('/server/' + id) },

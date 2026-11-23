@@ -50,11 +50,17 @@ test('the states of a call', async (t) => {
   });
 
   await t.test('both shells read the same words', () => {
-    for (const rel of ['js/voice/dock.js', 'mobile/js/views/voiceCall.js']) {
+    // The words are declared once, in the shared engine; the desk's dock and
+    // the phone's room read them and neither keeps a copy of its own.
+    const engine = fs.readFileSync(path.join(FRONTEND, 'packages/voiceSession.js'), 'utf8');
+    assert.ok(/connecting: 'Connecting'/.test(engine),
+      'the shared engine does not declare the words');
+    for (const rel of ['js/voice/dock.js', 'mobile/js/views/convo.js']) {
       const source = fs.readFileSync(path.join(FRONTEND, rel), 'utf8');
-      assert.ok(/CONNECTION_STATES/.test(source), rel + ' reads the shared words');
+      assert.ok(/CONNECTION_STATES|voiceSession/.test(source),
+        rel + ' does not read the shared words');
       assert.ok(!/connecting: 'Connecting'/.test(source),
-        rel + ' does not keep its own copy of the words');
+        rel + ' keeps its own copy of the words');
     }
   });
 });

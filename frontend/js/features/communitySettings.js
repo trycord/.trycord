@@ -40,6 +40,7 @@ import { rulesSection } from './communitySettings/rules.js';
 import { integrationsSection } from './communitySettings/integrations.js';
 import { voiceSection } from './communitySettings/voice.js';
 import { onboardingSection } from './communitySettings/onboarding.js';
+import { emojisSection } from './communitySettings/emojis.js';
 import {
   membersSection, rolesSection, invitesSection, categoriesSection,
 } from './communitySettings/access.js';
@@ -419,6 +420,7 @@ export function communitySettingsSections() {
   const registry = new Map([
     ['overview', overviewSection],
     ['appearance', appearanceSection],
+    ['emojis', emojisSection],
     ['channels', channelsSection],
     ['categories', categoriesSection],
     ['members', membersSection],

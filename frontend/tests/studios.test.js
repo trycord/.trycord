@@ -61,19 +61,13 @@ test('the admin studio names every section it draws', () => {
   }
 });
 
-test('the mobile admin names every section the strip offers', () => {
-  // The mobile strip is built from the registry, so every page it offers has
-  // to have a body: a page with no body answers with the overview, which is
-  // a different page wearing its name.
-  const source = read(path.join(MODULES.mobile, 'views', 'admin.js'));
-  const match = /const bodies = \{([\s\S]*?)\n  \};/.exec(source);
-  assert.ok(match, 'the mobile admin has no section table');
-  const named = [];
-  const re = /^\s*'([^']+)':|^\s*([a-zA-Z][\w]*):/gm;
-  let entry;
-  while ((entry = re.exec(match[1]))) named.push(entry[1] || entry[2]);
-
+test('the phone answers every admin section the rail offers', () => {
+  // The console is the same console on the phone: every section the rail
+  // offers has a renderer, and each one is the shared module's own.
+  const source = read(path.join(MODULES.mobile, 'views', 'index.js'));
   const offered = scopeNav('admin').flatMap((group) => group.items.map((item) => item.id));
-  const missing = offered.filter((id) => !named.includes(id));
-  assert.deepEqual(missing, [], 'admin pages the mobile module has no section for:\n' + missing.join('\n'));
+  for (const id of offered) {
+    assert.match(source, new RegExp("['\"]?" + id.replace(/\./g, '\\.') + "['\"]?\\s*:"),
+      'the phone does not answer ' + id);
+  }
 });

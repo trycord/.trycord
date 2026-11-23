@@ -223,4 +223,42 @@ test('the application gateway', async (t) => {
     assert.ok(res.data.application, 'the state does not say about the application');
     assert.equal(res.data.application.id, applicationId);
   });
+
+  // The community's own view of the same two facts: the manager reads the
+  // state from the console and mints a ticket on the application's behalf.
+  // The bare routes above refuse a session on purpose; these are where a
+  // session is the authority.
+  await t.test('a manager of the community reads the gateway from the console', async () => {
+    const res = await owner.get('/api/v1/communities/' + serverId + '/applications/' + applicationId + '/gateway');
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+    assert.equal(res.data.application.id, applicationId);
+    // The tests before this one may still hold a socket open, so the state
+    // itself is not asserted here — only that the answer is the state.
+    assert.equal(typeof res.data.application.connected, 'boolean', 'the state does not say whether the application is connected');
+    assert.equal(typeof res.data.application.sockets, 'number');
+    assert.ok(Array.isArray(res.data.application.events));
+    assert.equal(typeof res.data.connectedApplications, 'number');
+  });
+
+  await t.test('a manager mints a ticket on the application behalf', async () => {
+    const res = await owner.post('/api/v1/communities/' + serverId + '/applications/' + applicationId + '/gateway-ticket', {});
+    assert.equal(res.status, 200, JSON.stringify(res.data));
+    assert.ok(res.data.ticket, 'no ticket was issued');
+    assert.ok(res.data.expiresInMs > 0, 'the ticket does not say how long it lives');
+    assert.equal(res.data.url, '/api/v1/gateway');
+  });
+
+  await t.test('an application credential cannot use the community routes', async () => {
+    const read = await botApi.get('/api/v1/communities/' + serverId + '/applications/' + applicationId + '/gateway');
+    assert.ok(read.status >= 400, 'the application read the community route: ' + JSON.stringify(read.data));
+    const ticket = await botApi.post('/api/v1/communities/' + serverId + '/applications/' + applicationId + '/gateway-ticket', {});
+    assert.ok(ticket.status >= 400, 'the application used the community route: ' + JSON.stringify(ticket.data));
+  });
+
+  await t.test('a reader who is not of the community is told nothing', async () => {
+    const res = await other.get('/api/v1/communities/' + serverId + '/applications/' + applicationId + '/gateway');
+    assert.ok(res.status >= 400, 'a stranger read the gateway: ' + JSON.stringify(res.data));
+    const ticket = await other.post('/api/v1/communities/' + serverId + '/applications/' + applicationId + '/gateway-ticket', {});
+    assert.ok(ticket.status >= 400, 'a stranger minted a ticket: ' + JSON.stringify(ticket.data));
+  });
 });

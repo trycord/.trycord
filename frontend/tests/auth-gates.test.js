@@ -58,6 +58,21 @@ test('the shell is hidden under a standalone page, and the rule that hides it is
     'the stylesheet does not let the hidden attribute win over a component display');
 });
 
+test('a signed-out session page leaves by the site door, and only a local document keeps the app gate', () => {
+  const router = read(path.join(MODULES.desktop, 'router.js'));
+  assert.match(router, /publicPath/, 'the router does not know the public site address');
+  assert.match(router, /function leaveForSignIn\(route\)/,
+    'there is no single place that decides where a signed-out reader goes');
+  assert.match(router, /page\.access === 'session' && !signedIn\(\)[\s\S]*?leaveForSignIn\(route\)/,
+    'a session page does not use the site door');
+  assert.match(router, /page\.id === 'twoStep' && !signedIn\(\)[\s\S]*?leaveForSignIn\('\/'\)/,
+    'the enrolment page does not use the site door');
+  assert.match(router, /protocol === 'http:' \|\| protocol === 'https:'/,
+    'the router leaves the document even when there is no origin root to leave to');
+  assert.match(router, /navigate\(target, \{ replace: true \}\)/,
+    'a document off disk has no fallback to the application gate');
+});
+
 test('a registration cannot be sent before the documents are accepted', async () => {
   const result = gateFor('register');
   const form = result.node.querySelector('form');

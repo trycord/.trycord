@@ -47,7 +47,7 @@ test('the key-change answer warns only when the group actually moved', () => {
   assert.match(source, /event\.changed === true/,
     'a new epoch does not warn the reader');
 
-  const mobile = read(path.join(MODULES.mobile, 'encrypted.js'));
+  const mobile = read(path.join(MODULES.desktop, 'ui', 'encrypted.js'));
   assert.match(mobile, /event\.action === 'membership-changed'/,
     'the phone does not warn on a membership change');
   assert.match(mobile, /event\.changed === true/,

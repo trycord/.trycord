@@ -226,10 +226,16 @@ test('a mounted deployment answers auth deep links on the mount instead of redir
     assert.ok(html.includes('<base href="/app/'), route + ' is stamped with the mount');
   }
 
-  // The root-level paths still serve the same gate directly.
+  // The public site owns the sign-in door at the origin root. The mount still
+  // answers the application's own auth documents, which is what an edge alias
+  // of /login into /app/login lands on; neither answer redirects to the other.
   const root = await fetch(instance.baseUrl + '/login', { redirect: 'manual' });
   assert.equal(root.status, 200);
   assert.equal(root.headers.get('location'), null);
+  const rootHtml = String(await root.text());
+  assert.match(rootHtml, /data-login-form/, 'the public site owns the sign-in address');
+  assert.equal(rootHtml.includes('<base href'), false,
+    'the site sign-in page is not the application shell');
 });
 
 test('a named API origin outranks the serving origin in the client\u2019s backend.json', async (t) => {

@@ -12,6 +12,7 @@ import {
 import { navigate, path } from '../../../packages/nav.js';
 import { avatar } from '../../../js/ui/primitives.js';
 import { sheet, closeSheet, confirm, attachLongPress, failed, toast, emptyState, hold, failure, field } from '../ui.js';
+import { reportSheet } from '../actions.js';
 
 // An invitation that arrived as a link. It says what it opens into, and one
 // press joins it.
@@ -74,16 +75,31 @@ export function renderPlaces(ctx) {
   }
 
   function placeActions(server) {
+    // The report entry is for members, not for the people running the place:
+    // an owner reporting their own community to the platform is noise, and
+    // they have the settings to fix what they dislike. The server computes
+    // `is_owner` against the reader, so it is the honest answer.
+    const mine = !!(server && server.is_owner);
     return [
       { label: 'Open ' + (server.name || 'place'), icon: 'chevron-right', onClick: () => navigate(path('/server/' + server.id)) },
       { label: 'Members', icon: 'users', onClick: () => navigate(path('/server/' + server.id + '/members')) },
       { label: 'Files', icon: 'hard-drive', onClick: () => navigate(path('/server/' + server.id + '/workspace')) },
+      mine ? null : {
+        label: 'Report this place', icon: 'flag',
+        onClick: () => reportSheet({
+          title: 'Report ' + (server.name || 'this community'),
+          who: server.name || '',
+          payload: (reason, description) => ({
+            targetType: 'server', targetId: server.id, serverId: server.id, reason, description,
+          }),
+        }),
+      },
       { label: 'Leave this place', icon: 'log-out', danger: true, onClick: async () => {
         if (!(await confirm({ title: 'Leave ' + (server.name || 'this place') + '?', text: 'Its channels leave with it until an invitation brings you back.', confirmLabel: 'Leave', danger: true }))) return;
         try { await Api.leaveServer(server.id); await refreshServers(); paint(); toast('Left ' + (server.name || 'the place'), { type: 'success' }); }
         catch (e) { failed(e); }
       } },
-    ];
+    ].filter(Boolean);
   }
 
   function paint() {

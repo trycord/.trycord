@@ -65,6 +65,10 @@ test('every local import resolves to a file that exists', () => {
 });
 
 test('no module imports another module', () => {
+  // The modules are separate, with one sanctioned bridge: the phone shares the
+  // desk's interaction modules (js/ui — the primitives, the encryption glue,
+  // the menus) so there is one implementation and not two copies to keep
+  // equal. A mobile import from anywhere else in the desk is still a crossing.
   const crossings = [];
   for (const file of files) {
     const from = moduleOf(file);
@@ -74,8 +78,10 @@ test('no module imports another module', () => {
       if (!resolved) continue;
       const to = moduleOf(resolved);
       if (!to || to === from) continue;
-      if (from === 'packages' || (from === 'desktop' && to === 'mobile') || (from === 'mobile' && to === 'desktop')) {
-        crossings.push(relative(file) + ' (' + from + ') imports ' + relative(resolved) + ' (' + to + ')');
+      if (from === 'packages') { crossings.push(relative(file) + ' (packages) imports ' + relative(resolved) + ' (' + to + ')'); continue; }
+      if (from === 'desktop' && to === 'mobile') { crossings.push(relative(file) + ' (desktop) imports ' + relative(resolved) + ' (mobile)'); continue; }
+      if (from === 'mobile' && to === 'desktop' && !resolved.includes(path.join('js', 'ui') + path.sep)) {
+        crossings.push(relative(file) + ' (mobile) imports ' + relative(resolved) + ' (desktop, outside the shared js/ui)');
       }
     }
   }

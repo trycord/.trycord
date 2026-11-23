@@ -23,6 +23,7 @@ export const EVENTS = {
   DM_MESSAGE_UPDATED: 'dm:message_updated',
   DM_MESSAGE_DELETED: 'dm:message_deleted',
   DM_MESSAGE_EMBEDS: 'dm:message_embeds',
+  DM_MESSAGE_REACTION: 'dm:message_reaction',
   DM_READ: 'dm:read',
   DM_TYPING: 'dm:typing',
   DM_CONVERSATION_UPDATED: 'dm:conversation_updated',

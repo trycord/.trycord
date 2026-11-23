@@ -9,6 +9,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { fail } = require('../errors');
 const { secret } = require('../util');
+const features = require('../features');
 
 function tokenStale(user, row) {
   if (!row || !user.iat) return false;
@@ -147,6 +148,13 @@ function verificationEnforceable() {
 }
 
 function requireVerified(req, res, next) {
+  // The per-instance policy is the only thing that decides whether a verified
+  // address is required at all. An instance that has not turned the requirement
+  // on must not gate ordinary writes on the raw verified flag: an account that
+  // registered without an address, or one that never confirmed one, is not to be
+  // refused forever for it, and permanent accounts are not to be treated as
+  // unverifiable just for never confirming anything.
+  if (!features.current.emailVerificationRequired) return next();
   if (!verificationEnforceable()) return next();
   if (req.verified) return next();
   return fail(res, 'EMAIL_NOT_VERIFIED', 'verify your email to use this', 403);

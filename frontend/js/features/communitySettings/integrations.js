@@ -1,10 +1,10 @@
-// The integrations of a community: webhooks and bot applications.
+// The integrations of a community: webhooks.
 //
-// Both are credentials, and both are handled the same way. The server hands
-// the secret out once and cannot read it back, so the console shows it when
-// it arrives, offers it for copying, and afterwards shows a mask and the
-// actions that change it. Nothing is ever shown twice, and nothing is typed
-// into a secret field by hand.
+// The community's surface for outside software. The platform's applications -
+// bots and the rest of the developer platform - live in the developer portal,
+// not here: this is where the community manages what its own software may
+// talk to it, and the developer portal manages what Trycord itself is. The
+// two are different jobs, and this surface is only the first.
 
 import { el } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
@@ -109,179 +109,19 @@ async function deliveryHistory(serverId, hook) {
   }
 }
 
-// The name of an application, and what it is for.
-function appDialog(serverId, app, onDone) {
-  const name = el('input', {
-    class: 'input', type: 'text', value: app ? (app.name || '') : '',
-    'aria-label': 'The name of the application',
-    placeholder: 'What this application is called',
-  });
-  const description = el('input', {
-    class: 'input', type: 'text', value: app ? (app.description || '') : '',
-    'aria-label': 'What the application does',
-    placeholder: 'One sentence on what it does here',
-  });
-  const problem = el('p', { class: 'form-error', role: 'alert' });
-
-  const dialog = openDialog({
-    title: app ? 'Rename the application' : 'New application',
-    body: el('form', {
-      class: 'fold',
-      onSubmit: async (event) => {
-        event.preventDefault();
-        try {
-          if (app) {
-            await communityApi.updateApp(serverId, app.id, {
-              name: name.value.trim(),
-              description: description.value.trim(),
-            });
-            dialog.close();
-            onDone();
-            return;
-          }
-          const answer = await communityApi.createApp(serverId, {
-            name: name.value.trim(),
-            description: description.value.trim(),
-          });
-          dialog.close();
-          onDone();
-          // The token is in the answer and nowhere else. It is shown once.
-          const created = answer && answer.app ? answer.app : answer;
-          if (created && created.token) {
-            secretDialog({
-              title: 'The application token',
-              value: created.token,
-              text: 'This token is what the application posts with. It is shown once and it cannot be read again.',
-            });
-          }
-        } catch (error) {
-          problem.textContent = (error && error.message) ? error.message : 'That did not save.';
-        }
-      },
-    },
-    name,
-    description,
-    problem,
-    el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, app ? 'Save' : 'Create')),
-  });
-  name.focus();
-  return dialog;
-}
-
-// The commands one application answers.
-async function commandsDialog(serverId, app) {
-  const body = el('div', { class: 'fold' }, hold('Reading the commands'));
-  const problem = el('p', { class: 'form-error', role: 'alert' });
-  const dialog = openDialog({ title: 'The commands of ' + (app.name || 'the application'), body });
-
-  const paint = async () => {
-    try {
-      const answer = await communityApi.appCommands(serverId, app.id);
-      const commands = (answer && answer.commands) || [];
-      body.replaceChildren(el('div', { class: 'fold' },
-        el('div', { class: 'rowlist' }, ...(commands.length ? commands.map((command) => row({
-          title: '/' + command.name,
-          sub: command.description || command.response,
-          side: el('button', {
-            class: 'btn btn--danger btn--sm', type: 'button',
-            'aria-label': 'Remove the command /' + command.name,
-            onClick: async () => {
-              const yes = await confirmDialog({
-                title: 'Remove /' + command.name + '?',
-                body: 'The application stops answering it. Nothing else it answers changes.',
-                confirmLabel: 'Remove',
-                danger: true,
-              });
-              if (!yes) return;
-              try {
-                await communityApi.deleteAppCommand(serverId, app.id, command.id);
-                await paint();
-              } catch (error) {
-                problem.textContent = (error && error.message) ? error.message : 'That did not work.';
-              }
-            },
-          }, 'Remove'),
-        })) : [blank({
-          glyph: 'slash',
-          title: 'It answers nothing yet',
-          text: 'A command is a word the application answers with a message.',
-        })])),
-        problem,
-        el('button', {
-          class: 'btn btn--default btn--sm', type: 'button',
-          onClick: () => commandDialog(serverId, app, paint),
-        }, icon('plus', { size: 14 }), 'Add a command')));
-    } catch (error) {
-      body.replaceChildren(fold([fault(error, null)]));
-    }
-  };
-  await paint();
-  return dialog;
-}
-
-// One command, and the answer it gives.
-function commandDialog(serverId, app, onDone) {
-  const name = el('input', {
-    class: 'input', type: 'text', 'aria-label': 'The name of the command',
-    placeholder: 'ping',
-  });
-  const description = el('input', {
-    class: 'input', type: 'text', 'aria-label': 'What the command is for',
-    placeholder: 'One sentence on what it does',
-  });
-  const response = el('textarea', {
-    class: 'input', rows: '3', 'aria-label': 'The message the command answers with',
-    placeholder: 'The answer, with {name} for an argument',
-  });
-  const problem = el('p', { class: 'form-error', role: 'alert' });
-
-  const dialog = openDialog({
-    title: 'New command',
-    body: el('form', {
-      class: 'fold',
-      onSubmit: async (event) => {
-        event.preventDefault();
-        try {
-          await communityApi.setAppCommand(serverId, app.id, {
-            name: name.value.trim().replace(/^\//, ''),
-            description: description.value.trim(),
-            response: response.value,
-          });
-          dialog.close();
-          onDone();
-        } catch (error) {
-          problem.textContent = (error && error.message) ? error.message : 'That did not save.';
-        }
-      },
-    },
-    name,
-    description,
-    response,
-    problem,
-    el('button', { class: 'btn btn--primary btn--sm', type: 'submit' }, 'Save')),
-  });
-  name.focus();
-  return dialog;
-}
-
 export function integrationsSection(ctx) {
   const serverId = ctx.serverId;
   const host = el('div', { class: 'fold' });
   const report = reporter();
 
   let hooks = [];
-  let apps = [];
   let channels = [];
 
   const load = async () => {
     host.replaceChildren(hold('Reading the integrations'));
     try {
-      const [hookAnswer, appAnswer] = await Promise.all([
-        Api.webhooks(serverId),
-        communityApi.apps(serverId),
-      ]);
+      const hookAnswer = await Api.webhooks(serverId);
       hooks = (hookAnswer && hookAnswer.webhooks) || [];
-      apps = (appAnswer && appAnswer.apps) || [];
       const tree = State.serverTree.get(serverId);
       channels = (tree && tree.channels) || [];
       paint();
@@ -292,7 +132,6 @@ export function integrationsSection(ctx) {
 
   const paint = () => {
     const webhookBody = el('div', { class: 'rowlist' });
-    const appBody = el('div', { class: 'rowlist' });
 
     // -- the webhooks --------------------------------------------------------
     if (!hooks.length) {
@@ -386,122 +225,6 @@ export function integrationsSection(ctx) {
         }))));
     }
 
-    // -- the applications ----------------------------------------------------
-    if (!apps.length) {
-      appBody.replaceChildren(blank({
-        glyph: 'bot',
-        title: 'No applications',
-        text: 'An application posts as itself and answers commands.',
-      }));
-    } else {
-      appBody.replaceChildren(...apps.map((app) => el('div', {},
-        row({
-          lead: el('span', { class: 'role-dot' }, icon('bot', { size: 15 })),
-          title: app.name || 'Application',
-          sub: app.description || (app.status === 'active' ? 'Active' : 'Disabled'),
-          side: el('span', { class: 'rowtools' },
-            el('button', {
-              class: 'btn btn--ghost btn--sm', type: 'button',
-              'aria-label': (app.status === 'active' ? 'Switch off ' : 'Switch on ')
-                + 'the application ' + (app.name || ''),
-              title: app.status === 'active'
-                ? 'The application stops posting until it is switched on again.'
-                : 'The application posts again.',
-              onClick: async () => {
-                const on = app.status !== 'active';
-                try {
-                  await communityApi.updateApp(serverId, app.id, { status: on ? 'active' : 'disabled' });
-                  report.answered(on
-                    ? 'The application is switched on.'
-                    : 'The application is switched off. Its token still works, and it cannot post.');
-                  await load();
-                } catch (error) {
-                  report.fail(error);
-                }
-              },
-            }, app.status === 'active' ? 'Switch off' : 'Switch on'),
-            el('button', {
-              class: 'btn btn--ghost btn--sm', type: 'button',
-              'aria-label': 'Rename the application ' + (app.name || ''),
-              onClick: () => appDialog(serverId, app, load),
-            }, icon('edit', { size: 14 })),
-            el('button', {
-              class: 'btn btn--ghost btn--sm', type: 'button',
-              'aria-label': 'The commands of the application ' + (app.name || ''),
-              onClick: () => commandsDialog(serverId, app),
-            }, icon('slash', { size: 14 })),
-            el('button', {
-              class: 'btn btn--danger btn--sm', type: 'button',
-              'aria-label': 'Remove the application ' + (app.name || ''),
-              onClick: async () => {
-                const yes = await confirmDialog({
-                  title: 'Remove this application?',
-                  body: 'It stops posting, and its token goes with it.',
-                  confirmLabel: 'Remove',
-                  danger: true,
-                });
-                if (!yes) return;
-                try {
-                  await communityApi.deleteApp(serverId, app.id);
-                  report.answered('The server answered: the application was removed.');
-                  await load();
-                } catch (error) {
-                  report.fail(error);
-                }
-              },
-            }, 'Remove')),
-        }),
-        managedSecret({
-          label: 'The application token',
-          state: 'set',
-          note: 'The token is shown once, when the application is made. The server keeps only a hash of it, so a new token means a new application.',
-          replaceLabel: 'Replace',
-          onReplace: async () => {
-            const yes = await confirmDialog({
-              title: 'Make a new application?',
-              body: 'A token cannot be replaced in place, so this makes a second application with the same name and shows its token. The old one keeps working until it is removed.',
-              confirmLabel: 'Make a new one',
-              danger: true,
-            });
-            if (!yes) return;
-            try {
-              const answer = await communityApi.createApp(serverId, {
-                name: app.name,
-                description: app.description || '',
-              });
-              report.answered('The server answered: a new application was made.');
-              const created = answer && answer.app ? answer.app : answer;
-              if (created && created.token) {
-                secretDialog({
-                  title: 'The new application token',
-                  value: created.token,
-                  text: 'This is the new token, and the only time it can be shown.',
-                });
-              }
-              await load();
-            } catch (error) {
-              report.fail(error);
-            }
-          },
-          onClear: async () => {
-            const yes = await confirmDialog({
-              title: 'Remove the application?',
-              body: 'Removing the application removes its token with it. Nothing can post as it afterwards.',
-              confirmLabel: 'Remove the application',
-              danger: true,
-            });
-            if (!yes) return;
-            try {
-              await communityApi.deleteApp(serverId, app.id);
-              report.answered('The server answered: the application was removed.');
-              await load();
-            } catch (error) {
-              report.fail(error);
-            }
-          },
-        }))));
-    }
-
     host.replaceChildren(fold([
       report.node,
       card({
@@ -513,17 +236,6 @@ export function integrationsSection(ctx) {
               class: 'btn btn--default btn--sm', type: 'button',
               onClick: () => webhookDialog(serverId, null, channels, load),
             }, icon('plus', { size: 14 }), 'New webhook')),
-        ]),
-      }),
-      card({
-        label: 'Applications', glyph: 'bot',
-        body: fold([
-          appBody,
-          el('div', { class: 'rowtools' },
-            el('button', {
-              class: 'btn btn--default btn--sm', type: 'button',
-              onClick: () => appDialog(serverId, null, load),
-            }, icon('plus', { size: 14 }), 'New application')),
         ]),
       }),
     ]));

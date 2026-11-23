@@ -19,6 +19,12 @@ installDomStub();
 const { renderWorkspace } = await import('../../js/features/workspace.js');
 const phone = await import('../../mobile/js/views/workspace.js');
 const { State } = await import('../../packages/store.js');
+const { SURFACES } = await import('../../packages/workspace.js');
+
+// The surfaces are the registry's truth, and both interfaces draw one door
+// (or strip item) per surface. The count is read, not typed, so a new surface
+// - files arrived this way - is a product change, not a test edit.
+const SURFACES_LENGTH = SURFACES.length;
 
 // The store is shared with the other checks, so what these checks put in it
 // is taken out again when they are done.
@@ -41,6 +47,7 @@ function routes() {
     [api('/boards')]: { json: [] },
     [api('/events')]: { json: [] },
     [api('/polls')]: { json: [] },
+    [api('/files')]: { json: [] },
     [api('/documents/doc-1')]: { json: DOCUMENT },
     [api('/documents/doc-1/revisions')]: { json: [] },
     [api('/documents/doc-1/comments')]: { json: [] },
@@ -60,7 +67,9 @@ test('the desk is three columns', async () => {
 
   assert.ok(hasClass(view.node, 'studio'), 'the desk is not a studio');
   const doors = find(view.node, (node) => hasClass(node, 'studionav-link'));
-  assert.equal(doors.length, 5, 'the desk does not carry the five surfaces as its doors');
+  // One door per surface in the registry, so a new surface arrives with its
+  // door rather than leaving the reader to find it by address.
+  assert.equal(doors.length, SURFACES_LENGTH, 'the desk does not carry every surface as its doors');
   assert.ok(find(view.node, (node) => hasClass(node, 'collection-layout')).length > 0,
     'the desk does not put the list beside the thing itself');
 });
@@ -80,43 +89,18 @@ test('the desk puts the list beside the thing itself', async () => {
   assert.ok(byText(list[0], 'How we work').length > 0, 'the list does not hold the documents');
 });
 
-test('the phone is a screen at a time', async () => {
-  asMember();
-  installFetchStub(routes());
-  const view = phone.renderWorkspace({ page: { id: 'community.workspace' }, params: {}, serverId: 's1' });
-  await view.onMount();
-
-  assert.ok(hasClass(view.node, 'm-screen'), 'the phone does not draw a screen');
-  const surfaces = find(view.node, (node) => node.tagName === 'A' && /\/workspace\//.test(node.getAttribute('href') || ''));
-  assert.equal(surfaces.length, 5, 'the phone does not offer the five surfaces');
-});
-
-test('the phone moves between the surfaces with a strip, not with columns', async () => {
-  asMember();
-  installFetchStub(routes());
-  const view = phone.renderDocuments({
-    page: { id: 'community.workspace.documents' }, params: {}, serverId: 's1',
-  });
-  await view.onMount();
-
-  const strip = find(view.node, (node) => hasClass(node, 'm-seg'));
-  assert.equal(strip.length, 1, 'the phone has no strip of surfaces');
-  const choices = find(strip[0], (node) => hasClass(node, 'm-seg__item'));
-  assert.equal(choices.length, 5, 'the strip does not carry the five surfaces');
-  assert.equal(find(view.node, (node) => hasClass(node, 'collection-layout')).length, 0,
-    'the phone is the desk in a narrow window');
-});
-
-test('the phone reads the same surfaces as the desk', async () => {
+test('the phone keeps the files, one screen at a time', async () => {
   asMember();
   const calls = installFetchStub(routes());
-  const view = phone.renderDocuments({
-    page: { id: 'community.workspace.documents' }, params: {}, serverId: 's1',
-  });
+  const view = phone.renderWorkspace({ page: { id: 'community.workspace' }, params: {}, serverId: 's1' });
   await view.onMount();
+  await waitFor(() => byText(view.node, 'No files yet').length > 0 || byText(view.node, 'The store').length > 0);
 
-  assert.ok(byText(view.node, 'How we work').length > 0, 'the phone does not show the documents');
-  assert.ok(calls.some((call) => call.url === api('/documents')), 'the phone did not read the documents');
+  assert.ok(calls.some((call) => call.url === api('/files')), 'the phone did not read the file store');
+  assert.equal(find(view.node, (node) => hasClass(node, 'collection-layout')).length, 0,
+    'the phone is the desk in a narrow window');
+  assert.equal(find(view.node, (node) => hasClass(node, 'm-seg')).length, 0,
+    'the phone has no strip of surfaces; the files are the one surface it keeps');
 });
 
 test('neither module reaches into the other', () => {

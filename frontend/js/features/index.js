@@ -45,7 +45,7 @@ export const RENDERERS = {
   'applications': lazy('./developer.js', 'renderApplicationsPortal'),
   'applications.keys': lazy('./developer.js', 'renderDeveloper'),
   'applications.applications': lazy('./developer.js', 'renderDeveloper'),
-  'applications.dashboard': lazy('./developer.js', 'renderDeveloperPortal'),
+  'applications.dashboard': lazy('./developer.js', 'renderDeveloper'),
   'applications.documentation': lazy('./developer.js', 'renderDeveloper'),
   // The console's own sections answer to addresses of their own; the bare
   // developer page and these three are the same console, addressed differently.
@@ -104,6 +104,7 @@ export const RENDERERS = {
   'community.onboarding': (ctx) => renderOnboarding(ctx),
   'community.settings.overview': (ctx) => renderCommunity(ctx),
   'community.settings.appearance': (ctx) => renderCommunity(ctx),
+  'community.settings.emojis': (ctx) => renderCommunity(ctx),
   'community.settings.channels': (ctx) => renderCommunity(ctx),
   'community.settings.categories': (ctx) => renderCommunity(ctx),
   'community.settings.members': (ctx) => renderCommunity(ctx),

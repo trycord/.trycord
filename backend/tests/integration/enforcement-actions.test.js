@@ -103,7 +103,10 @@ test('the enforcement actions on an account', async (t) => {
 
     for (const file of [
       path.join(root, '..', 'frontend', 'js', 'features', 'adminSurfaces.js'),
-      path.join(root, '..', 'frontend', 'mobile', 'js', 'views', 'admin.js'),
+      // The phone keeps no admin console of its own; its moderation actions
+      // answer through the shared action matrix. The file is still read, so
+      // an enforcement vocabulary that creeps onto the phone is checked too.
+      path.join(root, '..', 'frontend', 'mobile', 'js', 'actions.js'),
     ]) {
       const source = fs.readFileSync(file, 'utf8');
       // Every action type the client names must be one the server knows.

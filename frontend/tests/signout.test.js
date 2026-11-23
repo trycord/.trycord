@@ -17,9 +17,9 @@ test('the desktop asks before it signs out', () => {
 });
 
 test('the phone asks before it signs out', () => {
-  const menu = read(path.join(MODULES.mobile, 'views', 'menu.js'));
-  assert.match(menu, /const sure = await confirm\(\{[\s\S]*?title: 'Sign out of Trycord\?'/,
+  const you = read(path.join(MODULES.mobile, 'views', 'you.js'));
+  assert.match(you, /await confirm\(\{[\s\S]*?title: 'Sign out\?'/,
     'the phone sign-out has no confirmation');
-  assert.match(menu, /if \(!sure\) return/,
+  assert.match(you, /if \(!\(await confirm/,
     'the phone ignores the answer to the confirmation');
 });

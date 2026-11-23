@@ -409,6 +409,11 @@ const Api = {
   memberPermissions: (serverId, userId) =>
     request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/members/' + encodeURIComponent(userId) + '/permissions'),
 
+  // Set or clear a member's name inside a community. Anyone may set their own;
+  // staff (KICK_MEMBERS) may set another's. An empty string clears it.
+  setNickname: (serverId, userId, nickname) =>
+    request('PATCH', '/api/servers/' + encodeURIComponent(serverId) + '/members/' + encodeURIComponent(userId) + '/nickname', { body: { nickname } }),
+
   // The notes a community's moderators keep about the people in it.
   memberNotes: (serverId) =>
     request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/notes'),
@@ -515,6 +520,19 @@ const Api = {
     fd.append('file', file);
     return xhrUpload('/api/servers/' + encodeURIComponent(serverId) + '/files', fd, onProgress);
   },
+
+  // A community's own emojis. The picture rides the multipart ceiling and the
+  // name rides the "name" field; the list is what turns `:name:` into a
+  // picture in every reader.
+  emojis: (serverId) => request('GET', '/api/servers/' + encodeURIComponent(serverId) + '/emojis'),
+  createEmoji: (serverId, file, name, onProgress) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('name', name);
+    return xhrUpload('/api/servers/' + encodeURIComponent(serverId) + '/emojis', fd, onProgress);
+  },
+  deleteEmoji: (serverId, emojiId) =>
+    request('DELETE', '/api/servers/' + encodeURIComponent(serverId) + '/emojis/' + encodeURIComponent(emojiId)),
 
   mutes: () => request('GET', '/api/mutes'),
   muteChannel: (channelId) => request('POST', '/api/mutes', { body: { channelId } }),
@@ -899,6 +917,8 @@ const Api = {
   continuumDiscovery: () => request('GET', '/.well-known/trycord'),
   continuumInstances: () => request('GET', '/api/continuum/instances'),
   continuumAddInstance: (body) => request('POST', '/api/continuum/instances', { body }),
+  continuumRemoveInstance: (id) =>
+    request('DELETE', '/api/continuum/instances/' + encodeURIComponent(id)),
   continuumSetTrust: (id, trustStatus) =>
     request('PATCH', '/api/continuum/instances/' + encodeURIComponent(id) + '/trust', { body: { trust_status: trustStatus } }),
   continuumEvents: () => request('GET', '/api/continuum/events'),

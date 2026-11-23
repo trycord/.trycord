@@ -64,9 +64,10 @@ async function fetchHead(url) {
   });
   if (!answer.ok) {
     // A page that answered with something that is not HTML is still a link,
-    // and the site name is worth keeping.
+    // and the site name is worth keeping. Preserve the content type so the
+    // caller can tell an image or a video URL from an ordinary link.
     if (answer.contentType) {
-      return { kind: 'link', siteName: new URL(url).hostname };
+      return { kind: 'link', siteName: new URL(url).hostname, contentType: answer.contentType };
     }
     return { error: answer.error };
   }
@@ -169,7 +170,18 @@ async function describe(url) {
     const got = await fetchHead(url);
     if (got.error) return { status: 'unavailable', kind: 'link' };
     if (got.html === undefined) {
-      return { status: 'ok', kind: got.kind || 'link', siteName: got.siteName || null, title: null };
+      // The URL itself is media (image/video) or some other non-HTML resource.
+      // Describe it as the media it is so the frontend draws a card instead of
+      // a plain link. The host was already validated by fetchHtml's guard.
+      const mediaKind = mediaKindFrom(url, got.contentType);
+      return {
+        status: 'ok',
+        kind: mediaKind,
+        siteName: got.siteName || null,
+        title: null,
+        imageUrl: mediaKind === 'image' ? url : null,
+        videoUrl: mediaKind === 'video' ? url : null,
+      };
     }
     const finalUrl = got.finalUrl || url;
     const host = new URL(finalUrl).hostname;
@@ -222,6 +234,25 @@ async function publicMediaUrl(raw, base) {
 // own host, so anything that is not plainly a video is left as a link card
 // rather than turned into a player.
 const VIDEO_EXT = /\.(mp4|webm|ogv|ogg|mov|m4v)(?:$|\?)/i;
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|ico|tiff?)(?:$|\?)/i;
+const IMAGE_TYPES = /^image\/(png|jpeg|jpg|gif|webp|svg\+xml|bmp|ico|tiff?)$/i;
+const VIDEO_TYPES = /^video\/(mp4|webm|ogv|ogg|mov|m4v)$/i;
+
+// Decide whether a direct media URL is an image, a video, or just a link.
+// Prefers the content type the server reported; falls back to the URL
+// extension when the type is absent or unrecognised.
+function mediaKindFrom(url, contentType) {
+  if (contentType) {
+    if (IMAGE_TYPES.test(contentType)) return 'image';
+    if (VIDEO_TYPES.test(contentType)) return 'video';
+  }
+  try {
+    const u = new URL(url);
+    if (VIDEO_EXT.test(u.pathname)) return 'video';
+    if (IMAGE_EXT.test(u.pathname)) return 'image';
+  } catch {}
+  return 'link';
+}
 function videoCandidate(raw, base) {
   const abs = absolute(raw, base);
   if (!abs) return null;
@@ -364,5 +395,6 @@ async function backfill(limit = 25) {
 
 module.exports = {
   queue, listForMessages, backfill, extractUrls, normalizeUrl,
-  shape, publicMediaUrl, VIDEO_EXT, meta, titleTag, absolute, decodeEntities,
+  shape, publicMediaUrl, VIDEO_EXT, IMAGE_EXT, meta, titleTag, absolute,
+  decodeEntities, mediaKindFrom,
 };

@@ -458,6 +458,10 @@ export function renderDmConversation(ctx) {
       if (String(event.conversationId) !== String(conversationId)) return;
       surface.api.embeds(event.messageId, event.embeds || []);
     }),
+    on(EVENTS.DM_MESSAGE_REACTION, (event) => {
+      if (String(event.conversationId) !== String(conversationId)) return;
+      surface.api.reaction(event.id, event.reactions || []);
+    }),
     on(EVENTS.DM_TYPING, (event) => {
       if (String(event.conversationId) !== String(conversationId)) return;
       surface.api.typing(event.username || 'Someone');

@@ -11,7 +11,7 @@ import { el } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import Api from '../../../packages/api.js';
 import { head, card, row, blank, fault, fold, hold } from '../../ui/page.js';
-import { confirmDialog, openDialog } from '../../ui/overlays.js';
+import { confirmDialog, openDialog, errorToast } from '../../ui/overlays.js';
 import { can, isOwner } from '../../../packages/store.js';
 import { communityApi } from '../../../packages/communitySettings.js';
 import { reporter } from './parts.js';
@@ -131,20 +131,27 @@ export function moderationSection(ctx) {
           class: 'btn btn--ghost btn--sm', type: 'button',
           'aria-label': 'Lift the ban on ' + (ban.displayName || ban.username || 'this person'),
           onClick: async () => {
-            const yes = await confirmDialog({
-              title: 'Lift the ban?',
-              body: (ban.displayName || ban.username || 'This person')
-                + ' can come back to the community. The record of the ban stays.',
-              confirmLabel: 'Lift the ban',
-            });
-            if (!yes) return;
-            try {
-              await Api.unbanMember(serverId, ban.userId || ban.user_id || ban.id);
-              report.answered('The server answered: the ban was lifted.');
-              await load();
-            } catch (error) {
-              report.fail(error);
-            }
+              const reasonInput = el('input', { class: 'input', type: 'text', placeholder: 'Reason for lifting the ban', value: ban.reason || '' });
+              const yes = await confirmDialog({
+                title: 'Lift the ban?',
+                body: (ban.displayName || ban.username || 'This person')
+                  + ' can come back to the community. The record of the ban stays.',
+                confirmLabel: 'Lift the ban',
+                inputs: [reasonInput],
+              });
+              if (!yes) return;
+              const clean = String(reasonInput.value || '').trim();
+              if (!clean) {
+                reasonInput.focus();
+                return;
+              }
+              try {
+                await Api.unbanMember(serverId, ban.userId || ban.user_id || ban.id, clean);
+                report.answered('The server answered: the ban was lifted.');
+                await load();
+              } catch (error) {
+                report.fail(error);
+              }
           },
         }, 'Lift'),
       })));
@@ -231,15 +238,25 @@ export function moderationSection(ctx) {
             class: 'btn btn--danger btn--sm', type: 'button',
             'aria-label': 'Remove ' + memberName(member) + ' from the community',
             onClick: async () => {
+              const reason = el('textarea', {
+                class: 'textarea', rows: '2', maxlength: '500',
+                'aria-label': 'Reason for removal',
+                placeholder: 'Reason for removal',
+              });
               const yes = await confirmDialog({
                 title: 'Remove ' + memberName(member) + '?',
-                body: 'They leave the community. They can come back if there is a place for them.',
+                body: el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'Reason for removal'), reason),
                 confirmLabel: 'Remove',
                 danger: true,
               });
               if (!yes) return;
+              const clean = String(reason.value || '').trim();
+              if (!clean) {
+                reason.focus();
+                return;
+              }
               try {
-                await Api.kickMember(serverId, member.id);
+                await Api.kickMember(serverId, member.id, clean);
                 report.answered('The server answered: ' + memberName(member) + ' was removed.');
                 await load();
               } catch (error) {
@@ -341,18 +358,56 @@ export function moderationSection(ctx) {
     await load();
   };
 
-  const bulkTimeout = (names) => bulk(names, (member) => Api.timeoutMember(serverId, member.id, 60),
-    'They are timed out for an hour');
+  // Several at once still need a reason: the server keeps one with every
+  // action, so the bar asks for it once and sends the same words for each
+  // member it acts on.
+  const bulkTimeout = async (names) => {
+    const reason = el('textarea', {
+      class: 'textarea', rows: '2', maxlength: '500',
+      'aria-label': 'Why are these members being timed out',
+      placeholder: 'Why are these members being timed out?',
+    });
+    const yes = await confirmDialog({
+      title: names.length === 1 ? 'Time out ' + names[0] + '?' : 'Time out ' + names.length + ' members?',
+      body: fold([
+        el('p', { class: 'form-note' }, 'They stay in the community and cannot post for an hour.'),
+        el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'Reason'), reason),
+      ]),
+      confirmLabel: 'Time out',
+      danger: true,
+    });
+    if (!yes) return;
+    const clean = String(reason.value || '').trim();
+    if (!clean) {
+      reason.focus();
+      return;
+    }
+    await bulk(names, (member) => Api.timeoutMember(serverId, member.id, 60, clean),
+      'They are timed out for an hour');
+  };
 
   const bulkRemove = async (names) => {
+    const reason = el('textarea', {
+      class: 'textarea', rows: '2', maxlength: '500',
+      'aria-label': 'Why are these members being removed',
+      placeholder: 'Why are these members being removed?',
+    });
     const yes = await confirmDialog({
       title: names.length === 1 ? 'Remove ' + names[0] + '?' : 'Remove ' + names.length + ' members?',
-      body: names.join(', ') + ' leave the community. They can come back if there is a place for them.',
+      body: fold([
+        el('p', { class: 'form-note' }, names.join(', ') + ' leave the community. They can come back if there is a place for them.'),
+        el('label', { class: 'field' }, el('span', { class: 'field-label' }, 'Reason'), reason),
+      ]),
       confirmLabel: 'Remove',
       danger: true,
     });
     if (!yes) return;
-    await bulk(names, (member) => Api.kickMember(serverId, member.id), 'They were removed');
+    const clean = String(reason.value || '').trim();
+    if (!clean) {
+      reason.focus();
+      return;
+    }
+    await bulk(names, (member) => Api.kickMember(serverId, member.id, clean), 'They were removed');
   };
 
   // The form that times somebody out.
@@ -365,11 +420,25 @@ export function moderationSection(ctx) {
     }
     const how = el('select', { class: 'input', 'aria-label': 'How long the timeout lasts' },
       ...TIMEOUTS.map((span) => el('option', { value: String(span.minutes) }, span.label)));
+    const reason = el('textarea', {
+      class: 'textarea', rows: '2', maxlength: '500',
+      'aria-label': 'Why is this timeout being set',
+      placeholder: 'Why is this timeout being set? The server keeps the reason with the timeout.',
+    });
     const run = el('button', { class: 'btn btn--default btn--sm', type: 'button' }, 'Time out');
     run.addEventListener('click', async () => {
       if (!who.value) { who.focus(); return; }
       const minutes = Number(how.value);
       const member = members.find((m) => String(m.id) === String(who.value));
+      const clean = String(reason.value || '').trim();
+      if (!clean) {
+        errorToast({ message: 'A reason is required before timing a member out. It can be up to 500 characters.' });
+        return;
+      }
+      if (clean.length > 500) {
+        errorToast({ message: 'That reason is longer than 500 characters. Shorten it before the server answers.' });
+        return;
+      }
       const yes = await confirmDialog({
         title: 'Time ' + memberName(member || {}) + ' out?',
         body: 'They stay in the community and cannot post for ' + (TIMEOUTS.find((t) => t.minutes === minutes) || { label: minutes + ' minutes' }).label
@@ -379,7 +448,7 @@ export function moderationSection(ctx) {
       });
       if (!yes) return;
       try {
-        await Api.timeoutMember(serverId, who.value, minutes);
+        await Api.timeoutMember(serverId, who.value, minutes, clean);
         report.answered('The server answered: the timeout was set.');
         await load();
       } catch (error) {
@@ -389,6 +458,7 @@ export function moderationSection(ctx) {
     return el('div', { class: 'fold fold--tight' },
       who,
       how,
+      reason,
       el('div', { class: 'rowtools' }, run));
   };
 

@@ -48,6 +48,7 @@ export const State = {
   federated: [],
   serverDetail: new Map(),
   serverTree: new Map(),
+  serverEmojis: new Map(),
   serverMembers: new Map(),
   serverRoles: new Map(),
   serverPermissions: new Map(),
@@ -205,6 +206,9 @@ function clearCaches() {
   State.serverTree.clear();
   treeInFlight.clear();
   treeFetchedAt.clear();
+  State.serverEmojis.clear();
+  emojiInFlight.clear();
+  emojiFetchedAt.clear();
   State.serverMembers.clear();
   State.serverRoles.clear();
   State.serverPermissions.clear();
@@ -283,6 +287,43 @@ export async function refreshServer(serverId) {
 const TREE_TTL_MS = 5000;
 const treeInFlight = new Map();
 const treeFetchedAt = new Map();
+
+// The emojis of each community, held beside its channel tree: the same
+// TTL and the same in-flight promise, because a conversation paints many
+// rows at once and each one asks the same question of the same list.
+const emojiInFlight = new Map();
+const emojiFetchedAt = new Map();
+
+// The picture behind a short code: the emoji named `name` in `serverId`, or
+// null when the community has none by that name. Renderers call this per
+// token, so it reads the map and never the wire.
+export function emojiOf(serverId, name) {
+  const list = serverId && name ? State.serverEmojis.get(serverId) : null;
+  if (!list) return null;
+  const wanted = String(name).toLowerCase();
+  return list.find((one) => one.name === wanted) || null;
+}
+
+export async function refreshServerEmojis(serverId, options) {
+  if (!serverId) return [];
+  const force = !!(options && options.force);
+  const fresh = emojiFetchedAt.get(serverId) && (Date.now() - emojiFetchedAt.get(serverId)) < TREE_TTL_MS;
+  if (!force && fresh) return State.serverEmojis.get(serverId) || [];
+  if (emojiInFlight.has(serverId)) return emojiInFlight.get(serverId);
+  const run = (async () => {
+    try {
+      const list = await Api.emojis(serverId);
+      State.serverEmojis.set(serverId, Array.isArray(list) ? list : []);
+      emojiFetchedAt.set(serverId, Date.now());
+      emit('emojis', { serverId, emojis: State.serverEmojis.get(serverId) });
+      return State.serverEmojis.get(serverId);
+    } finally {
+      emojiInFlight.delete(serverId);
+    }
+  })();
+  emojiInFlight.set(serverId, run);
+  return run;
+}
 
 export async function refreshServerTree(serverId, options) {
   const force = !!(options && options.force);

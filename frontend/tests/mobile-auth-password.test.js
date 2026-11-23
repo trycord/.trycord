@@ -10,17 +10,17 @@ import { installDomStub } from './helpers/dom-stub.js';
 installDomStub();
 
 const { renderAuth } = await import('../mobile/js/views/auth.js');
-const registry = await import('../packages/registry.js');
 
+// The register screen, as the reader sees it: raw, with a form in it.
 function registerForm() {
-  const result = renderAuth(registry.pageById('register'), {});
-  return result.node.querySelector('form');
+  const answer = renderAuth({ screen: 'register' });
+  return answer.node.querySelector('form');
 }
 
 test('the phone registration password can be revealed', () => {
   const form = registerForm();
   const password = form.querySelector('input[name="password"]');
-  const toggle = form.querySelector('.m-password-toggle');
+  const toggle = [...form.querySelectorAll('button')].find((b) => /^(Show|Hide)$/.test(b.textContent));
   assert.ok(password, 'the phone registration has no password field');
   assert.ok(toggle, 'the phone password cannot be revealed');
 
@@ -28,30 +28,22 @@ test('the phone registration password can be revealed', () => {
   toggle.dispatch('click');
   assert.equal(password.getAttribute('type'), 'text', 'the reveal did not change the field');
   assert.equal(toggle.textContent, 'Hide');
+
   toggle.dispatch('click');
-  assert.equal(password.getAttribute('type'), 'password', 'the field did not hide again');
+  assert.equal(password.getAttribute('type'), 'password', 'the reveal did not hide it again');
 });
 
-test('the phone meter follows the phrase and the confirmation', () => {
+test('the phone reads the phrase as guidance, not as a gate', () => {
   const form = registerForm();
   const password = form.querySelector('input[name="password"]');
-  const confirm = form.querySelector('input[name="confirm"]');
-  const meter = form.querySelector('.m-password-meter');
+  const reading = form.querySelector('.m-auth__strength');
+  assert.ok(reading, 'the phone registration has no reading of the phrase');
 
-  assert.ok(meter, 'the phone registration has no strength reading');
-  assert.equal(meter.hidden, true, 'the empty meter is shown');
-
-  password.value = 'correct horse battery staple';
+  password.value = 'short';
   password.dispatch('input');
-  assert.equal(meter.hidden, false, 'the meter stayed hidden with a phrase typed');
-  assert.ok(Number(meter.dataset.score) >= 3, 'a long passphrase did not move the meter');
+  assert.ok(/Short/.test(reading.textContent), 'a short phrase is not warned about');
 
-  confirm.value = 'correct horse';
-  confirm.dispatch('input');
-  assert.equal(confirm.getAttribute('aria-invalid'), 'true',
-    'a mismatch was not marked while typing');
-  confirm.value = 'correct horse battery staple';
-  confirm.dispatch('input');
-  assert.equal(confirm.getAttribute('aria-invalid'), 'false',
-    'a match was still marked invalid');
+  password.value = 'a long enough phrase of words';
+  password.dispatch('input');
+  assert.ok(!/Short/.test(reading.textContent), 'a long phrase is still warned about');
 });

@@ -133,6 +133,19 @@ module.exports = (engine) => [
       FOREIGN KEY (pinned_by) REFERENCES users(id) ON DELETE CASCADE
     )${engine}`,
 
+  // A feeling on a direct message. The channel `reactions` table carries a
+  // foreign key to `messages`, so it cannot hold a conversation's rows; this
+  // mirrors it, keyed to `dm_messages`, with the same (message, user, emoji)
+  // identity — one row per person per feeling.
+  `CREATE TABLE IF NOT EXISTS dm_reactions (
+      message_id VARCHAR(64) NOT NULL,
+      user_id    VARCHAR(64) NOT NULL,
+      emoji      VARCHAR(32) NOT NULL,
+      created_at VARCHAR(64) NOT NULL,
+      PRIMARY KEY (message_id, user_id, emoji),
+      FOREIGN KEY (message_id) REFERENCES dm_messages(id) ON DELETE CASCADE
+    )${engine}`,
+
   // An invitation to a group conversation. Distinct from membership: being
   // added is a fact, being invited is a question the recipient answers.
   // UNIQUE(conversation_id, invitee_id) means one outstanding question per

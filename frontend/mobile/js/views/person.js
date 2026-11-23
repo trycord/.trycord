@@ -172,6 +172,18 @@ export function renderPerson(ctx) {
         catch (e) { failed(e); }
       } }, 'Block'));
     }
+    // A person can be reported where they stand: the report goes to whoever
+    // moderates the instance, and they are never told who filed it.
+    actions.push(el('button', { class: 'm-go', type: 'button', onClick: () => reportSheet({
+      title: 'Report ' + (nameOf(person) || 'this person'),
+      who: nameOf(person) || '',
+      payload: (reason, description) => ({
+        targetType: 'user',
+        targetId: person.id,
+        serverId: serverId || undefined,
+        reason, description,
+      }),
+    }) }, icon('flag', { size: 17 }), 'Report'));
     return actions;
   }
 

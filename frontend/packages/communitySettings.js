@@ -39,6 +39,10 @@ export const COMMUNITY_SECTIONS = [
     blurb: 'The icon and the banner',
   },
   {
+    id: 'emojis', label: 'Emojis', icon: 'smile', group: 'This community',
+    blurb: 'The pictures the community gives a name to',
+  },
+  {
     id: 'channels', label: 'Channels', icon: 'hash', group: 'Structure',
     blurb: 'Create, rename and reorder the channels',
   },

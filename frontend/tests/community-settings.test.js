@@ -122,22 +122,15 @@ test('the console offers the sections the registry promises', async () => {
   }
 });
 
-test('the phone carries the same sections', async () => {
-  // The phone's own list of sections. It is read from the source rather than
-  // imported, because the mobile module is a separate composition and the
-  // point of the check is that the two lists agree.
-  const fs = await import('node:fs');
-  const path = await import('node:path');
-  const file = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'mobile', 'js', 'views', 'community.js');
-  const source = fs.readFileSync(file, 'utf8');
-
-  const block = source.match(/const SETTINGS_SECTIONS = \[([\s\S]*?)\];/);
-  assert.ok(block, 'the phone has no list of community settings sections');
-  const onPhone = [...block[1].matchAll(/\['([a-z]+)'/g)].map((match) => match[1]);
-
+test('the phone answers the console sections', async () => {
+  // The phone now carries the community settings studio as its own screens,
+  // through the same API the desk reads. Every section the registry promises
+  // must have a phone renderer, so a place can be managed from a hand.
+  const { RENDERERS } = await import('../mobile/js/views/index.js');
   for (const id of SECTIONS) {
-    assert.ok(onPhone.includes(id),
-      'the ' + id + ' section is on the desktop and not on the phone');
+    const pageId = 'community.settings.' + id;
+    assert.equal(typeof RENDERERS[pageId], 'function',
+      'the phone has no renderer for the ' + pageId + ' section');
   }
 });
 

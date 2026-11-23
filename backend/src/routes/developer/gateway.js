@@ -11,6 +11,12 @@
 //
 // The ticket is the whole of the handshake: a bot that has it may open one
 // socket, and the socket is gone the moment the ticket is spent.
+//
+// Beside them, the community's view of the same two facts: the manager of the
+// community the application belongs to may read the same state from the
+// console and mint a ticket on its behalf. Those live at
+// /api/v1/communities/:serverId/applications/:applicationId/gateway(-ticket),
+// where the authority is the community's rather than the token's.
 
 'use strict';
 
@@ -18,6 +24,7 @@ const express = require('express');
 const rateLimit = require('../../middleware/ratelimit');
 const { fail } = require('../../errors');
 const gateway = require('../../services/developer/gateway');
+const bots = require('../../services/bots');
 const { pathParam, ok, ERRORS } = require('./metadata');
 
 const router = express.Router();
@@ -197,6 +204,93 @@ const definitions = [
           events: connection ? connection.events : [],
         },
         connectedApplications: state.applications.length,
+      });
+    },
+  },
+
+  // The community's own view of the same two facts. The routes above are the
+  // application asking about itself with its own token; these are the manager
+  // of the community the application lives in, who reads the same state from
+  // the console and mints a ticket on its behalf - the shapes and the answers
+  // are the same, the authority is the community's.
+  {
+    method: 'get',
+    path: '/communities/:serverId/applications/:applicationId/gateway',
+    auth: 'principal',
+    scopes: ['bots:read'],
+    bots: false,
+    community: 'manage',
+    tags: ['Gateway'],
+    summary: 'The state of an application gateway, seen from its community',
+    description: 'Whether the application is connected, how many sockets it '
+      + 'holds and which events it has asked for. The caller manages the '
+      + 'community the application belongs to.',
+    parameters: [
+      pathParam('serverId', 'The community id or its slug.'),
+      pathParam('applicationId', 'The application id.'),
+    ],
+    responses: {
+      200: ok('The gateway state.', { type: 'object', required: ['application'], properties: {
+        application: { type: 'object', additionalProperties: true },
+        connectedApplications: { type: 'integer' },
+      } }),
+      401: ERRORS.unauthenticated,
+      403: ERRORS.forbidden,
+      404: ERRORS.missing,
+    },
+    handler: async (req, res) => {
+      const app = await bots.getApp(req.params.applicationId, req.server.id);
+      if (!app) return fail(res, 'NOT_FOUND', 'application not found');
+      const state = gateway.state();
+      const connection = state.applications.find(
+        (entry) => String(entry.applicationId) === String(req.params.applicationId),
+      );
+      res.json({
+        application: {
+          id: req.params.applicationId,
+          communityId: req.server.id,
+          connected: !!connection,
+          sockets: connection ? connection.sockets : 0,
+          events: connection ? connection.events : [],
+        },
+        connectedApplications: state.applications.length,
+      });
+    },
+  },
+  {
+    method: 'post',
+    path: '/communities/:serverId/applications/:applicationId/gateway-ticket',
+    auth: 'principal',
+    scopes: ['bots:write'],
+    bots: false,
+    community: 'manage',
+    tags: ['Gateway'],
+    summary: 'A ticket for an application gateway, minted by its community',
+    description: 'A short-lived, single-use ticket for opening the application '
+      + 'gateway, issued to a manager of the community so it can be handed to '
+      + 'the bot out of band. The token never rides in a URL.',
+    parameters: [
+      pathParam('serverId', 'The community id or its slug.'),
+      pathParam('applicationId', 'The application id.'),
+    ],
+    responses: {
+      200: ok('The ticket.', { type: 'object', required: ['ticket'], properties: {
+        ticket: { type: 'string' },
+        expiresInMs: { type: 'integer' },
+        url: { type: 'string' },
+      } }),
+      401: ERRORS.unauthenticated,
+      403: ERRORS.forbidden,
+      404: ERRORS.missing,
+    },
+    handler: async (req, res) => {
+      const app = await bots.getApp(req.params.applicationId, req.server.id);
+      if (!app) return fail(res, 'NOT_FOUND', 'application not found');
+      const ticket = gateway.issueTicket(req.params.applicationId, req.server.id);
+      res.json({
+        ticket,
+        expiresInMs: gateway.TICKET_TTL_MS,
+        url: '/api/v1/gateway',
       });
     },
   },

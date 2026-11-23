@@ -13,6 +13,45 @@ import { head, card, fault, fold } from '../ui/page.js';
 import { errorToast, toast, openDialog } from '../ui/overlays.js';
 import { createCropper } from '../../packages/imageCropper.js';
 
+// Changing the recovery address. The new address has to be confirmed before it
+// is trusted, and the current password is asked for because this is what a
+// password reset is sent to: a session alone must not be able to move it.
+function emailChangeDialog(user, reload) {
+  const password = el('input', {
+    class: 'input', type: 'password', autocomplete: 'current-password',
+    'aria-label': 'Current password',
+  });
+  const address = el('input', {
+    class: 'input', type: 'email', autocomplete: 'email',
+    'aria-label': 'New email address', placeholder: 'you@example.com',
+  });
+  const problem = el('p', { class: 'form-error', role: 'status' });
+  const save = el('button', { class: 'btn btn--primary btn--sm', type: 'button' }, 'Save');
+  const dialog = openDialog({
+    title: 'Change your email',
+    sub: 'The new address is confirmed before it is trusted. Your current password is asked for, because this is where a password reset is sent.',
+    body: fold([password, address, problem]),
+    foot: [
+      el('button', { class: 'btn btn--ghost btn--sm', type: 'button', onClick: () => dialog.close() }, 'Cancel'),
+      save,
+    ],
+  });
+  save.addEventListener('click', async () => {
+    save.disabled = true;
+    problem.textContent = '';
+    try {
+      await Api.changeEmail({ currentPassword: password.value, newEmail: address.value.trim() });
+      dialog.close();
+      toast('The link is on its way to the new address.');
+      await reload();
+    } catch (e) {
+      problem.textContent = (e && e.message) || 'The address was not changed.';
+      save.disabled = false;
+    }
+  });
+  return dialog;
+}
+
 // The identity panel.
 //
 // `reload` is handed in: removing the avatar or the banner changes the
@@ -34,6 +73,13 @@ function paint(identity, user, reload) {
     class: 'input', rows: '3',
     'aria-label': 'About you',
     placeholder: 'A few words for the people who open your profile',
+  });
+  // The address field is only drawn when there is no address yet: once one is
+  // on file, changing it goes through the password-confirmed dialog instead of
+  // a bare box that would let a session move where a reset is sent.
+  const emailField = el('input', {
+    class: 'input', type: 'email', autocomplete: 'email',
+    'aria-label': 'Email address', placeholder: 'you@example.com',
   });
   // The words the reader already wrote are shown, so saving the page does not
   // quietly replace them with an empty box.
@@ -271,6 +317,25 @@ function paint(identity, user, reload) {
             finally { button.disabled = false; }
           },
         }, 'Send a new verification link') : null,
+        user.email
+          ? el('button', {
+              class: 'btn btn--default btn--sm', type: 'button',
+              onClick: () => emailChangeDialog(user, reload),
+            }, 'Change email')
+          : el('div', { class: 'fold fold--tight' },
+              emailField,
+              el('button', {
+                class: 'btn btn--primary btn--sm', type: 'button',
+                onClick: async () => {
+                  const address = emailField.value.trim();
+                  if (!address) { errorToast({ message: 'Enter an email address.' }); return; }
+                  try {
+                    await Api.verifyEmailResend({ email: address });
+                    toast('The link is on its way. Confirm it to trust the address.', { type: 'success' });
+                    await reload();
+                  } catch (error) { errorToast(error); }
+                },
+              }, 'Add email')),
       ]),
     }));
 }

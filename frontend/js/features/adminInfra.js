@@ -390,19 +390,43 @@ export function adminContinuum() {
       try {
         const peers = await Api.continuumInstances();
         const rows = Array.isArray(peers) ? peers : [];
-        list.replaceChildren(...(rows.length ? rows.map((peer) => row({
-          lead: el('span', { class: 'role-dot' }, icon('server', { size: 15 })),
-          title: peer.name || 'An unnamed instance',
-          sub: (peer.id || '') + ' · ' + (peer.origin || ''),
-          side: el('div', { class: 'cardrow-side' },
+        list.replaceChildren(...(rows.length ? rows.map((peer) => {
+          const side = el('div', { class: 'cardrow-side' },
             trustChip(peer.trust_status),
             peer.trust_status !== 'trusted'
               ? el('button', { class: 'btn btn--default btn--sm', type: 'button', onClick: () => void setTrust(peer.id, 'trusted') }, 'Trust')
               : el('button', { class: 'btn btn--default btn--sm', type: 'button', onClick: () => void setTrust(peer.id, 'blocked') }, 'Block'),
             peer.trust_status !== 'pending'
               ? el('button', { class: 'btn btn--default btn--sm', type: 'button', onClick: () => void setTrust(peer.id, 'pending') }, 'Unblock')
-              : null),
-        })) : [blank({
+              : null);
+          if (peer.trust_status !== 'trusted') {
+            side.appendChild(el('button', {
+              class: 'btn btn--danger btn--sm', type: 'button',
+              'aria-label': 'Remove this instance from the list',
+              title: 'Remove the peer: it stops being answered, and it stops answering this one.',
+              onClick: async () => {
+                const yes = await confirmDialog({
+                  title: 'Remove this instance?',
+                  body: 'Remove the peer ' + (peer.name || peer.id) + '? Its events stop being accepted here, and it stops answering this one. Removing it does not touch anything the peer federated in.',
+                  confirmLabel: 'Remove instance',
+                  danger: true,
+                });
+                if (!yes) return;
+                try {
+                  await Api.continuumRemoveInstance(peer.id);
+                  toast('Instance removed. The federation list is smaller now.');
+                  if (repaintables.peers) await repaintables.peers();
+                } catch (e) { errorToast(e); }
+              },
+            }, 'Remove instance'));
+          }
+          return row({
+            lead: el('span', { class: 'role-dot' }, icon('server', { size: 15 })),
+            title: peer.name || 'An unnamed instance',
+            sub: (peer.id || '') + ' · ' + (peer.origin || ''),
+            side,
+          });
+        }) : [blank({
           glyph: 'share',
           title: 'No peers yet',
           text: 'This instance is local-only right now. Add the first one below: point the check at a remote Trycord instance and add what it says about itself.',

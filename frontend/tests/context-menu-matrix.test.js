@@ -30,11 +30,11 @@ const CLIENT = path.join(HERE, '..');
 // The menus, and the file each one is in.
 const MENUS = [
   { kind: 'channel', file: 'js/community/manage.js', builder: 'channelMenuItems' },
-  { kind: 'channel', file: 'mobile/js/manage.js', builder: 'channelActions' },
+  { kind: 'channel', file: 'mobile/js/actions.js', builder: 'channelActions' },
   { kind: 'category', file: 'js/community/manage.js', builder: 'categoryMenuItems' },
-  { kind: 'category', file: 'mobile/js/manage.js', builder: 'categoryActions' },
+  { kind: 'category', file: 'mobile/js/actions.js', builder: 'categoryActions' },
   { kind: 'member', file: 'js/ui/members.js', builder: 'memberActions' },
-  { kind: 'member', file: 'mobile/js/views/community.js', builder: 'memberActions' },
+  { kind: 'member', file: 'mobile/js/actions.js', builder: 'memberActions' },
 ];
 
 // The source of a menu builder.

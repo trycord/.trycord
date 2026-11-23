@@ -364,6 +364,7 @@ export const PAGES = [
   ...[
     ['overview', 'Overview', 'home', 'Community profile and public details'],
     ['appearance', 'Appearance', 'image', 'Banner, accent and layout'],
+    ['emojis', 'Emojis', 'smile', 'The pictures the community gives a name to'],
     ['channels', 'Channels', 'hash', 'Create and reorder channels'],
     ['categories', 'Categories', 'layers', 'Group channels together'],
     ['members', 'Members', 'users', 'Everyone here, and what they can do'],

@@ -69,20 +69,21 @@ test('the phone has its own composition choices', () => {
   assert.equal(mobilePrefs.rememberTabs(['dms', 'communities']).tabs.join(','), 'dms,communities');
 });
 
-test('each module draws its own preview card', () => {
-  const desktop = read(path.join(CLIENT, 'js', 'ui', 'embeds.js'));
-  const mobile = read(path.join(CLIENT, 'mobile', 'js', 'embeds.js'));
-  assert.match(desktop, /embed-card/);
-  assert.match(mobile, /m-embed/);
-  assert.doesNotMatch(desktop, /mobile\//, 'the desktop module names the mobile one');
-  assert.doesNotMatch(mobile, /\.\.\/\.\.\/js\//, 'the mobile module names the desktop one');
+test('the two shells draw the one preview card', () => {
+  // The embed module is shared: one preview, both shells. The phone wraps it
+  // in its own row class and keeps no copy of its own to keep equal.
+  const shared = read(path.join(CLIENT, 'js', 'ui', 'embeds.js'));
+  const convo = read(path.join(CLIENT, 'mobile', 'js', 'views', 'convo.js'));
+  assert.match(shared, /embed-card/);
+  assert.match(convo, /m-embed/);
+  assert.ok(!fs.existsSync(path.join(CLIENT, 'mobile', 'js', 'embeds.js')),
+    'the phone keeps a second embed module');
 });
 
-test('each module draws its own roster', () => {
-  const desktop = read(path.join(CLIENT, 'js', 'ui', 'members.js'));
-  const mobile = read(path.join(CLIENT, 'mobile', 'js', 'views', 'community.js'));
-  assert.match(desktop, /presenceOf/);
-  assert.match(mobile, /presenceOf/);
-  assert.doesNotMatch(desktop, /mobile\//, 'the desktop roster names the mobile one');
-  assert.doesNotMatch(mobile, /from '\.\.\/\.\.\/js\//, 'the mobile roster names the desktop one');
+test('the phone reads a roster of its own shape', () => {
+  // The desk's roster is the studio's; the phone reads the members through
+  // the catalogue and hands each one their own page address.
+  const place = read(path.join(CLIENT, 'mobile', 'js', 'views', 'place.js'));
+  assert.match(place, /serverMembers/, 'the phone does not read the roster');
+  assert.match(place, /users\//, 'the phone does not link a member to their page');
 });

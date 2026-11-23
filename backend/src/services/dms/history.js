@@ -15,6 +15,7 @@ const uploads = require('../uploads');
 const threads = require('../threads');
 const embeds = require('../embeds');
 const e2ee = require('../e2ee');
+const reactions = require('../reactions');
 const { visibleConversation } = require('./conversation');
 
 // Next canonical position within a conversation. The unique index on
@@ -72,14 +73,17 @@ async function history(userId, conversationId, { before = null, after = null, li
   // Normalise to oldest-first for the client. Only the backward page arrives newest-first.
   if (!forward) rows.reverse();
 
-  // One query each for the whole page: files, reply counts, previews.
+  // One query each for the whole page: files, reply counts, previews,
+  // feelings. A conversation reader opens on the newest word, and the
+  // feelings are part of what the words carry.
   const ids = rows.map((m) => m.id);
-  const [files, counts, cards] = await Promise.all([
+  const [files, counts, cards, feelings] = await Promise.all([
     uploads.getForDmMessages(ids),
     threads.replyCounts('dm', conversationId, ids),
     // Previews are resolved after the fact, so this is where a reader who reloads picks
     // them up.
     embeds.listForMessages(ids, 'dm'),
+    reactions.summary(ids, userId, 'dm'),
   ]);
 
   return rows.map((m) => {
@@ -104,6 +108,7 @@ async function history(userId, conversationId, { before = null, after = null, li
       threadRootId: m.thread_root_id || null,
       replyCount: counts[m.id] || 0,
       attachments: files[m.id] || [],
+      reactions: feelings[m.id] || [],
       // Present and empty rather than absent: an arriving card needs a tray, and a missing
       // key is indistinguishable from a preview that never came.
       embeds: cards[m.id] || [],

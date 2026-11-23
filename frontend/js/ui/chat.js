@@ -14,7 +14,7 @@ import { swipeToReply } from '../../packages/gestures.js';
 import { saveDraft, clearDraft, restoreDraft } from '../../packages/drafts.js';
 import { icon } from '../../packages/icons.js';
 import { avatar, spinner } from './primitives.js';
-import { State, nameOf, on as onStore } from '../../packages/store.js';
+import { State, nameOf, on as onStore, emojiOf, refreshServerEmojis } from '../../packages/store.js';
 import { blank } from './page.js';
 import { reportDialog } from './person.js';
 import {
@@ -109,6 +109,14 @@ export { copyText };
 // #channels are picked out of plain text and rendered as their own node. A
 // scanner rather than a regex replace, so the pieces between tokens stay text
 // and nothing nests wrong.
+//
+// The emoji rule reads a community's own short codes — `:name:` becomes the
+// picture the community gave that name, and a code nobody named stays exactly
+// the words that were typed. That is why the rule carries the surface's
+// community with it: without one, there is nothing to resolve against and
+// every code stays text.
+const EMOJI_TOKEN_RE = /^:[a-zA-Z0-9_]{2,30}:/;
+
 const INLINE_RULES = [
   { kind: 'link', re: /^https?:\/\/\S+/ },
   { kind: 'code', re: /^`[^`\n]+`/ },
@@ -119,9 +127,10 @@ const INLINE_RULES = [
   { kind: 'codeblockline', re: /^``[^`\n]+``/ },
   { kind: 'mention', re: /^@[\w.-]+/ },
   { kind: 'channel', re: /^#[\w-]+/ },
+  { kind: 'emoji', re: EMOJI_TOKEN_RE },
 ];
 
-function richText(text) {
+function richText(text, serverId) {
   const out = [];
   let rest = String(text || '');
   while (rest.length) {
@@ -146,6 +155,14 @@ function richText(text) {
       codeblockline: () => el('code', {}, token.slice(2, -2)),
       mention: () => el('span', { class: 'mention' }, token),
       channel: () => el('span', { class: 'mention' }, token),
+      emoji: () => {
+        const found = emojiOf(serverId, token.slice(1, -1));
+        if (!found) return el('span', {}, token);
+        return el('img', {
+          class: 'msg-emoji', src: found.url, alt: token, title: token,
+          draggable: 'false', loading: 'lazy',
+        });
+      },
     }[hit.rule.kind];
     out.push(tag());
     rest = rest.slice(token.length);
@@ -153,7 +170,7 @@ function richText(text) {
   return out;
 }
 
-function inlineContent(m) {
+function inlineContent(m, serverId) {
   // A message this device could not open is said so, rather than drawn as an
   // empty line. The server holds no text for it — the text is in the envelope,
   // and this device does not have the key.
@@ -163,15 +180,18 @@ function inlineContent(m) {
         m.content || 'This message could not be opened on this device.'),
     ];
   }
-  const nodes = richText(m.content || '');
+  const nodes = richText(m.content || '', serverId);
   if (m.editedAt) nodes.push(' ', el('span', { class: 'msg-edited' }, '(edited)'));
   return nodes;
 }
 
 // A file the message carries. It is a link, so it opens where it is; the menu
 // it carries offers the things a file can be asked for - its address, its name,
-// and a copy of either.
-function attachmentNode(a) {
+// a copy of either, and, on a message this reader did not write, a report.
+// The report points at the attachment itself, so the frozen snapshot a
+// moderator reads carries the picture and its author, not just the words
+// around it.
+function attachmentNode(a, message, cfg) {
   const url = a.url || a.objectUrl || '';
   const nice = a.name || a.filename || 'Attachment';
   // An upload still in flight is a promise, not a file: it is named, and it
@@ -190,12 +210,15 @@ function attachmentNode(a) {
       el('span', { class: 'msg-file-glyph' }, icon('download', { size: 15 })),
       el('span', { class: 'msg-file-name' }, nice),
       a.size ? el('span', { class: 'msg-file-size' }, humanSize(a.size)) : null);
-  attachContextMenu(node, () => attachmentMenuItems(a, url, nice));
+  attachContextMenu(node, () => attachmentMenuItems(a, url, nice, { message, cfg }));
   return node;
 }
 
-// The menu a file offers. Every entry acts on the file and nothing else.
-export function attachmentMenuItems(att, url, nice) {
+// The menu a file offers. Every entry acts on the file and nothing else. The
+// report entry travels with the message it hangs from: a picture you uploaded
+// yourself is not reported to yourself, and a file still flying has no server
+// row to report yet.
+export function attachmentMenuItems(att, url, nice, context) {
   const items = [];
   if (url) {
     items.push({
@@ -205,6 +228,26 @@ export function attachmentMenuItems(att, url, nice) {
     items.push({ label: 'Copy the address', icon: 'link', onSelect: () => copyText(url, 'File address') });
   }
   items.push({ label: 'Copy the name', icon: 'copy', onSelect: () => copyText(nice, 'File name') });
+
+  const ctx = context || {};
+  const m = ctx.message;
+  const cfg = ctx.cfg || {};
+  const mine = m && State.user && String(m.authorId) === String(State.user.id);
+  if (att && att.id && m && !mine && !m.pending) {
+    const label = att.contentType && String(att.contentType).startsWith('image/')
+      ? 'Report image' : 'Report the file';
+    items.push({
+      label, icon: 'flag',
+      onSelect: () => reportDialog({
+        title: 'Report ' + nice,
+        who: m.authorName && m.authorName !== 'Someone' ? m.authorName : 'the person who posted it',
+        payload: (reason, description) => ({
+          targetType: 'attachment', targetId: att.id,
+          serverId: cfg.serverId || undefined, reason, description,
+        }),
+      }),
+    });
+  }
   return items;
 }
 
@@ -221,11 +264,17 @@ function embedRow(cards) {
   }));
 }
 
-function reactionChip(entry, toggle, live) {
+function reactionChip(entry, toggle, live, serverId) {
   const names = entry.users && entry.users.length
     ? 'from ' + entry.users.length + ' reader' + (entry.users.length === 1 ? '' : 's')
     : 'from ' + entry.count;
-  const face = el('span', { class: 'msg-reaction-emoji', 'aria-hidden': 'true' }, entry.emoji);
+  // A community's short code becomes its picture; a code nobody named, or a
+  // unicode feeling, stays the characters it is.
+  const code = typeof entry.emoji === 'string' ? entry.emoji.match(EMOJI_TOKEN_RE) : null;
+  const found = code ? emojiOf(serverId, entry.emoji.slice(1, -1)) : null;
+  const face = found
+    ? el('img', { class: 'msg-emoji', src: found.url, alt: entry.emoji, title: entry.emoji, draggable: 'false', loading: 'lazy' })
+    : el('span', { class: 'msg-reaction-emoji', 'aria-hidden': 'true' }, entry.emoji);
   const count = el('span', { class: 'msg-reaction-count' }, String(entry.count));
   const share = 'React with ' + entry.emoji + ' ' + names;
   if (!live) {
@@ -263,6 +312,19 @@ const messageMenu = (m, self, cfg, composer, openThread, del, live) => {
         Promise.resolve(cfg.reactTo(m.id, emoji)).catch((e) => errorToast(e));
       },
     })));
+    // The community's own feelings follow the quick ones. A short code is a
+    // feeling like any other: the answer carries the whole summary, and every
+    // reader's chip repaints from it.
+    const community = cfg.serverId ? (State.serverEmojis.get(cfg.serverId) || []) : [];
+    for (const emoji of community.slice(0, 12)) {
+      items.push({
+        label: ':' + emoji.name + ':',
+        onSelect: () => {
+          if (!cfg.reactTo) return;
+          Promise.resolve(cfg.reactTo(m.id, ':' + emoji.name + ':')).catch((e) => errorToast(e));
+        },
+      });
+    }
     items.push({ separator: true });
     items.push({ label: 'Reply', icon: 'reply', onSelect: () => composer.replyTo(m) });
     if (cfg.threadOf) {
@@ -413,13 +475,13 @@ export function buildMessageRow(deps) {
 
     const content = el('div', { class: 'msg-content' },
       el('p', { class: 'msg-text' + (m.pending ? ' msg-text--pending' : '') },
-        inlineContent(m),
+        inlineContent(m, cfg.serverId),
         m.pending ? el('span', { class: 'msg-waiting' }, spinner()) : null),
       m.threadRootId ? el('p', { class: 'msg-replying' },
         icon('reply', { size: 13 }),
         el('span', {}, 'replies to ',
           el('span', { class: 'msg-replying-name' }, replyAuthor || 'an earlier message'))) : null,
-      m.attachments.length ? el('div', { class: 'msg-attachments' }, m.attachments.map(attachmentNode)) : null,
+      m.attachments.length ? el('div', { class: 'msg-attachments' }, m.attachments.map((a) => attachmentNode(a, m, cfg))) : null,
       m.embeds.length ? embedRow(m.embeds) : null,
       m.reactions.length ? el('div', { class: 'msg-reactions' },
         m.reactions.map((entry) => reactionChip(entry, (emoji, wasMine, share) => {
@@ -429,7 +491,7 @@ export function buildMessageRow(deps) {
           } else if (cfg.reactTo) {
             Promise.resolve(cfg.reactTo(m.id, emoji)).catch((e) => errorToast(e));
           }
-        }, live))) : null,
+        }, live, cfg.serverId))) : null,
       m.replyCount && cfg.threadOf ? el('button', {
         class: 'msg-thread-badge', type: 'button',
         'aria-label': 'Open thread, ' + m.replyCount + (m.replyCount === 1 ? ' reply' : ' replies'),
@@ -572,6 +634,18 @@ export function conversationSurface(config) {
 
   // A new picture of the reader repaints the rows already on the screen.
   const offUserStore = onStore('user', () => { if (!painting) repaint(true); });
+
+  // The community's emojis are part of what the words show, so the list is
+  // asked for when the surface opens and the rows repaint when it lands. A
+  // conversation in a community with no emojis asks and is answered with an
+  // empty list, which costs one small read.
+  if (cfg.serverId) {
+    Promise.resolve(refreshServerEmojis(cfg.serverId)).catch(() => {});
+  }
+  const offEmojiStore = onStore('emojis', (event) => {
+    if (String(event.serverId) !== String(cfg.serverId)) return;
+    if (!painting) repaint(true);
+  });
 
   const repaint = (keepScroll) => {
     painting = true;
@@ -941,19 +1015,30 @@ export function conversationSurface(config) {
   });
   emojiBtn.addEventListener('click', (event) => {
     event.stopPropagation();
+    // The community's own emojis sit under their own heading; a short code is
+    // what lands in the draft, and the picture is what every reader paints.
+    const community = cfg.serverId ? (State.serverEmojis.get(cfg.serverId) || []) : [];
+    const insert = (token) => {
+      const at = textarea.selectionStart === null ? textarea.value.length : textarea.selectionStart;
+      textarea.value = textarea.value.slice(0, at) + token + textarea.value.slice(at);
+      const next = at + token.length;
+      textarea.setSelectionRange(next, next);
+      textarea.focus();
+    };
     openMenu({
       anchor: emojiBtn,
       align: 'right',
-      items: CHAT_EMOJI.map((e) => ({
-        label: e,
-        onSelect: () => {
-          const at = textarea.selectionStart === null ? textarea.value.length : textarea.selectionStart;
-          textarea.value = textarea.value.slice(0, at) + e + textarea.value.slice(at);
-          const next = at + e.length;
-          textarea.setSelectionRange(next, next);
-          textarea.focus();
-        },
-      })),
+      items: [
+        ...CHAT_EMOJI.map((e) => ({ label: e, onSelect: () => insert(e) })),
+        ...(community.length ? [
+          { separator: true },
+          { header: 'This community' },
+          ...community.slice(0, 12).map((one) => ({
+            label: ':' + one.name + ':',
+            onSelect: () => insert(':' + one.name + ':'),
+          })),
+        ] : []),
+      ],
     });
   });
   templateBtn.addEventListener('click', (event) => {
@@ -1246,6 +1331,7 @@ export function conversationSurface(config) {
     cleanup() {
       if (typingTimer) { clearTimeout(typingTimer); typingTimer = null; }
       offUserStore();
+      offEmojiStore();
       typing.clear();
       drawTyping();
       const scrollerEl = scroller();

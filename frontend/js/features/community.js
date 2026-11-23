@@ -259,7 +259,7 @@ export function renderChannelView(ctx) {
         const pins = await Api.listPins(serverId, channelId);
         const rows = (Array.isArray(pins) ? pins : (pins && pins.items) || []).map(asMessage);
         if (mine !== generation) return;
-        pinsHost.replaceChildren(...(rows.length ? rows.map((m) => pinRow(m)) : [blank({
+        pinsHost.replaceChildren(...(rows.length ? rows.map((m) => pinRow(m, { serverId })) : [blank({
           glyph: 'pin',
           title: 'Nothing pinned',
           text: 'Pin a message to keep it at hand.',
@@ -353,9 +353,12 @@ export function renderChannelView(ctx) {
 }
 
 // The pins of a channel reuse the read-only message row the engine draws.
+// The channel's community rides along, so a pin that hangs a community's own
+// emoji paints the picture rather than the words.
 
-export function pinRow(m) {
-  const node = messageRow(m, { continued: false });
+export function pinRow(m, opts) {
+  const o = opts || {};
+  const node = messageRow(m, { continued: false, cfg: { serverId: o.serverId } });
   node.classList.add('msg--standalone');
   return el('article', { class: 'card card--flat card--dashed pin-row' },
     el('div', { class: 'pin-row-main' }, node));

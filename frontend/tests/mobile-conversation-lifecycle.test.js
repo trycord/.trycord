@@ -6,7 +6,7 @@ import { installDomStub, waitFor } from './helpers/dom-stub.js';
 installDomStub();
 globalThis.requestAnimationFrame = (callback) => { callback(); return 1; };
 
-const { renderConversation } = await import('../mobile/js/views/messages.js');
+const { renderConversation } = await import('../mobile/js/views/convo.js');
 
 test('a late DM history response cannot mark a closed conversation read', async () => {
   let finishHistory;

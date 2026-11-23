@@ -8,7 +8,7 @@ import { el } from '../../../packages/dom.js';
 import { brandMark } from '../../../packages/brand.js';
 import Api from '../../../packages/api.js';
 import { withLegalVersions } from '../../../packages/legal.js';
-import { State, loadSession, refreshServers, refreshDms, refreshFriends, refreshNotifications } from '../../../packages/store.js';
+import { State, applyToken, loadSession, refreshServers, refreshDms, refreshFriends, refreshNotifications } from '../../../packages/store.js';
 import realtime from '../../../packages/realtime.js';
 import { publicPath } from '../../../packages/nav.js';
 import { navigate, path } from '../../../packages/nav.js';
@@ -90,7 +90,8 @@ function signInScreen() {
     error.hidden = true;
     try {
       if (challenge) {
-        await Api.twoFactorVerify({ challengeToken: challenge, code: code.value.trim() });
+        const two = await Api.twoFactorVerify({ challengeToken: challenge, code: code.value.trim() });
+        applyToken(two.token, two.user);
         await loadSession();
         afterSignIn();
         navigate(path('/dms'));
@@ -103,6 +104,7 @@ function signInScreen() {
         code.focus();
         return;
       }
+      applyToken(out.token, out.user);
       await loadSession();
       afterSignIn();
       navigate(path('/dms'));
@@ -166,14 +168,19 @@ function registerScreen() {
         error.hidden = false;
         return;
       }
-      await Api.register(withLegalVersions({
+      const out = await Api.register(withLegalVersions({
         username: username.value.trim(),
         email: email.value.trim(),
         password: password.value,
       }, State.legal));
-      await loadSession();
-      afterSignIn();
-      navigate(path('/dms'));
+      if (out && out.token) {
+        applyToken(out.token, out.user);
+        await loadSession();
+        afterSignIn();
+        navigate(path('/dms'));
+      } else {
+        navigate(path('/login'), { replace: true });
+      }
     } catch (e) {
       error.textContent = (e && e.message) || 'That account could not be made.';
       error.hidden = false;

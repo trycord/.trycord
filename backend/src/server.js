@@ -421,6 +421,7 @@ async function boot(options = {}) {
   app.use('/api/servers/:serverId/channels', require('./routes/channels'));
   app.use('/api/servers/:serverId/categories', require('./routes/categories'));
   app.use('/api/servers/:serverId/roles', require('./routes/roles'));
+  app.use('/api/servers/:serverId/emojis', require('./routes/emojis'));
   app.use('/api/servers/:serverId/invites', inviteRoutes.managed);
   app.use('/api/servers/:serverId/communityMemory', require('./routes/communityMemory'));
   // The notes a community's moderators keep about the people in it.

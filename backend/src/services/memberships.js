@@ -431,7 +431,7 @@ async function recordCommunityAction(serverId, actorId, targetId, actionType, re
 async function kick(serverId, actorId, targetId, { reason } = {}) {
   const cleanReason = String(reason || '').trim();
   if (!cleanReason || cleanReason.length > 500) {
-    throw { code: 'VALIDATION_ERROR', message: 'A reason (<=500 characters) is required to kick a member.' };
+    throw { code: 'VALIDATION_ERROR', message: 'A reason is required before kicking a member. It can be up to 500 characters.' };
   }
   const out = await db.transaction(async (t) => {
     await assertManageable(serverId, actorId, targetId, 'kicked', t);
@@ -471,7 +471,7 @@ async function ban(serverId, actorId, targetId, { reason, minutes, reportId } = 
   if (!target) throw { code: 'NOT_FOUND', message: 'User not found' };
   const cleanReason = String(reason || '').trim();
   if (!cleanReason || cleanReason.length > 500) {
-    throw { code: 'VALIDATION_ERROR', message: 'A reason (<=500 characters) is required to ban a member.' };
+    throw { code: 'VALIDATION_ERROR', message: 'A reason is required before banning a member. It can be up to 500 characters.' };
   }
   const out = await db.transaction(async (t) => {
     await assertManageable(serverId, actorId, targetId, 'banned', t);
@@ -506,7 +506,7 @@ async function unban(serverId, actorId, targetId, reason = null) {
   if (!row) throw { code: 'NOT_FOUND', message: 'That ban does not exist' };
   const cleanReason = String(reason || '').trim();
   if (!cleanReason || cleanReason.length > 500) {
-    throw { code: 'VALIDATION_ERROR', message: 'A reason (<=500 characters) is required to unban a member.' };
+    throw { code: 'VALIDATION_ERROR', message: 'A reason is required before lifting a ban. It can be up to 500 characters.' };
   }
   const active = await db.get(
     `SELECT * FROM moderation_actions WHERE server_id = ? AND target_type = 'user'
@@ -574,7 +574,7 @@ async function timeout(serverId, actorId, targetId, minutes, { reason, reportId 
   const cleanReason = String(reason || '').trim();
   const isClear = minutes === 0 || minutes === '0';
   if (!isClear && (!cleanReason || cleanReason.length > 500)) {
-    throw { code: 'VALIDATION_ERROR', message: 'A reason (<=500 characters) is required to time out a member.' };
+    throw { code: 'VALIDATION_ERROR', message: 'A reason is required before timing a member out. It can be up to 500 characters.' };
   }
   const out = await db.transaction(async (t) => {
     await assertManageable(serverId, actorId, targetId, 'timed out', t);
@@ -625,7 +625,7 @@ async function timeout(serverId, actorId, targetId, minutes, { reason, reportId 
 async function warn(serverId, actorId, targetId, { reason, minutes, expiresInDays, reportId, category, severity } = {}) {
   const cleanReason = String(reason || '').trim();
   if (!cleanReason || cleanReason.length > 500) {
-    throw { code: 'VALIDATION_ERROR', message: 'A reason (<=500 characters) is required to warn a member.' };
+    throw { code: 'VALIDATION_ERROR', message: 'A reason is required before warning a member. It can be up to 500 characters.' };
   }
   const srv = await db.get('SELECT moderation_settings FROM servers WHERE id = ?', [serverId]);
   const settings = moderationSettings(srv);
@@ -657,7 +657,7 @@ async function warn(serverId, actorId, targetId, { reason, minutes, expiresInDay
 async function liftWarning(serverId, actorId, actionId, reason) {
   const cleanReason = String(reason || '').trim();
   if (!cleanReason || cleanReason.length > 500) {
-    throw { code: 'VALIDATION_ERROR', message: 'A reason (<=500 characters) is required to remove a warning.' };
+    throw { code: 'VALIDATION_ERROR', message: 'A reason is required before removing a warning. It can be up to 500 characters.' };
   }
   const action = await db.get(
     `SELECT * FROM moderation_actions WHERE id = ? AND server_id = ?

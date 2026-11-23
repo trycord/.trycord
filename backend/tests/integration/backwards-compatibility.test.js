@@ -209,6 +209,27 @@ test('the instance answers its own origin', async (t) => {
     assert.equal(allowed[0], false, 'an origin that is not on the list was allowed');
   });
 
+  await t.test('loopback stays available when an explicit allowlist is set', async () => {
+    // The local public site and the application are often served from a
+    // loopback address while the configured API is remote. Refusing that
+    // request made the sign-in form fail as an opaque network error.
+    const options = corsOptions(['https://trycord.dev'], ['https://api.trycord.dev']);
+    for (const origin of ['http://127.0.0.1:9971', 'http://localhost:9070', 'http://[::1]:9971']) {
+      const allowed = await new Promise((resolve) => {
+        options.origin(origin, (err, ok) => resolve(ok));
+      });
+      assert.equal(allowed, true, 'loopback origin was refused: ' + origin);
+    }
+  });
+
+  await t.test('a lookalike loopback host is not treated as loopback', async () => {
+    const options = corsOptions(['https://trycord.dev'], ['https://api.trycord.dev']);
+    const allowed = await new Promise((resolve) => {
+      options.origin('http://127.0.0.1.evil.example', (err, ok) => resolve(ok));
+    });
+    assert.equal(allowed, false, 'a host with a loopback prefix was allowed');
+  });
+
   await t.test('the instance\'s own origin is covered by the same rules', () => {
     assert.equal(originCovers('https://api.trycord.dev', 'https://api.trycord.dev'), true);
     assert.equal(originCovers('https://api.trycord.dev', 'https://other.trycord.dev'), false);

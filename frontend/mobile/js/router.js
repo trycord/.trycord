@@ -6,7 +6,7 @@
 // shell. A signed-out reader is answered with the front door whatever they
 // asked for.
 
-import { matchRoute, renderPage } from '../../packages/registry.js';
+import { matchRoute, renderPage, rendererFor } from '../../packages/registry.js';
 import { currentRoute, currentQuery, navigate, path } from '../../packages/nav.js';
 import { State, signedIn, serverById, refreshServer, refreshServerTree, channelById, channelsOf } from '../../packages/store.js';
 import { paintScreen, paintComposer, refreshChrome, shellRoot } from './shell.js';
@@ -125,6 +125,15 @@ async function paintRoute(seq) {
 
   let answer;
   try {
+    // A page with no bound renderer is not a fault: it is a screen this device
+    // does not carry. Say so plainly rather than raising "No renderer".
+    if (!rendererFor(page)) {
+      paintScreen({
+        head: { title: (page.nav && page.nav.label) || 'Trycord' },
+        node: notFoundNode('This screen lives on the wider console.'),
+      });
+      return;
+    }
     answer = await Promise.resolve(renderPage(page, ctx));
   } catch (error) {
     if (seq === generation) paintScreen({ head: { title: 'Something broke' }, node: faultNode(error) });

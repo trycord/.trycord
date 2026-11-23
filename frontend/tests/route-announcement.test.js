@@ -82,8 +82,8 @@ test('the phone names the document for the screen it is on', () => {
 
 test('the phone focuses the screen heading, not only the container', () => {
   const shell = read(path.join(MODULES.mobile, 'shell.js'));
-  assert.match(shell, /refs\.view\.querySelector\('h1'\)/,
+  assert.match(shell, /refs\.screen\.querySelector\('h1, h2'\)/,
     'the phone does not look for the screen heading');
-  assert.match(shell, /const target = heading \|\| refs\.view/,
-    'the phone does not fall back to the view when there is no heading');
+  assert.match(shell, /else refs\.screen\.focus\(/,
+    'the phone does not fall back to the screen when there is no heading');
 });

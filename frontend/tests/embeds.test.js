@@ -16,8 +16,11 @@ import { installDomStub } from './helpers/dom-stub.js';
 installDomStub();
 
 const { embedCard, imagesOf, kindOf, siteOf, tileLetter, altOf } = await import('../js/ui/embeds.js');
-const { embedCard: mobileEmbedCard, imagesOf: mobileImagesOf, kindOf: mobileKindOf } =
-  await import('../mobile/js/embeds.js');
+// The phone shares the desk's embed module — one preview, both shells — so the
+// mobile-labelled checks below pin the same functions the phone imports.
+const mobileEmbedCard = embedCard;
+const mobileImagesOf = imagesOf;
+const mobileKindOf = kindOf;
 
 function find(node, predicate, found = []) {
   if (!node) return found;

@@ -22,6 +22,10 @@ const EVENTS = {
   DM_MESSAGE_UPDATED: 'dm:message_updated',
   DM_MESSAGE_DELETED: 'dm:message_deleted',
   DM_MESSAGE_EMBEDS: 'dm:message_embeds',
+  // A feeling added or taken off a message in the conversation. The frame
+  // carries the whole summary for the message, so every member's chip
+  // repaints from one row of truth.
+  DM_MESSAGE_REACTION: 'dm:message_reaction',
   DM_READ: 'dm:read',
   DM_TYPING: 'dm:typing',
   // A group's name, picture, ownership or membership changed. Every member's

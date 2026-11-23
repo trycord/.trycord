@@ -271,17 +271,17 @@ test('accessibility of the client', async (t) => {
       'the phone\'s sheet manages focus');
   });
 
-  await t.test('the phone\'s communities dialog keeps the keyboard inside it', () => {
-    // The rail is a dialog drawn over the screen. It has to say it is modal,
-    // and Tab has to stay in it until it is closed; otherwise focus lands on
-    // the page the overlay is covering, where the reader cannot see it.
-    const mobile = fs.readFileSync(path.join(FRONTEND, 'mobile', 'js', 'shell.js'), 'utf8');
+  await t.test('the phone\'s sheet keeps the keyboard inside it', () => {
+    // The sheet is the phone's dialog. It has to say it is modal, and Tab has
+    // to stay in the panel until it is closed; otherwise focus lands on the
+    // screen the sheet is covering, where the reader cannot see it.
+    const mobile = fs.readFileSync(path.join(FRONTEND, 'mobile', 'js', 'ui.js'), 'utf8');
     assert.match(mobile, /role: 'dialog'[\s\S]*?aria-modal['"]?\s*:\s*'true'/,
-      'the rail dialog does not announce that it is modal');
+      'the sheet does not announce that it is modal');
     assert.match(mobile, /event\.key !== 'Tab'/,
-      'the rail dialog does not answer the Tab key');
-    assert.match(mobile, /railPanel\.contains\(document\.activeElement\)/,
-      'the rail dialog does not check where focus is before wrapping');
+      'the sheet does not answer the Tab key');
+    assert.match(mobile, /panel\.contains\(document\.activeElement\)/,
+      'the sheet does not check where focus is before wrapping');
   });
 
   await t.test('a filled control uses the ink chosen for its fill', () => {

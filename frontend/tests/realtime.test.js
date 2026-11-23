@@ -73,9 +73,9 @@ test('both modules answer the pin events', () => {
   assert.match(desktop, /on\(EVENTS\.MESSAGE_PINNED/);
   assert.match(desktop, /on\(EVENTS\.MESSAGE_UNPINNED/);
 
-  const mobile = read(path.join(MODULES.mobile, 'views', 'messages.js'));
-  assert.match(mobile, /realtime\.on\(EVENTS\.MESSAGE_PINNED/);
-  assert.match(mobile, /realtime\.on\(EVENTS\.MESSAGE_UNPINNED/);
+  const mobile = read(path.join(MODULES.mobile, 'views', 'convo.js'));
+  assert.match(mobile, /EVENTS\.(MESSAGE_PINNED|DM_PINNED)/);
+  assert.match(mobile, /EVENTS\.(MESSAGE_UNPINNED|DM_UNPINNED)/);
 });
 
 test('both modules answer a conversation that was read', () => {

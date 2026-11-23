@@ -20,7 +20,7 @@
 import { el } from '../../packages/dom.js';
 import { State, refreshServers } from '../../packages/store.js';
 import { icon } from '../../packages/icons.js';
-import { publicPath, replaceAddress } from '../../packages/nav.js';
+import { publicPath, replaceAddress, navigate } from '../../packages/nav.js';
 import { formatDateTime } from '../../packages/locale.js';
 import { card, row, blank, fault, fold, facts, head, hold, memo } from '../ui/page.js';
 import { confirmDialog, openDialog, errorToast, toast } from '../ui/overlays.js';
@@ -1333,7 +1333,7 @@ export function renderDeveloperPortal(ctx) {
           el('div', { class: 'settings-item-control' },
             el('button', {
               class: 'btn btn--primary btn--sm', type: 'button',
-              onClick: () => replaceAddress('/developers/keys'),
+              onClick: () => navigate('/applications/keys'),
             }, 'Manage Keys'))),
         el('div', { class: 'settings-item' },
           el('div', { class: 'settings-item-main' },
@@ -1342,7 +1342,7 @@ export function renderDeveloperPortal(ctx) {
           el('div', { class: 'settings-item-control' },
             el('button', {
               class: 'btn btn--primary btn--sm', type: 'button',
-              onClick: () => replaceAddress('/developers/applications'),
+              onClick: () => navigate('/applications/applications'),
             }, 'Manage Applications'))),
         el('div', { class: 'settings-item' },
           el('div', { class: 'settings-item-main' },
@@ -1351,7 +1351,7 @@ export function renderDeveloperPortal(ctx) {
           el('div', { class: 'settings-item-control' },
             el('button', {
               class: 'btn btn--primary btn--sm', type: 'button',
-              onClick: () => replaceAddress('/developers/documentation'),
+              onClick: () => navigate('/applications/documentation'),
             }, 'Read Docs'))),
         managed.length
           ? el('div', { class: 'settings-item' },
@@ -1361,7 +1361,7 @@ export function renderDeveloperPortal(ctx) {
               el('div', { class: 'settings-item-control' },
                 el('button', {
                   class: 'btn btn--primary btn--sm', type: 'button',
-                  onClick: () => replaceAddress('/developers/applications'),
+                  onClick: () => navigate('/applications/applications'),
                 }, 'View Integrations')))
           : null,
       ])
@@ -1503,7 +1503,7 @@ export function renderApplicationsPortal(ctx) {
           el('div', { class: 'settings-item-control' },
             el('button', {
               class: 'btn btn--primary btn--sm', type: 'button',
-              onClick: () => replaceAddress('/applications/applications'),
+              onClick: () => navigate('/applications/applications'),
             }, 'Applications'))),
         el('div', { class: 'settings-item' },
           el('div', { class: 'settings-item-main' },
@@ -1512,7 +1512,7 @@ export function renderApplicationsPortal(ctx) {
           el('div', { class: 'settings-item-control' },
             el('button', {
               class: 'btn btn--primary btn--sm', type: 'button',
-              onClick: () => replaceAddress('/applications/keys'),
+              onClick: () => navigate('/applications/keys'),
             }, 'API Keys'))),
         el('div', { class: 'settings-item' },
           el('div', { class: 'settings-item-main' },
@@ -1521,7 +1521,7 @@ export function renderApplicationsPortal(ctx) {
           el('div', { class: 'settings-item-control' },
             el('button', {
               class: 'btn btn--primary btn--sm', type: 'button',
-              onClick: () => replaceAddress('/applications/documentation'),
+              onClick: () => navigate('/applications/documentation'),
             }, 'Documentation'))),
         managed.length
           ? el('div', { class: 'settings-item' },
@@ -1531,7 +1531,7 @@ export function renderApplicationsPortal(ctx) {
               el('div', { class: 'settings-item-control' },
                 el('button', {
                   class: 'btn btn--primary btn--sm', type: 'button',
-                  onClick: () => replaceAddress('/applications/applications'),
+                  onClick: () => navigate('/applications/applications'),
                 }, 'View Communities')))
           : null,
       ])
@@ -1562,21 +1562,26 @@ export function renderDeveloper(ctx) {
   let live = null;
 
   // The section the reader asked for. The address may name it
-  // (/developer/applications), which is how a particular one can be linked
-  // to and where a reader comes back to it; the older ?section=… spelling
-  // says the same thing and still counts. An address that names neither
-  // opens on the first section.
+  // (/developer/applications, /applications/keys), which is how a particular
+  // one can be linked to and where a reader comes back to it; the older
+  // ?section=… spelling says the same thing and still counts. An address that
+  // names neither opens on the first section.
   function wantedSection() {
     const id = ctx && ctx.page && String(ctx.page.id || '');
-    const named = id
-      ? (id === 'developer' ? '' : id)  // the bare page carries no section
-      : '';
+    // Page ids carry a section after the dot: developer.applications and
+    // applications.applications both mean the applications section. The bare
+    // page id names none.
+    const named = id.indexOf('.') !== -1 ? id.slice(id.indexOf('.') + 1) : '';
     const asked = ctx && ctx.query ? String(ctx.query.get('section') || '') : '';
     const choice = [named, asked].find((value) => SECTIONS.some((section) => section.id === value));
     return choice || SECTIONS[0].id;
   }
 
   function paintTabs() {
+    // The address the tabs keep follows the page they live on: the desktop
+    // console is /developer/<section>, the portal is /applications/<section>.
+    const base = String(ctx && ctx.page && ctx.page.id || '').indexOf('applications') === 0
+      ? '/applications' : '/developer';
     tabs.replaceChildren(...SECTIONS.map((section) => el('button', {
       class: 'segmented-item',
       type: 'button',
@@ -1586,7 +1591,7 @@ export function renderDeveloper(ctx) {
       // follows so the copy of it carries the state, and the page stays
       // where it is.
       onClick: () => {
-        replaceAddress('/developer/' + section.id);
+        replaceAddress(base + '/' + section.id);
         show(section.id);
       },
     }, section.label)));

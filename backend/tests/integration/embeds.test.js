@@ -227,3 +227,64 @@ test('the URLs a message carries', async (t) => {
     assert.equal(embeds.normalizeUrl('javascript:alert(1)'), null);
   });
 });
+
+test('direct media URLs are recognised as media', async (t) => {
+  await t.test('an image content type is an image', () => {
+    assert.equal(embeds.mediaKindFrom('https://example.test/photo.png', 'image/png'), 'image');
+    assert.equal(embeds.mediaKindFrom('https://example.test/photo.jpg', 'image/jpeg'), 'image');
+    assert.equal(embeds.mediaKindFrom('https://example.test/photo.webp', 'image/webp'), 'image');
+    assert.equal(embeds.mediaKindFrom('https://example.test/photo.svg', 'image/svg+xml'), 'image');
+  });
+
+  await t.test('a video content type is a video', () => {
+    assert.equal(embeds.mediaKindFrom('https://example.test/clip.mp4', 'video/mp4'), 'video');
+    assert.equal(embeds.mediaKindFrom('https://example.test/clip.webm', 'video/webm'), 'video');
+    assert.equal(embeds.mediaKindFrom('https://example.test/clip.ogv', 'video/ogg'), 'video');
+    assert.equal(embeds.mediaKindFrom('https://example.test/clip.mov', 'video/quicktime'), 'video');
+  });
+
+  await t.test('an image URL extension falls back to image', () => {
+    assert.equal(embeds.mediaKindFrom('https://example.test/photo.png', ''), 'image');
+    assert.equal(embeds.mediaKindFrom('https://example.test/photo.JPG', ''), 'image');
+    assert.equal(embeds.mediaKindFrom('https://example.test/photo.webp', null), 'image');
+  });
+
+  await t.test('a video URL extension falls back to video', () => {
+    assert.equal(embeds.mediaKindFrom('https://example.test/clip.mp4', ''), 'video');
+    assert.equal(embeds.mediaKindFrom('https://example.test/clip.WebM', ''), 'video');
+    assert.equal(embeds.mediaKindFrom('https://example.test/clip.mov', null), 'video');
+  });
+
+  await t.test('an unrecognised URL is a link', () => {
+    assert.equal(embeds.mediaKindFrom('https://example.test/page', ''), 'link');
+    assert.equal(embeds.mediaKindFrom('https://example.test/page', 'text/html'), 'link');
+    assert.equal(embeds.mediaKindFrom('https://example.test/page', null), 'link');
+    assert.equal(embeds.mediaKindFrom('https://example.test/page', 'application/json'), 'link');
+  });
+});
+
+test('the fetch guard reports content type for non-HTML answers', async (t) => {
+  await t.test('an image answer carries its content type', async () => {
+    const site = await serve((req, res) => {
+      res.writeHead(200, { 'content-type': 'image/png' });
+      res.end('PNG');
+    });
+    t.after(() => site.close());
+
+    const answer = await fetchHtml(site.origin + '/photo.png', { allowLocalhost: true });
+    assert.equal(answer.ok, false);
+    assert.equal(answer.contentType, 'image/png');
+  });
+
+  await t.test('a video answer carries its content type', async () => {
+    const site = await serve((req, res) => {
+      res.writeHead(200, { 'content-type': 'video/mp4' });
+      res.end('MP4');
+    });
+    t.after(() => site.close());
+
+    const answer = await fetchHtml(site.origin + '/clip.mp4', { allowLocalhost: true });
+    assert.equal(answer.ok, false);
+    assert.equal(answer.contentType, 'video/mp4');
+  });
+});

@@ -318,6 +318,12 @@ h1, h2, h3, p { margin: 0; }
 .m-msg__time { font-size: var(--fs-micro); color: var(--text-3); }
 .m-msg__body { font-size: var(--fs-body); line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; }
 .m-msg__note { font-size: var(--fs-meta); color: var(--text-3); font-style: italic; }
+/* A community's own emoji, inline with the words or as a reaction's face:
+   sized from the text around it, so a sentence keeps its rhythm. */
+.m-msg__emoji {
+  display: inline-block; width: auto; height: 1.4em;
+  vertical-align: -0.3em; border-radius: var(--tc-radius-sm);
+}
 .m-msg__files { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .m-msg__file {
   display: flex; align-items: center; gap: 8px;
@@ -325,6 +331,9 @@ h1, h2, h3, p { margin: 0; }
   border: 1px solid var(--line); border-radius: var(--tc-radius-md);
   background: var(--panel-2);
   font-size: var(--fs-sm); color: var(--text-2);
+  /* A row can be a button (tap opens, hold offers the menu): the reset keeps
+     the words, and these keep the shape the anchor had. */
+  text-align: left; width: 100%; cursor: pointer;
 }
 .m-msg__file img { max-width: min(280px, 100%); border-radius: var(--tc-radius-sm); }
 .m-msg__reactions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }

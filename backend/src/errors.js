@@ -37,6 +37,12 @@ const Codes = {
   // Storage is full for this account. 413 so a client can tell a quota refusal
   // apart from a rejected file: the file itself was valid.
   QUOTA_EXCEEDED: 413,
+  // The upload is bigger than the cap that applies to it. The multipart
+  // parser answers the general ceiling with this code and 413 directly; a
+  // service with a tighter cap of its own (an emoji beside the words it
+  // decorates) throws it, and this entry is what keeps that refusal a 413
+  // rather than a 500.
+  PAYLOAD_TOO_LARGE: 413,
   SERVER_PRIVATE: 403,
   SERVER_SUSPENDED: 403,
   SERVER_REMOVED: 403,

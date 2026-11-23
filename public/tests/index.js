@@ -13,6 +13,6 @@ require('./resolver-behaviour.test.js');
 require('./status.test.js');
 require('./directory.test.js');
 require('./legal.test.js');
-require('./demo.test.js');
 require('./site.test.js');
+require('./login.test.js');
 require('./incidents.test.js');

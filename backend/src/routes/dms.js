@@ -5,6 +5,8 @@ const express = require('express');
 const auth = require('../middleware/auth');
 const rateLimit = require('../middleware/ratelimit');
 const { fail, serviceError } = require('../errors');
+const db = require('../db');
+const reactions = require('../services/reactions');
 const dms = require('../services/dms');
 const threads = require('../services/threads');
 const replies = require('../services/replies');
@@ -342,6 +344,73 @@ router.patch('/:id/messages/:messageId', auth.requireVerified, rateLimit({ windo
     gateway.broadcastDm(members, { type: EVENTS.DM_MESSAGE_UPDATED, ...out, conversationId: out.conversationId });
     res.json(out);
   } catch (e) { serviceError(res, e); }
+});
+
+// ---- reactions ------------------------------------------------------
+//
+// The same feelings a channel message carries, on the same terms: a member
+// of the conversation reacts, and only their own feeling may be taken off.
+// The rows live in `dm_reactions` (the channel table's foreign key reaches
+// `messages`, so it cannot hold these), and the frame carries the message's
+// whole summary, so every member's chip repaints from one row of truth.
+//
+// A restricted account is told the same thing the send route says: reacting
+// is speaking, only quieter.
+
+// POST /api/dms/:id/messages/:messageId/reactions { emoji }
+router.post('/:id/messages/:messageId/reactions', auth.requireVerified, rateLimit({ windowMs: 60000, max: 120 }), async (req, res, next) => {
+  try {
+    const enforcement = require('../services/enforcement');
+    if (await enforcement.isRestricted(req.user.id, 'DIRECT_MESSAGES')) {
+      return fail(res, 'FEATURE_RESTRICTED', 'direct messages are restricted on your account', 403,
+        { feature: 'DIRECT_MESSAGES' });
+    }
+    const seen = await dms.visibleConversation(req.params.id, req.user.id);
+    if (!seen) return fail(res, 'NOT_FOUND', 'conversation not found');
+    const msg = await db.get('SELECT id FROM dm_messages WHERE id = ? AND conversation_id = ?',
+      [req.params.messageId, req.params.id]);
+    if (!msg) return fail(res, 'NOT_FOUND', 'message not found in this conversation');
+    let emoji;
+    try {
+      emoji = await reactions.add(req.user.id, msg.id, (req.body || {}).emoji, 'dm');
+    } catch (e) {
+      if (e && e.code) return fail(res, e.code, e.message);
+      throw e;
+    }
+    const summaries = await reactions.summary([msg.id], req.user.id, 'dm');
+    const members = await dms.memberIds(req.params.id);
+    gateway.broadcastDm(members, {
+      type: EVENTS.DM_MESSAGE_REACTION, id: msg.id, conversationId: req.params.id,
+      reactions: summaries[msg.id] || [],
+    });
+    res.json({ ok: true, emoji, reactions: summaries[msg.id] || [] });
+  } catch (e) { next(e); }
+});
+
+// DELETE /api/dms/:id/messages/:messageId/reactions/:emoji — removes only
+// the caller's own reaction.
+router.delete('/:id/messages/:messageId/reactions/:emoji', auth.requireVerified, async (req, res, next) => {
+  try {
+    const seen = await dms.visibleConversation(req.params.id, req.user.id);
+    if (!seen) return fail(res, 'NOT_FOUND', 'conversation not found');
+    const msg = await db.get('SELECT id FROM dm_messages WHERE id = ? AND conversation_id = ?',
+      [req.params.messageId, req.params.id]);
+    if (!msg) return fail(res, 'NOT_FOUND', 'message not found in this conversation');
+    let emoji;
+    try {
+      emoji = await reactions.remove(req.user.id, msg.id, req.params.emoji, 'dm');
+    } catch (e) {
+      if (e && e.code) return fail(res, e.code, e.message);
+      throw e;
+    }
+    const summaries = await reactions.summary([msg.id], req.user.id, 'dm');
+    const members = await dms.memberIds(req.params.id);
+    gateway.broadcastDm(members, {
+      type: EVENTS.DM_MESSAGE_REACTION, id: msg.id, conversationId: req.params.id,
+      reactions: summaries[msg.id] || [],
+    });
+    res.json({ ok: true, emoji, reactions: summaries[msg.id] || [] });
+  } catch (e) { next(e); }
 });
 
 // GET /api/dms/:id/pins — the messages this conversation keeps at hand.

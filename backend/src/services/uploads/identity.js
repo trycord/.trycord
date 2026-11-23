@@ -14,7 +14,7 @@ const storage = require('../storage');
 const { now, uuid } = require('../../util');
 const { sniffBinary, cleanFilename, IMAGE_MIMES } = require('./detect');
 
-const COMMUNITY_MEDIA_KINDS = ['icon', 'banner'];
+const COMMUNITY_MEDIA_KINDS = ['icon', 'banner', 'emoji'];
 
 // Both id prefixes are load-bearing. The fetch routes are authenticated, so a file id
 // arriving from the wire must not be able to name a message attachment - and the regex

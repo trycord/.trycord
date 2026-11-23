@@ -170,20 +170,46 @@ async function snapshotTarget(targetType, targetId, reporterId, suppliedServerId
   }
   if (targetType === 'attachment') {
     const row = await db.get(
-      `SELECT a.id, a.filename, a.mime, a.size, a.url, a.message_id,
-              m.channel_id, m.server_id, m.author_id
-       FROM attachments a JOIN messages m ON m.id = a.message_id
-       JOIN channels c ON c.id = m.channel_id LEFT JOIN servers s ON s.id = c.server_id
+      `SELECT a.id, a.filename, a.mime, a.size, a.url, a.message_id, a.dm_message_id, a.dm_conversation_id,
+              m.channel_id, c.server_id AS channel_server_id, m.author_id AS message_author_id,
+              dm.author_id AS dm_author_id, dm.created_at AS dm_created_at
+       FROM attachments a
+       LEFT JOIN messages m ON m.id = a.message_id
+       LEFT JOIN channels c ON c.id = m.channel_id
+       LEFT JOIN dm_messages dm ON dm.id = a.dm_message_id
        WHERE a.id = ?`,
       [targetId]
     );
     if (!row) notFound('attachment not found');
-    if (row.server_id && !(await isMember(reporterId, row.server_id))) {
+    // An attachment is only ever attached to one message. A row with neither
+    // message key is an upload still pending adoption - visible to nobody but
+    // its uploader, so there is nothing a report could point a moderator at.
+    if (!row.message_id && !row.dm_message_id) notFound('attachment not found');
+    if (row.dm_message_id) {
+      // A picture in a conversation is reportable by the people who were in
+      // it, and by nobody else.
+      const member = await db.get(
+        'SELECT 1 AS yes FROM dm_members WHERE conversation_id = ? AND user_id = ?',
+        [row.dm_conversation_id, reporterId]
+      );
+      if (!member) {
+        const e = new Error('you are not part of that conversation');
+        e.code = 'NOT_A_MEMBER'; throw e;
+      }
+      return {
+        serverId: null,
+        subjectType: 'attachment',
+        subjectId: row.id,
+        title: 'Attachment ' + row.filename,
+        snapshot: { ...row },
+      };
+    }
+    if (row.channel_server_id && !(await isMember(reporterId, row.channel_server_id))) {
       const e = new Error('you are not a member of that community');
       e.code = 'NOT_A_MEMBER'; throw e;
     }
     return {
-      serverId: row.server_id || null,
+      serverId: row.channel_server_id || null,
       subjectType: 'attachment',
       subjectId: row.id,
       title: 'Attachment ' + row.filename,

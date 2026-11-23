@@ -190,6 +190,28 @@ module.exports = (engine) => [
       FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE
     )${engine}`,
 
+  // The pictures a community gives a name to, so its members can write
+  // `:name:` in a message or hang it on a message as a feeling. The image
+  // itself is a row in `server_media` (kind 'emoji'), stored and served by
+  // the same pipeline as the icon and the banner; this table is the name and
+  // who gave it. Declared after `server_media` because MySQL checks the
+  // referenced table when the foreign key is created. UNIQUE(server_id, name)
+  // means one picture per name: a second upload with a name already taken is
+  // refused, not silently replaced, so an emoji in old messages cannot
+  // quietly change its face.
+  `CREATE TABLE IF NOT EXISTS emojis (
+      id         VARCHAR(64) PRIMARY KEY,
+      server_id  VARCHAR(64) NOT NULL,
+      name       VARCHAR(32) NOT NULL,
+      media_id   VARCHAR(64) NOT NULL,
+      creator_id VARCHAR(64) NOT NULL,
+      created_at VARCHAR(64) NOT NULL,
+      UNIQUE (server_id, name),
+      FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE,
+      FOREIGN KEY (media_id) REFERENCES server_media(id) ON DELETE CASCADE,
+      FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+    )${engine}`,
+
   // Community Memory: curated knowledge entries that survive beyond chat
   // history. A community's administrators and members with the MEMORIZE
   // permission create entries; anyone in the community can read them. Each

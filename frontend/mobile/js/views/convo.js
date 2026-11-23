@@ -8,7 +8,7 @@
 import { el, clear } from '../../../packages/dom.js';
 import { icon } from '../../../packages/icons.js';
 import { avatar } from '../../../js/ui/primitives.js';
-import { State, nameOf, normalizeUser, markConversationRead } from '../../../packages/store.js';
+import { State, nameOf, normalizeUser, markConversationRead, emojiOf, refreshServerEmojis, on as onStore } from '../../../packages/store.js';
 import { mediaUrl } from '../../../packages/media.js';
 import { dayLabel, toDate, timeOfDay, fileSize } from '../../../packages/format.js';
 import realtime, { EVENTS } from '../../../packages/realtime.js';
@@ -58,9 +58,9 @@ function authorOf(message) {
 
 function bySeq(a, b) { return (a.seq || 0) - (b.seq || 0); }
 
-/** Links, code, emphasis and names become their parts; nothing becomes HTML. */
-function renderRich(container, text) {
-  const pattern = /(https?:\/\/[^\s]+|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|@[a-zA-Z0-9_.-]{2,32})/g;
+/** Links, code, emphasis, names and the community's short codes become their parts; nothing becomes HTML. */
+function renderRich(container, text, serverId) {
+  const pattern = /(https?:\/\/[^\s]+|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|@[a-zA-Z0-9_.-]{2,32}|:[a-zA-Z0-9_]{2,30}:)/g;
   let last = 0;
   let m;
   const source = String(text || '');
@@ -71,27 +71,73 @@ function renderRich(container, text) {
     else if (/^`/.test(token)) container.appendChild(el('code', { class: 'm-code' }, token.slice(1, -1)));
     else if (/^\*\*/.test(token)) container.appendChild(el('strong', {}, token.slice(2, -2)));
     else if (/^\*/.test(token)) container.appendChild(el('em', {}, token.slice(1, -1)));
+    else if (/^:.*:$/.test(token)) {
+      // The community's own short code becomes its picture; a code nobody
+      // named stays exactly the words that were typed.
+      const found = emojiOf(serverId, token.slice(1, -1));
+      if (found) {
+        container.appendChild(el('img', {
+          class: 'm-msg__emoji', src: found.url, alt: token, title: token,
+          draggable: 'false', loading: 'lazy',
+        }));
+      } else {
+        container.appendChild(document.createTextNode(token));
+      }
+    }
     else container.appendChild(el('span', { class: 'm-mention' }, token));
     last = m.index + token.length;
   }
   if (last < source.length) container.appendChild(document.createTextNode(source.slice(last)));
 }
 
-async function attachmentNode(att) {
+// One attachment of a message, on the phone. A picture is its own tile; a
+// document is a row. A long press offers the things a file can be asked for -
+// open, address - and, on a message this reader did not write, a report: the
+// report freezes the file and its author, not just the words around it.
+async function attachmentNode(att, context) {
   const url = await mediaUrl(att.url || ('/api/attachments/' + att.id));
   const kind = String(att.content_type || att.contentType || '');
   const name = att.filename || 'Attachment';
   // A picture is shown as a picture: its own tile, at the size a phone reads
   // it, with the name for the reader who cannot see it. A document keeps the
   // row with its name and size.
-  if (kind.indexOf('image/') === 0) {
-    return el('div', { class: 'm-msg__image' },
-      el('img', { src: url, alt: name, loading: 'lazy' }));
-  }
-  return el('a', { class: 'm-msg__file', href: url, target: '_blank', rel: 'noopener noreferrer' },
+  const isImage = kind.indexOf('image/') === 0;
+  const node = isImage
+    ? el('div', { class: 'm-msg__image' }, el('img', { src: url, alt: name, loading: 'lazy' }))
+    : el('button', {
+      class: 'm-msg__file', type: 'button',
+      onClick: () => { window.open(url, '_blank', 'noopener,noreferrer'); },
+    },
     icon('hard-drive', { size: 16 }),
     el('span', { class: 'truncate' }, name),
     att.size ? el('span', { class: 'muted' }, fileSize(att.size)) : null);
+
+  const ctx = context || {};
+  const message = ctx.message;
+  if (att.id && message && !ctx.mine && !message.pending) {
+    attachLongPress(node, () => [
+      { label: 'Open the file', icon: 'external', onClick: () => { window.open(url, '_blank', 'noopener,noreferrer'); } },
+      { label: 'Copy the address', icon: 'copy', onClick: async () => {
+        try { await navigator.clipboard.writeText(new URL(url, location.origin).href); toast('Copied', { type: 'success' }); }
+        catch { toast('This device will not copy.', { type: 'danger' }); }
+      } },
+      {
+        label: isImage ? 'Report image' : 'Report the file',
+        icon: 'flag',
+        onClick: () => reportSheet({
+          title: 'Report ' + name,
+          who: message.authorDisplay || message.authorName || 'its author',
+          payload: (reason, description) => ({
+            targetType: 'attachment',
+            targetId: att.id,
+            serverId: ctx.serverId || undefined,
+            reason, description,
+          }),
+        }),
+      },
+    ]);
+  }
+  return node;
 }
 
 function embedNode(card) {
@@ -99,8 +145,17 @@ function embedNode(card) {
   if (card.siteName || card.site_name) body.appendChild(el('div', { class: 'm-embed__site' }, card.siteName || card.site_name));
   if (card.title) body.appendChild(el('div', { class: 'm-embed__title' }, card.title));
   if (card.description || card.desc) body.appendChild(el('p', { class: 'm-embed__desc' }, card.description || card.desc));
-  const image = card.image || card.imageUrl || card.image_url;
-  if (image) {
+
+  // A preview the server could not describe shows the link text only.
+  if (card.status !== 'ok') return body;
+
+  const image = card.imageUrl || card.image_url || card.image;
+  const video = card.videoUrl || card.video_url || card.video;
+  if (video) {
+    const holder = el('div', { class: 'm-embed__media' });
+    mediaUrl(video).then((src) => { if (src) holder.appendChild(el('video', { src, controls: true, preload: 'none', playsinline: true, alt: '', loading: 'lazy' })); }).catch(() => {});
+    body.appendChild(holder);
+  } else if (image) {
     const holder = el('div', { class: 'm-embed__media' });
     mediaUrl(image).then((src) => { if (src) holder.appendChild(el('img', { src, alt: '', loading: 'lazy' })); }).catch(() => {});
     body.appendChild(holder);
@@ -132,6 +187,16 @@ export function renderConversation(context, scope) {
   let loadingOlder = false;
   let replyTo = null;
   const offs = [];
+
+  // The community's emojis are part of what the words show, so the list is
+  // asked for when the room opens and the rows repaint when it lands. A
+  // conversation carries no community, and short codes there stay words.
+  if (!isDm && scope.serverId) {
+    Promise.resolve(refreshServerEmojis(scope.serverId)).catch(() => { /* the words read as text */ });
+    offs.push(onStore('emojis', (event) => {
+      if (String(event.serverId) === String(scope.serverId)) paint();
+    }));
+  }
 
   function find(id) { return rows.get(String(id)); }
   function findSeq(seq) {
@@ -224,13 +289,17 @@ export function renderConversation(context, scope) {
       body.appendChild(el('div', { class: 'm-msg__note' }, 'Sealed for another key — this device cannot open it.'));
     } else if (message.content) {
       const words = el('div', { class: 'm-msg__body' });
-      renderRich(words, message.content);
+      renderRich(words, message.content, isDm ? null : scope.serverId);
       body.appendChild(words);
     }
 
     const files = el('div', { class: 'm-msg__files' });
     for (const att of message.attachments || []) {
-      attachmentNode(att).then((n) => { files.appendChild(n); }).catch(() => {});
+      attachmentNode(att, {
+        message,
+        mine,
+        serverId: isDm ? null : (scope.serverId || null),
+      }).then((n) => { files.appendChild(n); }).catch(() => {});
     }
     if (message.attachments && message.attachments.length) body.appendChild(files);
 
@@ -245,10 +314,17 @@ export function renderConversation(context, scope) {
     if ((message.reactions || []).length) {
       const bar = el('div', { class: 'm-msg__reactions' });
       for (const reaction of message.reactions) {
+        // A community's short code becomes its picture; a code nobody named,
+        // or a unicode feeling, stays the characters it is.
+        const code = typeof reaction.emoji === 'string' ? reaction.emoji.match(/^:[a-zA-Z0-9_]{2,30}:$/) : null;
+        const found = code ? emojiOf(isDm ? null : scope.serverId, reaction.emoji.slice(1, -1)) : null;
+        const face = found
+          ? el('img', { class: 'm-msg__emoji', src: found.url, alt: reaction.emoji, title: reaction.emoji, draggable: 'false', loading: 'lazy' })
+          : document.createTextNode(reaction.emoji);
         bar.appendChild(el('button', {
           class: 'm-msg__reaction', type: 'button', 'aria-pressed': reacted(reaction.emoji) ? 'true' : 'false',
           onClick: () => toggleReaction(message, reaction.emoji),
-        }, reaction.emoji + ' ' + (reaction.count || (reaction.users || []).length || 1)));
+        }, face, ' ' + (reaction.count || (reaction.users || []).length || 1)));
       }
       body.appendChild(bar);
     }
@@ -315,26 +391,17 @@ export function renderConversation(context, scope) {
 
   async function toggleReaction(message, emoji) {
     try {
-      if (isDm) {
-        const had = (message.reactions || []).some((r) => r.emoji === emoji
-          && ((r.me === true) || (r.users || []).some((u) => String(u) === String(State.user.id))));
-        if (had) await Api.unreactDm(scope.id, message.id, emoji);
-        else await Api.reactDm(scope.id, message.id, emoji);
-      } else {
-        const had = (message.reactions || []).some((r) => r.emoji === emoji
-          && ((r.me === true) || (r.users || []).some((u) => String(u) === String(State.user.id))));
-        if (had) await Api.unreactChannel(scope.id, message.id, emoji);
-        else await Api.reactChannel(scope.id, message.id, emoji);
-      }
-      const fresh = isDm ? await Api.dmMessages(scope.id, { limit: 40 }) : await Api.messages(scope.id, { limit: 40 });
-      const opened = await encrypted.readRows(Array.isArray(fresh) ? fresh : [], scope.id);
-      for (const raw of opened) {
-        const message_0 = normalizeMessage(raw);
-        if (message_0 && (message_0.id === message.id || (rows.get(String(message_0.id)) || {}).seq === message_0.seq)) {
-          const known = rows.get(String(message_0.id));
-          if (known) known.reactions = message_0.reactions;
-        }
-      }
+      const had = (message.reactions || []).some((r) => r.emoji === emoji
+        && ((r.me === true) || (r.users || []).some((u) => String(u) === String(State.user.id))));
+      // The answer carries the message's whole summary, so the chip is
+      // repainted from what the server wrote rather than a page refetched.
+      const out = isDm
+        ? (had ? await Api.unreactDm(scope.id, message.id, emoji)
+               : await Api.reactDm(scope.id, message.id, emoji))
+        : (had ? await Api.unreactChannel(scope.id, message.id, emoji)
+               : await Api.reactChannel(scope.id, message.id, emoji));
+      const known = find(message.id) || message;
+      if (out && out.reactions) known.reactions = out.reactions;
       paint();
     } catch (e) { failed(e); }
   }
@@ -627,14 +694,26 @@ export function renderConversation(context, scope) {
         const known = find(frame.messageId);
         if (known) { known.embeds = frame.embeds || []; paint(); }
       }));
+      offs.push(realtime.on(EVENTS.DM_MESSAGE_REACTION, (frame) => {
+        if (String(frame.conversationId) !== String(scope.id)) return;
+        const known = find(frame.id);
+        if (known) { known.reactions = frame.reactions || []; paint(); }
+      }));
     } else {
-      offs.push(realtime.on(EVENTS.MESSAGE, (frame) => { if (String(frame.channelId) === String(scope.id)) openFrame(frame); }));
-      offs.push(realtime.on(EVENTS.MESSAGE_UPDATED, (frame) => { if (String(frame.channelId) === String(scope.id)) openFrame(frame); }));
-      offs.push(realtime.on(EVENTS.MESSAGE_DELETED, (frame) => { if (String(frame.channelId) === String(scope.id)) remove(frame.id); }));
+      offs.push(realtime.on(EVENTS.MESSAGE, (frame) => { if (String(frame.channel_id || frame.channelId) === String(scope.id)) openFrame(frame); }));
+      offs.push(realtime.on(EVENTS.MESSAGE_UPDATED, (frame) => { if (String(frame.channel_id || frame.channelId) === String(scope.id)) openFrame(frame); }));
+      offs.push(realtime.on(EVENTS.MESSAGE_DELETED, (frame) => { if (String(frame.channel_id || frame.channelId) === String(scope.id)) remove(frame.id); }));
       offs.push(realtime.on(EVENTS.MESSAGE_EMBEDS, (frame) => {
-        if (String(frame.channelId) !== String(scope.id)) return;
+        if (String(frame.channel_id || frame.channelId) !== String(scope.id)) return;
         const known = find(frame.messageId);
         if (known) { known.embeds = frame.embeds || []; paint(); }
+      }));
+      // A feeling travels with the message's whole summary, so the chip is
+      // repainted from one row of truth whoever pressed it.
+      offs.push(realtime.on(EVENTS.MESSAGE_REACTION, (frame) => {
+        if (String(frame.channel_id || frame.channelId) !== String(scope.id)) return;
+        const known = find(frame.id);
+        if (known) { known.reactions = frame.reactions || []; paint(); }
       }));
       // A pin is a fact about the room: the row is told at once, whoever
       // pinned it.

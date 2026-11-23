@@ -86,11 +86,12 @@ async function create({ serverId, ownerUserId, name, description, iconUrl, scope
 async function setCredential(applicationId, serverId, { scopes, rateLimitPerMinute } = {}) {
   const app = await bots.getApp(applicationId, serverId);
   if (!app) return null;
-  const granted = normaliseScopes(scopes);
   const existing = await db.get(
     'SELECT * FROM developer_api_keys WHERE bot_application_id = ? AND status = ?',
     [app.id, 'active']
   );
+  const carried = existing ? apiKeys.readScopes(existing.scopes) : [];
+  const granted = scopes === undefined ? carried : normaliseScopes(scopes);
   if (existing) {
     const limit = apiKeys.clampRateLimit(rateLimitPerMinute === undefined
       ? existing.rate_limit_per_minute

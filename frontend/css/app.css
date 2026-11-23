@@ -1804,6 +1804,14 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 /* The emoji face of a reaction chip: sized to the chip, not the author text. */
 .msg-reaction-emoji { line-height: 1; font-size: var(--fs-sm); }
 
+/* A community's own emoji, inline with the words or as a reaction chip's face:
+   sized from the text around it, so a sentence keeps its rhythm and a chip
+   stays one line tall. */
+.msg-emoji {
+  display: inline-block; width: auto; height: 1.45em;
+  vertical-align: -0.3em; border-radius: 3px;
+}
+
 /* Composer furniture: the two icon buttons flanking the field, and the strip
    that names an open reply, edit or attachment. */
 .iconbtn {
@@ -2216,6 +2224,18 @@ code, kbd, pre, samp { font-family: var(--mono); font-size: 0.9em; }
 .settings-image-field { display: flex; flex-direction: column; gap: 10px; }
 .settings-image-tools { display: flex; align-items: center; gap: 10px; }
 .settings-image-field .form-error { margin: 0; }
+
+/* The emojis a community has named: the picture at the row's head, and the
+   one question a manager answers above the list. */
+.settings-emoji-thumb {
+  width: 34px; height: 34px; object-fit: contain; flex: none;
+  border-radius: var(--radius-sm);
+  background: var(--panel-3); border: 1px solid var(--line-2);
+}
+.emoji-upload { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.emoji-upload .input { flex: 1 1 180px; min-width: 0; }
+.emoji-upload .input--file { flex: 2 1 240px; }
+.emoji-upload .btn { flex: none; }
 
 .settings-item {
   display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;

@@ -192,7 +192,14 @@ function corsDelegate(policy) {
     if (origin && req.headers.host && sameHostOf(origin, req.headers.host)) {
       return cb(null, { origin: true, credentials: policy.credentials });
     }
-    policy.origin(origin, cb);
+    // Everything else is the policy's own decision, so the policy's origin
+    // function is handed through inside the options object cors asks for.
+    // Calling it here and passing its answer as the options - `true` for
+    // allowed, `false` for refused - was read by the assign that builds the
+    // per-request options as "no origin configured", which is cors's
+    // wildcard: the refusal path answered every stranger the same header it
+    // answered the dashboard.
+    cb(null, { origin: policy.origin, credentials: policy.credentials });
   };
 }
 
