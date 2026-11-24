@@ -13,9 +13,8 @@
 // So the question asked here is the one that was missing: does every section
 // actually draw something? A section that returns an empty container fails.
 //
-// The second half asks the other half of the directive: the phone carries
-// the same sections, and a section that is only on the desktop is a section
-// the phone does not have.
+// The second half checks the same sections on the phone: a section that is
+// only on the desktop is a section the phone does not have.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

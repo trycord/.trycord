@@ -98,7 +98,7 @@ backend/shots/
 .env.bak.*
 
 # Local red-team findings handoff. Untracked on purpose: it is a working
-# document for the developer AI on this machine, not a public advisory.
+# document kept on this machine, not a public advisory.
 # Publishing it would disclose live vulnerabilities.
 /REDTEAM-FINDINGS.md
 
@@ -115,9 +115,9 @@ backend/tmp/
 /frontend/.browser-harness/
 /frontend/.browser-harness.html
 
-# Instructions written for any local AI that reads and works on this
-# repository. They carry truths about this machine and its limits that do not
-# belong in a public repository, so they stay out of every commit.
+# Local working instructions. They carry truths about this machine and its
+# limits that do not belong in a public repository, so they stay out of every
+# commit.
 /INSTRUCTIONS.MD
 /instructions.md
 /AGENTS.md

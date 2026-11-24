@@ -1,6 +1,6 @@
 // The social surface, end to end.
 //
-// This is the workflow the V10 directive names: a profile answers only when
+// This workflow checks that a profile answers only when
 // the pair is allowed to see it, a friendship moves through request,
 // acceptance, notification and removal, a direct conversation carries names,
 // roles, invitations, pins and search, and a notification is one row the

@@ -1,7 +1,6 @@
 // Communities, categories, channels, roles and the people in them.
 //
-// These are the things a member touches first, and the things the directive
-// names as having to be complete: creating a community, organising it into
+// These are the things a member touches first: creating a community, organising it into
 // categories and channels, putting people in it, and being refused when you
 // are not allowed.
 //

@@ -36,7 +36,7 @@ The alternatives, and why they were not chosen:
 | --- | --- |
 | **Capacitor** | A genuine native *application* — a native shell, native plugins, native build artefacts, store distribution — but the interface is web content in a webview. The repository already has a strong, purpose-built mobile web module at `frontend/mobile/`. Wrapping that, or wrapping a desktop client, would have produced a second skin for something that already exists rather than a second client. |
 | **Kotlin Multiplatform / Compose Multiplatform** | The strongest fit for "independent native experience", and genuinely native on both. It is also a much larger surface to author correctly, with no toolchain here to check any of it: a Compose Multiplatform project with an iOS target, a shared domain module, expect/actual platform modules and a Compose navigation graph would be several times this code, with a much higher chance of shipping something that does not compile. React Native is the choice that is most likely to be correct and runnable the first time it meets a toolchain. |
-| **A second web client** | Explicitly excluded by the directive, and already covered by `frontend/mobile/`. |
+| **A second web client** | Already covered by `frontend/mobile/`; it would be a second skin for the same client. |
 
 **The trade-off, stated plainly:** React Native renders its own view layer
 through a bridge (or, from 0.76, through the New Architecture's synchronous
