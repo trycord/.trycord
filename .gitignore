@@ -120,3 +120,27 @@ backend/tmp/
 # belong in a public repository, so they stay out of every commit.
 /INSTRUCTIONS.MD
 /instructions.md
+/AGENTS.md
+/GITIGNORETHIS-REQUIREMENTS.md
+/MASTER_DIRECTIVE.md
+/prompt.md
+/UI_REBUILD_PROGRESS.md
+/IMPLEMENTATION_PLAN.md
+/IMPLEMENTATION_STATE.md
+/IMPLEMENTATION_STATUS.md
+/progress.md
+/reports.md
+/kilo.jsonc
+
+# One-off work reports and progress logs. These describe a single work session,
+# not the product, and were repeatedly swept into commits by `git add -A`.
+/backend/progress.md
+/public/CSS-REPAIR-REPORT.md
+/public/DESIGN-REVIEW.md
+/public/V10-AUDIT-REPORT.md
+
+# Editor and tool backup files. Anchored to the extension so no source file is
+# accidentally ignored.
+*.bak
+*.orig
+*.rej

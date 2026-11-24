@@ -182,7 +182,7 @@ matter most, and what each is for:
 | `docs/extensions.md` | The extension model, the capability grants, and what the sandbox does and does not do |
 | `docs/api/` | The developer platform: the versioned surface, the scopes, the events |
 | `docs/audit/` | The security, licensing and performance reviews, each finding marked verified or read |
-| `docs/release/3.0/` | The 3.0 release records: the capability inventory, the plan, the state, the test log, the decisions, the migration notes |
+| `docs/release/3.0/MIGRATION_NOTES.md` | Operator notes for upgrading an existing instance to 3.0 |
 
 ## Deployment
 
