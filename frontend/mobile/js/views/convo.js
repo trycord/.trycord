@@ -32,8 +32,12 @@ function normalizeMessage(raw) {
     createdAt: raw.createdAt || raw.created_at,
     editedAt: raw.editedAt || raw.edited_at || null,
     authorId: group ? raw.authorId : (raw.authorId || raw.author_id),
-    authorName: group ? raw.authorName : (raw.authorName || raw.username || raw.user),
-    authorDisplay: group ? (raw.authorDisplay || raw.authorName) : (raw.authorDisplay || raw.display_name || raw.user),
+    authorName: group
+      ? (raw.authorName || raw.author_name)
+      : (raw.authorName || raw.author_name || raw.username || raw.user),
+    authorDisplay: group
+      ? (raw.authorDisplay || raw.author_display || raw.authorName || raw.author_name)
+      : (raw.authorDisplay || raw.author_display || raw.displayName || raw.display_name || raw.user),
     authorAvatar: raw.authorAvatar || raw.author_avatar || null,
     authorIsBot: !!(raw.authorIsBot || raw.author_is_bot),
     replyCount: raw.replyCount || raw.reply_count || 0,
@@ -777,7 +781,7 @@ export function renderConvo(ctx) {
   const isDm = ctx.page.id === 'dms.conversation';
   const scope = isDm
     ? { kind: 'dm', id: ctx.conversationId || ctx.params.id }
-    : { kind: 'channel', id: (channel || {}).id || ctx.params.channel, serverId: ctx.serverId, placeholder: channel ? 'Say something in ' + channel.name : 'Say something' };
+    : { kind: 'channel', id: (channel || {}).id || ctx.params.channel, serverId: ctx.serverId, placeholder: 'Say something' };
 
   if (!isDm && channel && (channel.type === 'voice' || channel.type === 'stage')) {
     return voiceRoom(channel, ctx.serverId);

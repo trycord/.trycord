@@ -318,9 +318,9 @@ button.m-row:hover, .m-row[role="menuitem"]:hover { background: var(--m-card-2);
 .m-embeds { display: grid; gap: 6px; margin-top: 6px; }
 
 .m-send, .m-send-slot { display: flex; align-items: flex-end; gap: 8px; padding: var(--tc-space-2) var(--m-pad)
-  calc(var(--tc-space-2) + env(safe-area-inset-bottom, 0px)); background: var(--m-deep); border-top: 1px solid var(--m-line); }
-.m-send__field { flex: 1; min-width: 0; display: grid; gap: 6px; }
-.m-send__input { width: 100%; min-height: 42px; max-height: 132px; padding: 10px 12px;
+  calc(var(--m-bar-h) + var(--tc-space-2) + env(safe-area-inset-bottom, 0px)); background: var(--m-deep); border-top: 1px solid var(--m-line); }
+.m-send__field { flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 8px; }
+.m-send__input { flex: 1; width: 100%; min-height: 42px; max-height: 132px; padding: 10px 12px;
   background: var(--m-card); border: 1px solid var(--m-line); border-radius: var(--tc-radius-lg);
   resize: none; outline: none; line-height: 1.4; }
 .m-send__input:focus { border-color: var(--m-brand-line); }

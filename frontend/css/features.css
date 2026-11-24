@@ -101,13 +101,13 @@
 .conversation-empty, .conversation-system, .friendtile-tools, .placecard-go { color: var(--ink-2); font-size: var(--fs-sm); }
 .conversation-empty-subtext { color: var(--ink-3); }
 .conversation-browser { display: grid; gap: var(--tc-space-2); }
-.friendtile-main, .placecard-main { min-width: 0; flex: 1; }
+.friendtile-main, .placecard-main { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .placecard--federated { border: 1px dashed var(--line); }
 .placelist, .peoplegrid, .requestlist { display: grid; gap: var(--tc-space-2); }
-.quickcard { padding: var(--tc-space-4); display: grid; gap: var(--tc-space-2); }
-.quickcard-glyph { color: var(--brand); }
+.quickcard { padding: var(--tc-space-3) var(--tc-space-4); display: flex; align-items: center; gap: var(--tc-space-3); }
+.quickcard-glyph { color: var(--brand); flex: none; }
 .quickcard-label { font-weight: 750; }
-.quickcard-go { color: var(--brand-hover); font-size: var(--fs-sm); }
+.quickcard-go { color: var(--brand-hover); font-size: var(--fs-sm); margin-left: auto; }
 
 /* --- communities and profile ------------------------------------------------ */
 
@@ -116,8 +116,9 @@
 }
 .community-identity--link:hover { text-decoration: none; }
 .community-identity__mark, .settings-profile-face { flex: none; }
-.community-identity__name, .profile-name { font-size: var(--fs-xl); }
-.community-identity__about, .community-identity__words, .profile-status, .profile-presence-note { color: var(--ink-2); font-size: var(--fs-sm); }
+.community-identity__words { display: grid; gap: 2px; min-width: 0; color: var(--ink-2); font-size: var(--fs-sm); }
+.community-identity__name, .profile-name { font-size: var(--fs-xl); color: var(--ink); }
+.community-identity__about, .profile-status, .profile-presence-note { color: var(--ink-2); font-size: var(--fs-sm); }
 .profile-nameblock { display: grid; }
 .profile-presence, .profile-presence-line { display: flex; align-items: center; gap: 6px; }
 .profile-roles { display: flex; flex-wrap: wrap; gap: 4px; }

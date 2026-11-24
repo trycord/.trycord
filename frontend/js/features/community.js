@@ -27,7 +27,6 @@ import { communitySettingsSections } from './communitySettings.js';
 import { roleDot, roleColourField, memberRoleDot, roleChips } from '../../packages/roles.js';
 import { renderVoiceRoom } from '../voice/room.js';
 import { errorToast, toast, openDialog } from '../ui/overlays.js';
-import { communityIdentity } from '../ui/communityIdentity.js';
 
 function renderSettingsSection(ctx, section) {
   const table = communitySettingsSections();
@@ -76,8 +75,6 @@ export function renderChannelView(ctx) {
     return head({
       // Which community this is. The channel is where the conversation is, and
       // the community is the place it happens, so the place says its name.
-      identity: communityIdentity(server),
-      kicker: server.name,
       title: channelTitlePrefix + (channel ? channel.name : 'channel'),
       lede: channel && channel.topic
         ? channel.topic
@@ -241,11 +238,9 @@ export function renderChannelView(ctx) {
   const pinsHost = el('div', { class: 'rowlist' });
 
   const pinsPage = el('div', { class: 'convo-page' },
-    el('div', { class: 'convo-scroll fold fold--tight' },
-      makeHead(),
-      pinsHost));
+    el('div', { class: 'convo-scroll fold fold--tight' }, pinsHost));
   const page = el('div', { class: 'convo-page' },
-    el('div', { class: 'convo-scroll' }, makeHead(), surface.node),
+    el('div', { class: 'convo-scroll' }, surface.node),
     surface.typing,
     surface.composer.node);
   const host = el('div', { class: 'convo-host' }, page);
@@ -340,6 +335,7 @@ export function renderChannelView(ctx) {
 
   return {
     node: isPins ? pinsPage : host,
+    head: makeHead(),
     inspector,
     onMount: open,
     cleanup() {
