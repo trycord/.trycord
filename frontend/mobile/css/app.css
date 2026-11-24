@@ -557,3 +557,80 @@ button.m-me:hover { border-color: var(--m-brand-line); }
 @keyframes m-toast-in { from { opacity: 0; transform: translateY(10px); } }
 .m-avatar, .avatar { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--m-ink) 7%, transparent); }
 * { scrollbar-width: none; }
+
+
+/* --- the Trycord skin: phone ----------------------------------------------- */
+
+:root {
+  --tc-bg: #111318;
+  --tc-bg-deep: #0B0C10;
+  --tc-surface: #1A1D24;
+  --tc-surface-hover: #242832;
+  --tc-border: #2B303B;
+  --tc-text: #F4F3F0;
+  --tc-text-muted: #9BA2B0;
+  --tc-radius-sm: 7px;
+  --tc-radius-md: 11px;
+  --tc-radius-lg: 15px;
+  --tc-radius-xl: 20px;
+}
+
+[data-theme="light"] {
+  --tc-bg: #F2F3F6;
+  --tc-bg-deep: #FFFFFF;
+  --tc-surface: #FFFFFF;
+  --tc-surface-hover: #E8EAF0;
+  --tc-border: #DDE0E7;
+  --tc-text: #1A1C22;
+  --tc-text-muted: #646A76;
+}
+
+:focus-visible { outline: 2px solid var(--tc-brand-focus); outline-offset: 2px; }
+
+.m-bar {
+  background: linear-gradient(180deg, var(--m-deep) 0%, var(--m-bg) 100%);
+  border-bottom: 1px solid var(--m-line);
+}
+.m-bar__title { font-weight: 800; letter-spacing: -0.02em; }
+.m-bar__mark { border-radius: 11px; }
+.m-bar__btn { border-radius: 11px; }
+
+.m-screen { padding-bottom: calc(var(--m-bar-h) + 56px); }
+.m-msg {
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 9px;
+  padding: 6px 12px;
+  border-radius: 12px;
+}
+.m-msg + .m-msg { margin-top: 2px; }
+.m-msg__author { font-size: 12.5px; }
+.m-msg__body { font-size: 13px; line-height: 1.45; }
+.m-avatar, .avatar { border-radius: 10px; }
+.m-avatar--rounded, .avatar--rounded { border-radius: 50%; }
+
+.m-send { background: linear-gradient(180deg, var(--m-bg), var(--m-deep)); }
+.m-send__input {
+  border-radius: 14px;
+  background: var(--m-card-2);
+  border-color: transparent;
+}
+.m-send__input:focus { background: var(--m-card); border-color: var(--m-brand-line); }
+.m-send__go {
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--tc-brand-hover), var(--m-brand));
+}
+.m-send__attach { border-radius: 12px; color: var(--m-ink-2); }
+
+.m-doors {
+  background: linear-gradient(180deg, var(--m-deep), color-mix(in srgb, var(--m-deep) 96%, var(--m-ink) 4%));
+  border: 1px solid var(--m-line);
+  border-radius: 20px;
+  padding: 6px 4px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 30%);
+}
+.m-door { border-radius: 14px; }
+.m-go--quiet { box-shadow: none; }
+
+.m-card { border-radius: 16px; border: 1px solid var(--m-line); }
+.m-input, .m-area { border-radius: 12px; }
+

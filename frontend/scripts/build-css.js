@@ -42,6 +42,7 @@ const LAYERS = [
   'shell.css',
   'features.css',
   'entry.css',
+  'design.css',
 ];
 
 // The public website is the same product with the same brand. It carries no palette
